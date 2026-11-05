@@ -10,6 +10,8 @@ import {
 } from 'react-leaflet';
 import { AlertTriangle } from 'lucide-react';
 import { Switch } from '../ui/index.js';
+import { useBasemapProxy } from '../ui/BasemapContext.js';
+import { basemapProxyUrl } from '../api/client.js';
 import { KENGERI_AOI, REAL_WORLD_FEATURES } from '../lib/realWorldData.js';
 import '../styles/studio/mapviews.css';
 
@@ -68,6 +70,10 @@ export default function GeographicMapCanvas({
   const theme = useThemeName();
   const P = useMemo(readPalette, [theme]);
   const tileStyle = theme === 'day' ? 'light_all' : 'dark_all';
+  const proxy = useBasemapProxy();
+  const tileUrl = proxy
+    ? basemapProxyUrl(theme === 'day' ? 'light' : 'dark')
+    : `https://{s}.basemaps.cartocdn.com/${tileStyle}/{z}/{x}/{y}{r}.png`;
 
   return (
     <div className='stu-geo'>
@@ -85,7 +91,7 @@ export default function GeographicMapCanvas({
         {basemapOn && !tileError && (
           <TileLayer
             key={tileStyle}
-            url={`https://{s}.basemaps.cartocdn.com/${tileStyle}/{z}/{x}/{y}{r}.png`}
+            url={tileUrl}
             subdomains='abcd'
             maxZoom={19}
             eventHandlers={{

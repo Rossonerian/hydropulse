@@ -5,6 +5,7 @@ import './styles/base.css';
 import './styles/ops/shell.css';
 
 import AppShell from './components/AppShell.jsx';
+import { BasemapProxyContext } from './ui/BasemapContext.js';
 import ControlPanel from './components/ControlPanel.jsx';
 import MapCanvas from './components/MapCanvas.jsx';
 import Terrain3DViewer from './components/Terrain3DViewer.jsx';
@@ -362,6 +363,7 @@ export default function App() {
   }
 
   return (
+    <BasemapProxyContext.Provider value={!!health?.basemap_proxy}>
     <AppShell
       customData={customData}
       onDataSource={openDataSource}
@@ -546,5 +548,6 @@ export default function App() {
         </Suspense>
       }
     />
+    </BasemapProxyContext.Provider>
   );
 }
