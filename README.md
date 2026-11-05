@@ -3,6 +3,8 @@
 **Software-Only Municipal Hydraulic Digital Twin for Pipe Burst Triangulation**
 *Lakshya 2026 @ SJBIT Bengaluru Â· Track 02: Smart and Sustainable Future*
 
+**Documentation:** see [`docs/README.md`](docs/README.md) for the index of planning, deployment and run-of-show docs.
+
 ---
 
 ## 1. Project Overview
@@ -150,7 +152,7 @@ make fixtures
 make snapshot
 ```
 
-For production Linux setup, environment variables (`.env.example`), security hardening, OpenRouter configuration, and Docker container packaging, see **[`DEPLOYMENT.md`](DEPLOYMENT.md)**.
+For production Linux setup, environment variables (`.env.example`), security hardening, OpenRouter configuration, and Docker container packaging, see **[`DEPLOYMENT.md`](docs/DEPLOYMENT.md)**.
 
 ---
 
@@ -158,4 +160,4 @@ For production Linux setup, environment variables (`.env.example`), security har
 
 - **CORS Errors**: Always access the UI via `http://localhost:5173` (or configure `HYDROPULSE_CORS_ORIGINS` in production).
 - **Port Conflicts**: Ensure port 8000 (backend) and 5173 (frontend) are free before launching.
-- **Offline Venue Setup**: See `RUN_OF_SHOW.md` for full instructions to run HydroPulse completely offline without an internet connection.
+- **Offline Venue Setup**: See `docs/RUN_OF_SHOW.md` for full instructions to run HydroPulse completely offline without an internet connection.

@@ -1,0 +1,40 @@
+# Dev-tooling configuration only. HydroPulse is not packaged from this file.
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+exclude = [".venv", "frontend", "node_modules"]
+
+[tool.ruff.lint]
+# Syntax errors + pyflakes only for now; widen gradually.
+select = ["E9", "F"]
+
+[tool.pytest.ini_options]
+# tests/test_contract.py needs a running server (see `make test-live`), so it is
+# deliberately left out of testpaths. Keep this list in sync with backend-ci.yml.
+testpaths = ["backend/tests", "tests/test_data_utils.py", "tests/test_mock_fixtures.py"]
+addopts = "-q"
+markers = [
+    "live: needs a running HydroPulse server (BASE_URL); not part of the default run",
+]
+
+[tool.mypy]
+# Lenient and informational; not enforced in CI.
+python_version = "3.11"
+ignore_missing_imports = true
+check_untyped_defs = false
+warn_unused_ignores = false
+
+# Baseline: pre-existing pyflakes findings, deliberately not fixed in the tooling change.
+# Remove entries as the code is cleaned up.
+[tool.ruff.lint.per-file-ignores]
+"backend/hydraulic_engine.py" = ["F401"]
+"backend/iot_manager.py" = ["F401"]
+"backend/main.py" = ["F401"]
+"backend/network_builder.py" = ["F401"]
+"backend/scenario_engine.py" = ["F401"]
+"backend/tests/test_deployment_readiness.py" = ["F811"]
+"backend/tests/test_part2_features.py" = ["F401", "F841"]
+"data_utils/build_presets.py" = ["F401"]
+"data_utils/make_mock_fixtures.py" = ["F401"]
+"tests/test_contract.py" = ["F401", "F841"]
