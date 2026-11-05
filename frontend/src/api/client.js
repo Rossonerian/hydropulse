@@ -7,12 +7,13 @@ const timeout = 4000;
 const mockFiles = __HYDROPULSE_MOCK_FILES__;
 async function request(path, options = {}) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeout);
+  const { timeoutMs, ...fetchOptions } = options;
+  const timer = setTimeout(() => controller.abort(), timeoutMs ?? timeout);
   try {
     const response = await fetch(`${BASE}${path}`, {
-      ...options,
+      ...fetchOptions,
       signal: controller.signal,
-      headers: { 'Content-Type': 'application/json', ...options.headers },
+      headers: { 'Content-Type': 'application/json', ...fetchOptions.headers },
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
@@ -39,6 +40,24 @@ const mock = async (file) => {
   const payload = jsonStart !== -1 ? text.slice(jsonStart) : text;
   return JSON.parse(payload);
 };
+const LIVE_ONLY_MSG = 'Import needs the live backend';
+// Admin-protected network calls: never fake success offline, map auth/conflict statuses to plain messages.
+async function networkAdminRequest(path, body, adminToken) {
+  if (forced) throw new Error(LIVE_ONLY_MSG);
+  try {
+    return await request(path, {
+      method: 'POST',
+      body: JSON.stringify(body),
+      headers: adminToken ? { 'X-Admin-Token': adminToken } : {},
+      timeoutMs: 30000,
+    });
+  } catch (e) {
+    if (e.status === 401 || e.status === 403) e.message = 'Admin token required or invalid';
+    else if (e.status === 409) e.message = 'Network changed, re-validate';
+    else if (e.status === undefined) e.message = LIVE_ONLY_MSG;
+    throw e;
+  }
+}
 export const client = {
   forcedMock: forced,
   hasMockFile: (file) => mockFiles.includes(file),
@@ -60,4 +79,27 @@ export const client = {
     }),
   isolate: (body) =>
     request('/api/isolate', { method: 'POST', body: JSON.stringify(body) }),
+  importPreview: async ({ format, filename, content, network_name }) => {
+    if (forced) throw new Error(LIVE_ONLY_MSG);
+    const body = { format, filename, content };
+    if (network_name) body.network_name = network_name;
+    try {
+      return await request('/api/network/import/preview', {
+        method: 'POST',
+        body: JSON.stringify(body),
+        timeoutMs: 30000,
+      });
+    } catch (e) {
+      if (e.status === undefined) e.message = LIVE_ONLY_MSG;
+      throw e;
+    }
+  },
+  importCommit: ({ preview_token, expected_network_revision, adminToken }) =>
+    networkAdminRequest(
+      '/api/network/import/commit',
+      { preview_token, expected_network_revision, confirm: true },
+      adminToken,
+    ),
+  resetNetwork: ({ target = 'baseline', adminToken } = {}) =>
+    networkAdminRequest('/api/network/reset', { target, confirm: true }, adminToken),
 };

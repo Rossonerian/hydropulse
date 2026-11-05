@@ -7,9 +7,11 @@ import {
   Moon,
   Menu,
   X,
+  Database,
 } from 'lucide-react';
 import { DataSourceBadge } from '../ui/DataSourceBadge.jsx';
 import { useTheme } from '../ui/useTheme.js';
+import '../styles/ops/import.css';
 
 export default function TopBar({
   view = 'operations',
@@ -20,6 +22,9 @@ export default function TopBar({
   network,
   onHelp,
   onRoi,
+  customData = false,
+  onDataSource,
+  onResetCustom,
 }) {
   const { theme, toggleTheme } = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -99,6 +104,23 @@ export default function TopBar({
 
       {/* Actions (Desktop & Tablet) */}
       <div className="topbar-actions">
+        {customData && (
+          <span className="topbar-custom">
+            Custom data
+            <button type="button" className="topbar-custom__reset" onClick={onResetCustom}>
+              Reset to demo
+            </button>
+          </span>
+        )}
+        <button
+          type="button"
+          className="topbar-btn topbar-source-btn"
+          onClick={onDataSource}
+          title="Change data source"
+        >
+          <Database size={15} />
+          <span>Data source</span>
+        </button>
         <button
           type="button"
           className="topbar-btn"
@@ -185,7 +207,34 @@ export default function TopBar({
             <span><b>{String(numSensors).padStart(2, '0')}</b> sensors</span>
           </div>
 
+          {customData && (
+            <p className="topbar-custom" style={{ margin: 'var(--space-3) var(--space-4)' }}>
+              Custom data
+              <button
+                type="button"
+                className="topbar-custom__reset"
+                onClick={() => {
+                  onResetCustom?.();
+                  setMobileMenuOpen(false);
+                }}
+              >
+                Reset to demo
+              </button>
+            </p>
+          )}
+
           <div className="mobile-menu-actions">
+            <button
+              type="button"
+              className="mobile-action-btn"
+              onClick={() => {
+                onDataSource?.();
+                setMobileMenuOpen(false);
+              }}
+            >
+              <Database size={18} />
+              <span>Data source</span>
+            </button>
             <button
               type="button"
               className="mobile-action-btn"

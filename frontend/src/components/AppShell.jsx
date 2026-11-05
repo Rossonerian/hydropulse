@@ -34,6 +34,11 @@ export default function AppShell({
   incidentPanel,
   pressureCharts,
   studioShell,
+  customData = false,
+  onDataSource,
+  onResetCustom,
+  onReplayTour,
+  extra,
 }) {
   return (
     <main className="app-shell">
@@ -46,6 +51,9 @@ export default function AppShell({
         network={network}
         onHelp={onHelp}
         onRoi={onRoi}
+        customData={customData}
+        onDataSource={onDataSource}
+        onResetCustom={onResetCustom}
       />
 
       {view === 'studio' ? (
@@ -136,7 +144,7 @@ export default function AppShell({
         </div>
       )}
 
-      <HelpModal open={helpOpen} onClose={onHelpClose} />
+      <HelpModal open={helpOpen} onClose={onHelpClose} onReplayTour={onReplayTour} />
       <RoiPanel
         open={roiOpen}
         onClose={onRoiClose}
@@ -154,6 +162,7 @@ export default function AppShell({
         isCached={isCached}
         onClearCache={onClearCache}
       />
+      {extra}
     </main>
   );
 }

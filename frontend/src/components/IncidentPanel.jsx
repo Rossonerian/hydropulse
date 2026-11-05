@@ -124,7 +124,7 @@ export default function IncidentPanel({
         <div className='incident-header'>
           <h2>No active incident</h2>
           <p className='incident-description'>
-            Select a scenario preset or junction to simulate a burst.
+            Pick a leak preset (keys 1, 2, 3) or press Simulate burst to see where it is and how much water it loses.
           </p>
         </div>
       )}

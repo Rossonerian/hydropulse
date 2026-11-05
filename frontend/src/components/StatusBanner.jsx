@@ -51,7 +51,7 @@ function StatusBanner({
         <AlertTriangle size={16} aria-hidden="true" />
         <span>
           <b>Backend offline:</b> {sourceLabel}
-          {formattedTime && ` (last valid update: ${formattedTime})`}
+          {formattedTime && ` (last valid update: ${formattedTime})`}. You can keep exploring with offline demo data; results are recorded or generated, not live.
         </span>
         <div className="status-banner-actions" style={{ display: 'flex', gap: '8px', marginLeft: 'auto' }}>
           {onRetry && (
