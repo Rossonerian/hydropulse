@@ -252,16 +252,16 @@ def load_config(environ: dict[str, str] | None = None) -> BackendConfig:
     ).strip()
     openrouter_api_key = openrouter_key_raw if openrouter_key_raw else None
     openrouter_model = (
-        (env_map.get("HYDROPULSE_OPENROUTER_MODEL") or env_map.get("OPENROUTER_MODEL") or "meta-llama/llama-3.3-70b-instruct:free").strip()
-        or "meta-llama/llama-3.3-70b-instruct:free"
+        (env_map.get("HYDROPULSE_OPENROUTER_MODEL") or env_map.get("OPENROUTER_MODEL") or "nvidia/nemotron-3.5-lightning:free").strip()
+        or "nvidia/nemotron-3.5-lightning:free"
     )
     raw_fallbacks = env_map.get("HYDROPULSE_OPENROUTER_FALLBACK_MODELS") or env_map.get("OPENROUTER_FALLBACK_MODELS") or ""
     if raw_fallbacks.strip():
         fallback_models = tuple(m.strip() for o in raw_fallbacks.split(",") if (m := o.strip()))
     else:
         fallback_models = (
-            "qwen/qwen-2.5-72b-instruct:free",
-            "mistralai/mistral-small-3.1-24b-instruct:free",
+            "google/gemma-4-31b-it:free",
+            "google/gemma-4-26b-a4b-it:free",
         )
     openrouter_base_url = (
         (env_map.get("HYDROPULSE_OPENROUTER_BASE_URL") or env_map.get("OPENROUTER_BASE_URL") or "https://openrouter.ai/api/v1").strip().rstrip("/")
