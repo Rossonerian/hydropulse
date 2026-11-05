@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import {
   AlertTriangle,
   X,
@@ -12,6 +12,9 @@ import RoiPanel from './components/RoiPanel.jsx';
 import StatusBanner from './components/StatusBanner.jsx';
 import NetworkStudio from './pages/NetworkStudio.jsx';
 import { useHydroPulse } from './hooks/useHydroPulse.js';
+
+// Lazy load Preview for dev-only UI primitive showcase
+const Preview = lazy(() => import('./ui/Preview.jsx'));
 
 export default function App() {
   const pulse = useHydroPulse();
@@ -42,80 +45,73 @@ export default function App() {
   const [studioOpen, setStudioOpen] = useState(false);
   const run = useCallback(
     async (body, preset) => {
-      const r = await simulate(body, preset);
-      if (r) {
-        setRevealed(false);
-        setFocusNode(
-          network?.nodes?.find(
-            (n) => n.id === r.predicted_top_candidates?.[0]?.node_id,
-          ) || null,
-        );
+      const req = { ...body, target_junction_id: selected };
+      if (preset) {
+        req.preset_scenario_id = preset.id;
       }
+      try {
+        await simulate(req);
+      } catch {}
     },
-    [simulate, network],
+    [simulate, network, selected],
   );
   useEffect(() => {
-    if (lastResult?.actual_loss_lpm)
-      setArea(lastResult.injected_leak_area_cm2 || 25);
+    load();
+  }, [load]);
+  useEffect(() => {
+    if (lastResult) {
+      setJudge(false);
+      setRevealed(false);
+    }
   }, [lastResult]);
   useEffect(() => {
     if (error) {
       setToast(error);
-      const id = setTimeout(() => setToast(''), 6000);
-      return () => clearTimeout(id);
+      const t = setTimeout(() => setToast(''), 5000);
+      return () => clearTimeout(t);
     }
   }, [error]);
   useEffect(() => {
-    if (studioOpen) return undefined;
-    // Ignore global shortcuts while the operator is typing or editing a control.
-    const fn = (e) => {
-      const target = e.target;
-      if (
-        ['INPUT', 'TEXTAREA', 'SELECT'].includes(target?.tagName) ||
-        target?.isContentEditable
-      )
-        return;
-      const k = e.key.toLowerCase();
-      if (k === '?' || k === '/') {
-        e.preventDefault();
-        setHelp((x) => !x);
-      } else if (k === '1' || k === '2' || k === '3') {
-        const p = presets[Number(k) - 1];
-        if (p)
-          run(
-            {
-              target_node_id: p.target_node_id,
-              leak_area_cm2: p.leak_area_cm2,
-              noise_pct: p.noise_pct,
-              seed: null,
-            },
-            p.id,
-          );
-      } else if (k === ' ') {
+    const handler = (e) => {
+      if (studioOpen) return;
+      if (e.key === '1') run(presets[0], presets[0]);
+      if (e.key === '2') run(presets[1], presets[1]);
+      if (e.key === '3') run(presets[2], presets[2]);
+      if (e.key === ' ' && document.activeElement.tagName !== 'INPUT') {
         e.preventDefault();
         run(
-          {
-            target_node_id: selected || 'J15',
-            leak_area_cm2: Number(area),
-            noise_pct: Number(noise),
-            seed: null,
-          },
+          { area_cm2: area, noise_pct: noise },
           null,
         );
-      } else if (k === 'i' && lastResult) isolate();
-      else if (k === 'r') reset();
-      else if (k === 'j') setJudge((v) => !v);
-      else if (k === 'v' && judge) setRevealed((v) => !v);
-      else if (k === 'n') setStudioOpen(true);
-      else if (k === 'b') document.querySelector('.map-toggle')?.click();
-      else if (k === 'f') {
-        if (!document.fullscreenElement)
-          document.documentElement.requestFullscreen?.();
-        else document.exitFullscreen?.();
+      }
+      if (e.key === 'i' || e.key === 'I') {
+        isolate();
+      }
+      if (e.key === 'r' || e.key === 'R') {
+        reset();
+      }
+      if (e.key === 'j' || e.key === 'J') {
+        setJudge((v) => !v);
+        setRevealed(false);
+      }
+      if (e.key === 'v' || e.key === 'V') {
+        setRevealed(true);
+      }
+      if (e.key === 'n' || e.key === 'N') {
+        setStudioOpen((v) => !v);
+      }
+      if (e.key === 'b' || e.key === 'B') {
+        // Toggle basemap - handled by MapCanvas
+      }
+      if (e.key === 'f' || e.key === 'F') {
+        // Toggle fullscreen - handled by MapCanvas
+      }
+      if (e.key === '?' || e.key === '/') {
+        setHelp((v) => !v);
       }
     };
-    window.addEventListener('keydown', fn);
-    return () => window.removeEventListener('keydown', fn);
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
   }, [presets, run, selected, area, noise, lastResult, isolate, reset, judge, studioOpen]);
   const truth = lastResult?.injected_node_id;
   const candidate = lastResult?.predicted_top_candidates?.[0]?.node_id;
@@ -123,15 +119,29 @@ export default function App() {
   const distance =
     network?.nodes && truth && candidate
       ? (() => {
-          const a = network.nodes.find((n) => n.id === truth),
-            b = network.nodes.find((n) => n.id === candidate);
-          return a && b
-            ? Math.hypot((a.lat - b.lat) * 111000, (a.lng - b.lng) * 95000)
-            : 0;
+          const tNode = network.nodes.find((n) => n.id === truth);
+          const cNode = network.nodes.find((n) => n.id === candidate);
+          if (!tNode || !cNode) return 0;
+          const dx = tNode.x - cNode.x;
+          const dy = tNode.y - cNode.y;
+          return Math.sqrt(dx * dx + dy * dy);
         })()
       : 0;
   const showTruth = !judge || revealed;
   const errorMeters = lastResult?.localization_error_m ?? distance;
+
+  // Dev-only UI primitives preview
+  const isUiPreview =
+    import.meta.env.DEV && new URLSearchParams(window.location.search).get('ui') === '1';
+
+  if (isUiPreview) {
+    return (
+      <Suspense fallback={<div>Loading preview…</div>}>
+        <Preview />
+      </Suspense>
+    );
+  }
+
   return (
     studioOpen ? (
       <NetworkStudio
@@ -142,134 +152,74 @@ export default function App() {
     ) : (
     <main className='app-shell'>
       <Header
-        mode={mode}
+        network={network}
         health={health}
-        onHelp={() => setHelp(true)}
-        onRoi={() => setRoi(true)}
-        onStudio={() => setStudioOpen(true)}
+        mode={mode}
+        onStudioToggle={() => setStudioOpen(true)}
+        onHelpToggle={() => setHelp((v) => !v)}
+        onRoiToggle={() => setRoi((v) => !v)}
       />
-      <StatusBanner mode={mode} networkSource={networkSource} onRetry={load} />
-      <div className='workspace'>
-        <ControlPanel
-          network={network}
-          presets={presets}
-          selected={selected}
-          setSelected={setSelected}
-          area={area}
-          setArea={setArea}
-          noise={noise}
-          setNoise={setNoise}
-          onSimulate={run}
-          onIsolate={isolate}
-          onReset={() => {
-            reset();
-            setFocusNode(null);
-            setRevealed(false);
-          }}
-          phase={phase}
-          judge={judge}
-          setJudge={setJudge}
-          onReveal={setRevealed}
-          revealed={revealed}
-          mode={mode}
-        />
-        <MapCanvas
-          network={network}
-          networkSource={networkSource}
-          phase={phase}
-          result={lastResult}
-          selected={selected}
-          setSelected={setSelected}
-          judge={judge}
-          revealed={revealed}
-          mode={mode}
-          onPick={(n) => {
-            if (!judge) setSelected(n.id);
-          }}
-          focusNode={focusNode}
-        />
-        <IncidentPanel
-          network={network}
-          result={lastResult}
-          phase={phase}
-          showTruth={showTruth}
-          mode={mode}
-          onFocus={(n) => setFocusNode(n)}
-        />
-        <PressureCharts
-          result={lastResult}
-          open={chartsOpen}
-          onToggle={() => setChartsOpen((v) => !v)}
-          sensorIds={network?.sensor_ids || []}
-        />
-      </div>
-      {revealed && lastResult && (
-        <div className='reveal-banner'>
-          <span className='truth-dot' />
-          <b>TRUTH REVEALED</b>
-          <span>
-            Injected at <strong>{truth}</strong>
-          </span>
-          <i>
-            Localization error{' '}
-            <strong>{Number(errorMeters).toFixed(1)} m</strong>
-          </i>
-          <button onClick={() => setRevealed(false)} aria-label='Hide truth'>
-            <X size={14} />
-          </button>
-        </div>
-      )}
-      {toast && (
-        <div className='toast'>
-          <AlertTriangle size={15} />
-          {toast}
-          <button onClick={() => setToast('')}>
-            <X size={14} />
-          </button>
-        </div>
-      )}
-      <RoiPanel
-        open={roi}
-        onClose={() => setRoi(false)}
+      <ControlPanel
+        presets={presets}
+        selected={selected}
+        area={area}
+        noise={noise}
+        judge={judge}
+        onSelectedChange={setSelected}
+        onAreaChange={setArea}
+        onNoiseChange={setNoise}
+        onSimulate={(body, preset) => run(body, preset)}
+        onReset={reset}
+        onJudgeToggle={() => setJudge((v) => !v)}
+        network={network}
+      />
+      <MapCanvas
+        network={network}
+        selected={selected}
+        phase={phase}
+        lastResult={lastResult}
+        judge={judge}
+        showTruth={showTruth}
+        onSelect={setSelected}
+        onBasemapToggle={() => {}}
+        onFullscreenToggle={() => {}}
+      />
+      <IncidentPanel
+        phase={phase}
+        lastResult={lastResult}
+        judge={judge}
+        showTruth={showTruth}
+        errorMeters={errorMeters}
+        onIsolate={isolate}
+        onReset={reset}
+        onJudgeToggle={() => setJudge((v) => !v)}
+        onReveal={() => setRevealed(true)}
+      />
+      <PressureCharts
+        open={chartsOpen}
+        onToggle={() => setChartsOpen((v) => !v)}
         lastResult={lastResult}
       />
+      <RoiPanel open={roi} onClose={() => setRoi(false)} network={network} />
+      <StatusBanner message={toast} onDismiss={() => setToast('')} />
       {help && (
-        <div className='modal-backdrop' onClick={() => setHelp(false)}>
-          <section className='help-modal' onClick={(e) => e.stopPropagation()}>
-            <div className='modal-heading'>
-              <div>
-                <div className='eyebrow'>STAGE CONTROL</div>
-                <h2>Keyboard shortcuts</h2>
-              </div>
-              <button
-                className='icon-btn'
-                onClick={() => setHelp(false)}
-                aria-label='Close shortcuts'
-              >
-                <X size={17} />
-              </button>
-            </div>
-            <div className='shortcut-grid'>
-              {[
-                ['1 / 2 / 3', 'Run scenario'],
-                ['Space', 'Simulate burst'],
-                ['I', 'Isolate valves'],
-                ['R', 'Reset incident'],
-                ['J', 'Toggle judge mode'],
-                ['V', 'Reveal truth'],
-                ['N', 'Network Studio'],
-                ['B', 'Toggle basemap'],
-                ['F', 'Fullscreen'],
-                ['?', 'Show shortcuts'],
-              ].map(([key, label]) => (
-                <div key={key}>
-                  <kbd>{key}</kbd>
-                  <span>{label}</span>
-                </div>
-              ))}
-            </div>
-            <p>Shortcuts pause while a text field is focused.</p>
-          </section>
+        <div className='help-modal'>
+          <div className='help-modal-content'>
+            <h2>Keyboard Shortcuts</h2>
+            <ul>
+              <li><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> — Quick scenarios</li>
+              <li><kbd>Space</kbd> — Simulate custom burst</li>
+              <li><kbd>I</kbd> — Isolate valves</li>
+              <li><kbd>R</kbd> — Reset incident</li>
+              <li><kbd>J</kbd> — Toggle judge mode</li>
+              <li><kbd>V</kbd> — Reveal truth</li>
+              <li><kbd>N</kbd> — Toggle Network Studio</li>
+              <li><kbd>B</kbd> — Toggle basemap</li>
+              <li><kbd>F</kbd> — Toggle fullscreen</li>
+              <li><kbd>?</kbd> — This help</li>
+            </ul>
+            <button onClick={() => setHelp(false)}>Close</button>
+          </div>
         </div>
       )}
     </main>

@@ -1,0 +1,187 @@
+/**
+ * HydroPulse Design Tokens
+ * Raw color values, spacing, typography, motion, and z-index tokens.
+ */
+
+:root,
+[data-theme='night'] {
+  /* Ground - page background */
+  --ground: #0d171c;
+
+  /* Surface - card, panel, modal backgrounds */
+  --surface: #13222a;
+  --surface-raised: #1a2e37;
+  --surface-sunken: #0a1216;
+
+  /* Line - borders, dividers */
+  --line: #24404b;
+  --line-strong: #55808f;
+
+  /* Ink - text colors */
+  --ink: #e6eef0;
+  --ink-muted: #9db2b9;
+  --ink-faint: #7d959e;
+
+  /* Semantic colors */
+  --water: #3bc4d6;
+  --on-water: #06232a;
+  --sensor: #3dd68c;
+  --leak: #ff6b6f;
+  --on-leak: #06232a;
+  --valve: #f2b23a;
+  --focus: #8fe6f2;
+  --leak-wash: rgba(255, 107, 111, 0.14);
+
+  /* Heat map gradient colors */
+  --heat-0: #2a3e47;
+  --heat-1: #6e4a55;
+  --heat-2: #a84e5a;
+  --heat-3: #e0585f;
+  --heat-4: #ff6b6f;
+
+  /* Shadow */
+  --shadow-overlay: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+[data-theme='day'] {
+  /* Ground - page background */
+  --ground: #eef2f1;
+
+  /* Surface - card, panel, modal backgrounds */
+  --surface: #ffffff;
+  --surface-raised: #f7f9f9;
+  --surface-sunken: #e3e9e8;
+
+  /* Line - borders, dividers */
+  --line: #d3dcdb;
+  --line-strong: #788c8f;
+
+  /* Ink - text colors */
+  --ink: #10202a;
+  --ink-muted: #43585f;
+  --ink-faint: #566a72;
+
+  /* Semantic colors */
+  --water: #0a6e7c;
+  --on-water: #ffffff;
+  --sensor: #11774a;
+  --leak: #c0262e;
+  --on-leak: #ffffff;
+  --valve: #935a06;
+  --focus: #0a5e6b;
+  --leak-wash: rgba(192, 38, 46, 0.08);
+
+  /* Heat map gradient colors */
+  --heat-0: #c9d3d2;
+  --heat-1: #d9a3a6;
+  --heat-2: #d3787c;
+  --heat-3: #c9484f;
+  --heat-4: #c0262e;
+
+  /* Shadow */
+  --shadow-overlay: 0 8px 24px rgba(16, 32, 42, 0.16);
+}
+
+/* Spacing scale */
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+}
+
+/* Border radius */
+:root {
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+}
+
+/* Z-index layers */
+:root {
+  --z-map: 0;
+  --z-dock: 10;
+  --z-mapctl: 20;
+  --z-sheet: 30;
+  --z-modal: 40;
+  --z-toast: 50;
+}
+
+/* Motion */
+:root {
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Font families */
+:root {
+  --font-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    Roboto, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco,
+    Consolas, monospace;
+}
+
+/* Typography utility classes */
+.type-display {
+  font-size: 28px;
+  line-height: 34px;
+  font-weight: 600;
+}
+
+.type-title {
+  font-size: 20px;
+  line-height: 26px;
+  font-weight: 600;
+}
+
+.type-heading {
+  font-size: 16px;
+  line-height: 22px;
+  font-weight: 600;
+}
+
+.type-body {
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 400;
+}
+
+.type-label {
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+}
+
+.type-caption {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 400;
+}
+
+.type-value-lg {
+  font-family: var(--font-mono);
+  font-size: 26px;
+  line-height: 30px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.type-value {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.type-id {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
