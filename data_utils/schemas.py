@@ -146,6 +146,7 @@ class HealthResponse(BaseModel):
     network_revision: Optional[str] = None
     source: Optional[str] = None
     can_rollback: bool = False
+    basemap_proxy: bool = False
 
     model_config = ConfigDict(
         json_schema_extra={

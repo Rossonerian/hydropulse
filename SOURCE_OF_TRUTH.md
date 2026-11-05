@@ -1,5 +1,5 @@
 # HydroPulse: SOURCE OF TRUTH
-Version: 1.1.0 · Contract owner: Hardhik · Last updated: v1.1 Part 2 Additive Contract · Status: FROZEN for v1.0, EXTENDED for v1.1
+Version: 1.1.1 · Contract owner: Hardhik · Last updated: v1.1 Part 2 Additive Contract · Status: FROZEN for v1.0, EXTENDED for v1.1
 
 > This file is the single source of truth for every human and AI agent working on HydroPulse.
 > If code, a prompt, a plan, a chat message or an agent's assumption disagrees with this file, THIS FILE WINS
@@ -290,6 +290,12 @@ are exposed via additive endpoints and schemas.
   - Request: `AutoValveRequest` (actions: set_mode, propose, confirm_close, emergency_stop, reset_valves; leak parameters, proposal ID, confirmation).
   - Response: `AutoValveResponse` (active valve closures, two-phase proposal payload, safety emergency stop status).
 
+### Basemap tile proxy (v1.1.1, additive)
+- `GET /api/basemap/{style}/{z}/{x}/{y}`: public, read-only CARTO raster tile proxy. `style` is `dark` or `light`; `z` 0-19; `x`,`y` in `[0, 2^z)`.
+  - Response: image bytes (`image/png`) with `Cache-Control: public, max-age=<HYDROPULSE_BASEMAP_CACHE_TTL_S>`. 404 when no CARTO key is configured or the tile is out of range, 422 for bad `z`, 502 when upstream fails (plain detail, never the key or upstream URL).
+  - The CARTO key is server-side only (`HYDROPULSE_CARTO_API_KEY`); it is never in a response, log or `safe_summary`.
+- `GET /api/health` gains optional `basemap_proxy: bool` (default false; true when a key is configured). The frontend uses the proxy only when it is true.
+
 ---------------------------------------------------------------------------------------------------
 ## 8. Mock fixtures (frontend/public/mock/)
 | Endpoint                    | Fixture file                                            |
@@ -398,3 +404,4 @@ post "NETWORK REGENERATED" in chat.
 | 1.0.0   | H0   | Hardhik | Initial frozen contract and rules |
 | 1.0.1   | backend MVP | Hardhik | Non-breaking. §1: candidate screening is a size-aware fingerprint fit (cosine-only screening scored 27.5% top-1 at 0% noise in the benchmark); no API field changed. `seed` must be ≥ 0 (negative seeds were a 500, now a 422) |
 | 1.1.0   | Part 2 Wave 1 | Gangu / Hardhik | Additive API Contract v1.1: versioned network state (NetworkRevisionMeta), revision token in v1.0 responses, What-If analysis, AI Advisor, Network Importer/Builder/IntelliSense, IoT telemetry, pipe condition, and auto-valve endpoints. 100% backward compatible with v1.0. |
+| 1.1.1   | basemap proxy | Hardhik (authorised edit) | Additive: `GET /api/basemap/{style}/{z}/{x}/{y}` CARTO tile proxy (key server-side) and optional `basemap_proxy` bool on `GET /api/health`. No existing field changed. |

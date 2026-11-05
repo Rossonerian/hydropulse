@@ -114,6 +114,12 @@ OPENROUTER_API_KEY=
 
 **Critical**: Replace `https://frontend.example.invalid` with the exact deployed frontend origin (e.g., `https://app.yourdomain.com`) before starting the service. Incorrect CORS configuration will block all frontend requests.
 
+### CARTO Basemap Key (optional)
+
+Add `HYDROPULSE_CARTO_API_KEY=<key>` to `/etc/hydropulse/hydropulse.env` on the host only (never commit it), then run `sudo systemctl restart hydropulse`.
+The backend proxies tiles at `/api/basemap/{dark|light}/{z}/{x}/{y}` so the key never reaches the browser; `GET /api/health` reports `basemap_proxy: true` once configured.
+Without a key the frontend keeps using the keyless public CARTO tiles.
+
 ### Non-Secret Template
 
 A root-owned, non-secret template is available at `deploy/hydropulse.env.example` for reference. Do not store secrets in this file.
