@@ -9,6 +9,9 @@ import ControlPanel from './components/ControlPanel.jsx';
 import MapCanvas from './components/MapCanvas.jsx';
 import Terrain3DViewer from './components/Terrain3DViewer.jsx';
 import IncidentPanel from './components/IncidentPanel.jsx';
+import WelcomeScreen from './components/WelcomeScreen.jsx';
+import NetworkImportModal from './components/NetworkImportModal.jsx';
+import { Toast } from './ui/index.js';
 import { useHydroPulse } from './hooks/useHydroPulse.js';
 
 // Lazy load NetworkStudio and PressureCharts with React.Suspense
@@ -17,6 +20,24 @@ const PressureCharts = lazy(() => import('./components/PressureCharts.jsx'));
 
 // Dev-only UI primitive showcase
 const Preview = lazy(() => import('./ui/Preview.jsx'));
+
+const ENTRY_KEY = 'hp-entry';
+function readEntry() {
+  try {
+    const v = localStorage.getItem(ENTRY_KEY);
+    return v === 'demo' || v === 'import' ? v : null;
+  } catch {
+    return null;
+  }
+}
+function writeEntry(v) {
+  try {
+    if (v) localStorage.setItem(ENTRY_KEY, v);
+    else localStorage.removeItem(ENTRY_KEY);
+  } catch {
+    /* storage unavailable: choice just isn't remembered */
+  }
+}
 
 export default function App() {
   const pulse = useHydroPulse();
@@ -55,6 +76,46 @@ export default function App() {
   const [help, setHelp] = useState(false);
   const [roi, setRoi] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  const [entry, setEntry] = useState(readEntry);
+  const [importOpen, setImportOpen] = useState(false);
+  const [notice, setNotice] = useState(null);
+
+  const customData = !!health?.source && health.source !== 'synthetic';
+
+  const chooseEntry = useCallback((choice) => {
+    writeEntry(choice);
+    setEntry(choice);
+    if (choice === 'import') setImportOpen(true);
+  }, []);
+  const openDataSource = useCallback(() => {
+    writeEntry(null);
+    setEntry(null);
+    setImportOpen(false);
+  }, []);
+
+  useEffect(() => {
+    if (!notice) return undefined;
+    const t = setTimeout(() => setNotice(null), 6000);
+    return () => clearTimeout(t);
+  }, [notice]);
+
+  // The shared network changed: reload it, drop the old incident and pick a valid target.
+  const handleNetworkChanged = useCallback(async () => {
+    await pulse.load();
+    reset();
+    setRevealed(false);
+    setSelected('');
+  }, [pulse, reset]);
+
+  // Keep the selected junction valid for whichever network is active.
+  useEffect(() => {
+    if (!network?.nodes) return;
+    if (!network.nodes.some((n) => n.id === selected && n.type === 'junction')) {
+      const next = presets?.[0]?.target_node_id;
+      const fallback = network.nodes.find((n) => n.type === 'junction')?.id;
+      setSelected(network.nodes.some((n) => n.id === next) ? next : fallback || '');
+    }
+  }, [network, presets, selected]);
 
   // Auto-select Incident tab on simulation completion with polite live announcement
   useEffect(() => {
@@ -273,8 +334,32 @@ export default function App() {
     );
   }
 
+  if (!entry) {
+    return <WelcomeScreen onChoose={chooseEntry} />;
+  }
+
   return (
     <AppShell
+      customData={customData}
+      onDataSource={openDataSource}
+      onResetCustom={() => setImportOpen(true)}
+      extra={
+        <>
+          <NetworkImportModal
+            open={importOpen}
+            onClose={() => setImportOpen(false)}
+            mode={mode}
+            health={health}
+            network={network}
+            customActive={customData}
+            onActivated={handleNetworkChanged}
+            onNotify={(tone, message) => setNotice({ tone, message })}
+          />
+          {notice && (
+            <Toast tone={notice.tone} message={notice.message} onDismiss={() => setNotice(null)} />
+          )}
+        </>
+      }
       view={view}
       onViewChange={setView}
       mode={mode}
