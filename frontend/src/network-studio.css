@@ -1,12 +1,34 @@
 :root {
-  --studio-midnight: #1a1a2e;
-  --studio-oxford: #16213e;
-  --studio-navy: #0f3460;
-  --studio-sand: #efc07b;
-  --studio-ivory: #f7f3ea;
-  --studio-muted: #b9bdcd;
-  --studio-inset: #121b35;
-  --studio-line: rgba(239, 192, 123, 0.12);
+  /* Official HydroPulse 6-Token Brand Palette */
+  --hp-ink: #0B132B;
+  --hp-navy: #1C2541;
+  --hp-slate: #3A506B;
+  --hp-cyan: #5BC0DE;
+  --hp-sand: #F4D6B0;
+  --hp-amber: #D97706;
+
+  /* Semantic UI tokens */
+  --hp-bg: var(--hp-ink);
+  --hp-surface: var(--hp-navy);
+  --hp-surface-raised: var(--hp-slate);
+  --hp-accent: var(--hp-cyan);
+  --hp-text: var(--hp-sand);
+  --hp-warning: var(--hp-amber);
+
+  /* Semantic network status tokens */
+  --hp-leak: #EF4444;
+  --hp-isolated: #64748B;
+  --hp-sensor: #10B981;
+
+  /* Studio theme mapped to official tokens */
+  --studio-midnight: var(--hp-ink);
+  --studio-oxford: var(--hp-navy);
+  --studio-navy: var(--hp-slate);
+  --studio-sand: var(--hp-sand);
+  --studio-ivory: #FDF7ED;
+  --studio-muted: #8EA0B8;
+  --studio-inset: #0F172C;
+  --studio-line: rgba(91, 192, 222, 0.22);
   --studio-raised: 7px 7px 16px rgba(4, 7, 18, 0.48),
     -4px -4px 12px rgba(255, 255, 255, 0.035),
     inset 1px 1px 0 rgba(255, 255, 255, 0.045);
@@ -15,7 +37,7 @@
     inset 1px 1px 0 rgba(255, 255, 255, 0.04);
   --studio-pressed: inset 4px 4px 9px rgba(4, 7, 18, 0.42),
     inset -2px -2px 7px rgba(255, 255, 255, 0.025);
-  --studio-focus: 0 0 0 2px var(--studio-midnight), 0 0 0 4px var(--studio-sand);
+  --studio-focus: 0 0 0 2px var(--hp-ink), 0 0 0 4px var(--hp-cyan);
 }
 
 .hp-studio {
@@ -145,7 +167,7 @@
 }
 .studio-save-state i { width: 6px; height: 6px; border-radius: 50%; background: #a2c18d; }
 .studio-save-state.is-dirty { color: var(--studio-sand); background: rgba(239, 192, 123, 0.09); border-color: rgba(239, 192, 123, 0.2); }
-.studio-save-state.is-dirty i { background: var(--studio-sand); box-shadow: 0 0 9px #efc07b88; }
+.studio-save-state.is-dirty i { background: var(--studio-sand); box-shadow: 0 0 9px rgba(244, 214, 176, 0.55); }
 .studio-toolbar-separator { width: 1px; height: 27px; margin: 0 2px; background: rgba(239, 192, 123, 0.15); }
 .studio-icon-button {
   width: 35px;
@@ -241,7 +263,7 @@
 .studio-canvas-topline { z-index: 2; display: flex; align-items: center; justify-content: space-between; padding: 0 13px; border-bottom: 1px solid rgba(239, 192, 123, 0.1); background: linear-gradient(90deg, rgba(22, 33, 62, 0.76), rgba(22, 33, 62, 0.22)); }
 .studio-canvas-topline > div:first-child { display: flex; align-items: center; gap: 7px; color: #ded3b9; font-size: 9px; font-weight: 700; letter-spacing: 1px; }
 .studio-canvas-topline small { padding-left: 6px; color: #8f9caf; font-size: 8px; letter-spacing: 0.8px; }
-.studio-canvas-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--studio-sand); box-shadow: 0 0 9px #efc07b99; }
+.studio-canvas-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--studio-sand); box-shadow: 0 0 9px rgba(244, 214, 176, 0.6); }
 .studio-canvas-controls { display: flex; align-items: center; gap: 6px; }
 .studio-canvas-controls .studio-icon-button { width: 28px; height: 28px; }
 .studio-canvas-controls > span { min-width: 34px; color: #b6c1d1; text-align: center; font: 10px 'Quicksand', sans-serif; }
@@ -435,10 +457,10 @@
   background: rgba(255, 255, 255, 0.05);
 }
 .mode-pill.is-active {
-  background: linear-gradient(135deg, #EFC07B 0%, #D49B45 100%);
-  color: #070B14;
+  background: linear-gradient(135deg, var(--hp-cyan) 0%, #3a9dbd 100%);
+  color: var(--hp-ink);
   font-weight: 700;
-  box-shadow: 0 2px 8px rgba(239, 192, 123, 0.35);
+  box-shadow: 0 2px 8px rgba(91, 192, 222, 0.4);
 }
 
 /* Provenance and Freshness Badges */
@@ -536,11 +558,11 @@
   width: 38px;
   height: 38px;
   border-radius: 10px;
-  background: rgba(239, 192, 123, 0.15);
-  color: #EFC07B;
+  background: rgba(244, 214, 176, 0.15);
+  color: var(--hp-sand);
   display: grid;
   place-items: center;
-  border: 1px solid rgba(239, 192, 123, 0.3);
+  border: 1px solid rgba(244, 214, 176, 0.3);
 }
 .catalog-header-actions {
   display: flex;
@@ -555,7 +577,7 @@
   font-size: 11px;
   color: #94A3B8;
 }
-.catalog-count-pill b { color: #EFC07B; }
+.catalog-count-pill b { color: var(--hp-sand); }
 
 .catalog-audit-banner {
   display: flex;
@@ -626,9 +648,9 @@
   color: #E2E8F0;
 }
 .catalog-cat-pill.is-active {
-  background: rgba(239, 192, 123, 0.18);
-  border-color: #EFC07B;
-  color: #EFC07B;
+  background: rgba(91, 192, 222, 0.18);
+  border-color: var(--hp-cyan);
+  color: var(--hp-cyan);
   font-weight: 700;
 }
 
@@ -658,13 +680,13 @@
   transition: all 0.18s;
 }
 .catalog-card:hover {
-  border-color: rgba(239, 192, 123, 0.4);
+  border-color: rgba(91, 192, 222, 0.4);
   transform: translateY(-1px);
 }
 .catalog-card.is-selected {
-  border-color: #EFC07B;
+  border-color: var(--hp-cyan);
   background: #121C30;
-  box-shadow: 0 0 14px rgba(239, 192, 123, 0.15);
+  box-shadow: 0 0 14px rgba(91, 192, 222, 0.2);
 }
 .catalog-card-top {
   display: flex;
@@ -857,16 +879,16 @@
   font-size: 10px;
 }
 .wizard-step.is-active {
-  color: #EFC07B;
-  background: rgba(239, 192, 123, 0.05);
+  color: var(--hp-sand);
+  background: rgba(244, 214, 176, 0.08);
 }
 .wizard-step.is-active span {
-  background: #EFC07B;
-  color: #070B14;
+  background: var(--hp-sand);
+  color: var(--hp-ink);
   font-weight: 700;
 }
 .wizard-step.is-done { color: #10B981; }
-.wizard-step.is-done span { background: #10B981; color: #070B14; }
+.wizard-step.is-done span { background: #10B981; color: var(--hp-ink); }
 
 .wizard-content { padding: 24px; min-height: 380px; }
 .upload-dropzone {
@@ -880,7 +902,7 @@
   gap: 12px;
   background: #0D1627;
 }
-.upload-dropzone svg { color: #EFC07B; }
+.upload-dropzone svg { color: var(--hp-sand); }
 .upload-dropzone h3 { margin: 0; color: #F8FAFC; font-size: 16px; }
 .upload-dropzone p { margin: 0; color: #94A3B8; font-size: 12px; }
 .wizard-note {
@@ -888,13 +910,13 @@
   gap: 10px;
   margin-top: 16px;
   padding: 10px 14px;
-  background: rgba(34, 211, 238, 0.06);
-  border: 1px solid rgba(34, 211, 238, 0.2);
+  background: rgba(91, 192, 222, 0.08);
+  border: 1px solid rgba(91, 192, 222, 0.25);
   border-radius: 8px;
   color: #94A3B8;
   font-size: 11px;
 }
-.wizard-note b { color: #22D3EE; }
+.wizard-note b { color: var(--hp-cyan); }
 
 .wizard-field {
   display: flex;
@@ -938,9 +960,9 @@
   color: #E2E8F0;
 }
 .asset-type-chip.is-selected {
-  background: rgba(239, 192, 123, 0.15);
-  border-color: #EFC07B;
-  color: #EFC07B;
+  background: rgba(91, 192, 222, 0.18);
+  border-color: var(--hp-cyan);
+  color: var(--hp-cyan);
   font-weight: 600;
 }
 .wizard-warning-box {
@@ -1019,7 +1041,7 @@
 }
 .staging-confirm-box h3 { margin: 0; color: #F8FAFC; font-size: 18px; }
 .staging-confirm-box p { margin: 0; color: #94A3B8; font-size: 13px; }
-.staging-confirm-box p b { color: #EFC07B; }
+.staging-confirm-box p b { color: var(--hp-sand); }
 .staging-commit-notice {
   background: rgba(16, 185, 129, 0.08);
   border: 1px solid rgba(16, 185, 129, 0.25);
@@ -1060,7 +1082,7 @@
   display: inline-block;
   font-size: 9px;
   font-family: var(--font-mono);
-  color: #EFC07B;
+  color: var(--hp-sand);
   margin-top: 2px;
 }
 .inspector-content {
@@ -1090,7 +1112,7 @@
 .provenance-row code {
   font-family: var(--font-mono);
   font-size: 10px;
-  color: #EFC07B;
+  color: var(--hp-sand);
   background: #111A2D;
   padding: 2px 6px;
   border-radius: 4px;
@@ -1180,7 +1202,7 @@
   font-size: 10px;
   color: #94A3B8;
 }
-.hud-compass svg { color: #EFC07B; transition: transform 0.1s linear; }
+.hud-compass svg { color: var(--hp-sand); transition: transform 0.1s linear; }
 .hud-button-group {
   display: flex;
   gap: 4px;
@@ -1279,7 +1301,7 @@
   font-size: 11.5px;
   color: #F8FAFC;
 }
-.geo-layer-title svg { color: #EFC07B; }
+.geo-layer-title svg { color: var(--hp-sand); }
 .geo-layer-toggle-btn {
   font-size: 10px;
   color: #64748B;
@@ -1300,7 +1322,7 @@
   cursor: pointer;
 }
 .layer-check-item input[type="checkbox"] {
-  accent-color: #EFC07B;
+  accent-color: var(--hp-cyan);
   cursor: pointer;
 }
 .layer-color-dot {

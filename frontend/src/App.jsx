@@ -6,6 +6,7 @@ import {
 import Header from './components/Header.jsx';
 import ControlPanel from './components/ControlPanel.jsx';
 import MapCanvas from './components/MapCanvas.jsx';
+import Terrain3DViewer from './components/Terrain3DViewer.jsx';
 import IncidentPanel from './components/IncidentPanel.jsx';
 import PressureCharts from './components/PressureCharts.jsx';
 import RoiPanel from './components/RoiPanel.jsx';
@@ -40,19 +41,24 @@ export default function App() {
     [focusNode, setFocusNode] = useState(null),
     [toast, setToast] = useState('');
   const [studioOpen, setStudioOpen] = useState(false);
+  const [viewMode, setViewMode] = useState('2d');
+  const [activeDraft, setActiveDraft] = useState(null);
+
+  const activeNetwork = activeDraft || network;
+
   const run = useCallback(
     async (body, preset) => {
       const r = await simulate(body, preset);
       if (r) {
         setRevealed(false);
         setFocusNode(
-          network?.nodes?.find(
+          activeNetwork?.nodes?.find(
             (n) => n.id === r.predicted_top_candidates?.[0]?.node_id,
           ) || null,
         );
       }
     },
-    [simulate, network],
+    [simulate, activeNetwork],
   );
   useEffect(() => {
     if (lastResult?.actual_loss_lpm)
@@ -107,6 +113,7 @@ export default function App() {
       else if (k === 'j') setJudge((v) => !v);
       else if (k === 'v' && judge) setRevealed((v) => !v);
       else if (k === 'n') setStudioOpen(true);
+      else if (k === 'm') setViewMode((prev) => (prev === '2d' ? '3d' : '2d'));
       else if (k === 'b') document.querySelector('.map-toggle')?.click();
       else if (k === 'f') {
         if (!document.fullscreenElement)
@@ -121,10 +128,10 @@ export default function App() {
   const candidate = lastResult?.predicted_top_candidates?.[0]?.node_id;
   // Older backend responses may omit localization_error_m, so derive distance from node coordinates.
   const distance =
-    network?.nodes && truth && candidate
+    activeNetwork?.nodes && truth && candidate
       ? (() => {
-          const a = network.nodes.find((n) => n.id === truth),
-            b = network.nodes.find((n) => n.id === candidate);
+          const a = activeNetwork.nodes.find((n) => n.id === truth),
+            b = activeNetwork.nodes.find((n) => n.id === candidate);
           return a && b
             ? Math.hypot((a.lat - b.lat) * 111000, (a.lng - b.lng) * 95000)
             : 0;
@@ -135,7 +142,7 @@ export default function App() {
   return (
     studioOpen ? (
       <NetworkStudio
-        initialNetwork={network}
+        initialNetwork={activeNetwork}
         networkSource={networkSource}
         onExit={() => setStudioOpen(false)}
       />
@@ -144,6 +151,8 @@ export default function App() {
       <Header
         mode={mode}
         health={health}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
         onHelp={() => setHelp(true)}
         onRoi={() => setRoi(true)}
         onStudio={() => setStudioOpen(true)}
@@ -151,7 +160,7 @@ export default function App() {
       <StatusBanner mode={mode} networkSource={networkSource} onRetry={load} />
       <div className='workspace'>
         <ControlPanel
-          network={network}
+          network={activeNetwork}
           presets={presets}
           selected={selected}
           setSelected={setSelected}
@@ -173,23 +182,39 @@ export default function App() {
           revealed={revealed}
           mode={mode}
         />
-        <MapCanvas
-          network={network}
-          networkSource={networkSource}
-          phase={phase}
-          result={lastResult}
-          selected={selected}
-          setSelected={setSelected}
-          judge={judge}
-          revealed={revealed}
-          mode={mode}
-          onPick={(n) => {
-            if (!judge) setSelected(n.id);
-          }}
-          focusNode={focusNode}
-        />
+        {viewMode === '2d' ? (
+          <MapCanvas
+            network={activeNetwork}
+            networkSource={networkSource}
+            phase={phase}
+            result={lastResult}
+            selected={selected}
+            setSelected={setSelected}
+            judge={judge}
+            revealed={revealed}
+            mode={mode}
+            onPick={(n) => {
+              if (!judge) setSelected(n.id);
+            }}
+            focusNode={focusNode}
+          />
+        ) : (
+          <div className='map-canvas terrain-workspace-view'>
+            <Terrain3DViewer
+              network={activeNetwork}
+              result={lastResult}
+              phase={phase}
+              selected={selected}
+              setSelected={setSelected}
+              judge={judge}
+              revealed={revealed}
+              mode={mode}
+              onUpdateDraft={(updated) => setActiveDraft(updated)}
+            />
+          </div>
+        )}
         <IncidentPanel
-          network={network}
+          network={activeNetwork}
           result={lastResult}
           phase={phase}
           showTruth={showTruth}
@@ -200,7 +225,7 @@ export default function App() {
           result={lastResult}
           open={chartsOpen}
           onToggle={() => setChartsOpen((v) => !v)}
-          sensorIds={network?.sensor_ids || []}
+          sensorIds={activeNetwork?.sensor_ids || []}
         />
       </div>
       {revealed && lastResult && (
@@ -257,6 +282,7 @@ export default function App() {
                 ['R', 'Reset incident'],
                 ['J', 'Toggle judge mode'],
                 ['V', 'Reveal truth'],
+                ['M', 'Toggle 2D / 3D view'],
                 ['N', 'Network Studio'],
                 ['B', 'Toggle basemap'],
                 ['F', 'Fullscreen'],

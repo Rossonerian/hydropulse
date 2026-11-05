@@ -106,12 +106,12 @@ function StudioPipe({ id, sourceX, sourceY, targetX, targetY, data, selected }) 
         id={id}
         path={path}
         style={{
-          stroke: preview ? '#EFC07B' : '#EFC07B',
+          stroke: preview ? '#5BC0DE' : '#5BC0DE',
           strokeWidth: selected ? 5 : 3.5,
           strokeDasharray: preview || closed ? '8 7' : undefined,
           opacity: preview ? 0.78 : closed ? 0.48 : 0.92,
           strokeLinecap: 'round',
-          filter: selected ? 'drop-shadow(0 0 5px #efc07b88)' : undefined,
+          filter: selected ? 'drop-shadow(0 0 5px #5bc0de88)' : undefined,
         }}
       />
       {!preview && (selected || data?.showLabel) && (
@@ -1035,6 +1035,27 @@ function StudioWorkspace({ initialNetwork, networkSource, onExit }) {
             />
           ) : (
             <Terrain3DViewer
+              network={draft.network}
+              selected={selection?.id}
+              setSelected={(id) => {
+                if (!id) {
+                  setSelection(null);
+                  return;
+                }
+                const node = draft.network.nodes.find((n) => n.id === id);
+                if (node) {
+                  setSelection({ type: 'node', id });
+                } else {
+                  const pipe = draft.network.pipes.find((p) => p.id === id);
+                  if (pipe) setSelection({ type: 'pipe', id });
+                }
+              }}
+              onUpdateDraft={(updatedNet) => {
+                commit((next) => {
+                  next.network = updatedNet;
+                  return next;
+                });
+              }}
               selectedFeature={inspectedFeature}
               onSelectFeature={(feat) => setInspectedFeature(feat)}
               showIllustrativeDepth={showIllustrativeDepth}

@@ -6,8 +6,18 @@ import {
   CircleHelp,
   Calculator,
   GitBranch,
+  Map,
+  Compass,
 } from 'lucide-react';
-export default function Header({ mode, health, onHelp, onRoi, onStudio }) {
+export default function Header({
+  mode,
+  health,
+  viewMode = '2d',
+  onViewModeChange,
+  onHelp,
+  onRoi,
+  onStudio,
+}) {
   return (
     <header className='topbar'>
       <div className='brand'>
@@ -29,6 +39,42 @@ export default function Header({ mode, health, onHelp, onRoi, onStudio }) {
         Bengaluru <span className='context-divider' />{' '}
         <span className='mono'>12.9081° N&nbsp; 77.4852° E</span>
       </div>
+
+      {/* Operations 2D Map / 3D Terrain / Schematic Mode Switcher */}
+      <div className='ops-view-switcher' role='tablist' aria-label='Operations View Mode'>
+        <button
+          className={`ops-view-pill ${viewMode === '2d' ? 'is-active' : ''}`}
+          onClick={() => onViewModeChange?.('2d')}
+          role='tab'
+          aria-selected={viewMode === '2d'}
+          title='2D Geographic Leaflet Map'
+          type='button'
+        >
+          <Map size={13} />
+          <span>2D Map</span>
+        </button>
+        <button
+          className={`ops-view-pill ${viewMode === '3d' ? 'is-active' : ''}`}
+          onClick={() => onViewModeChange?.('3d')}
+          role='tab'
+          aria-selected={viewMode === '3d'}
+          title='3D Navigable Terrain & Spatial Network Scene'
+          type='button'
+        >
+          <Compass size={13} />
+          <span>3D Terrain</span>
+        </button>
+        <button
+          className='ops-view-pill'
+          onClick={onStudio}
+          title='Open Network Studio Schematic Editor (N)'
+          type='button'
+        >
+          <GitBranch size={13} />
+          <span>Schematic Studio</span>
+        </button>
+      </div>
+
       <div className='header-right'>
         <div className='network-counts'>
           <span>

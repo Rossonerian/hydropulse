@@ -1158,3 +1158,64 @@ export function projectToMetricScene(lat, lng, elevation = 818.0) {
 
   return { x, y, z };
 }
+
+/**
+ * Inverse Projection: Local Metric Scene (x, z) to Geographic (lat, lng)
+ */
+export function unprojectFromMetricScene(x, z) {
+  const originLat = KENGERI_AOI.center.lat;
+  const originLng = KENGERI_AOI.center.lng;
+  const METRES_PER_DEG_LAT = 110850.0;
+  const METRES_PER_DEG_LNG = 108500.0;
+
+  const lat = originLat + z / METRES_PER_DEG_LAT;
+  const lng = originLng + x / METRES_PER_DEG_LNG;
+
+  return {
+    lat: Math.round(lat * 1e6) / 1e6,
+    lng: Math.round(lng * 1e6) / 1e6,
+  };
+}
+
+/**
+ * Calculates accurate geodesic Haversine distance in metres for a polyline route.
+ */
+export function calculatePolylineLength(points) {
+  if (!Array.isArray(points) || points.length < 2) return 0;
+  let totalM = 0;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const lat1 = Array.isArray(p1) ? p1[0] : p1.lat;
+    const lng1 = Array.isArray(p1) ? p1[1] : p1.lng;
+    const lat2 = Array.isArray(p2) ? p2[0] : p2.lat;
+    const lng2 = Array.isArray(p2) ? p2[1] : p2.lng;
+
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLng = ((lng2 - lng1) * Math.PI) / 180;
+    const rLat1 = (lat1 * Math.PI) / 180;
+    const rLat2 = (lat2 * Math.PI) / 180;
+
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.sin(dLng / 2) * Math.sin(dLng / 2) * Math.cos(rLat1) * Math.cos(rLat2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    totalM += 6371000 * c;
+  }
+  return Math.round(totalM * 10) / 10;
+}
+
+/**
+ * Helper to interpolate geodesic midpoint between two lat/lng coordinates.
+ */
+export function interpolateMidpoint(p1, p2) {
+  const lat1 = Array.isArray(p1) ? p1[0] : p1.lat;
+  const lng1 = Array.isArray(p1) ? p1[1] : p1.lng;
+  const lat2 = Array.isArray(p2) ? p2[0] : p2.lat;
+  const lng2 = Array.isArray(p2) ? p2[1] : p2.lng;
+
+  return {
+    lat: Math.round(((lat1 + lat2) / 2) * 1e6) / 1e6,
+    lng: Math.round(((lng1 + lng2) / 2) * 1e6) / 1e6,
+  };
+}

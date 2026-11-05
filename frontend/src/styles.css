@@ -3,8 +3,8 @@
 @tailwind utilities;
 :root {
   font-family: Inter, sans-serif;
-  color: #e2e8f0;
-  background: #070b14;
+  color: var(--hp-sand);
+  background: var(--hp-ink);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   font-smooth: always;
@@ -12,16 +12,39 @@
   font-optical-sizing: auto;
   font-size: 13px;
   font-weight: 400;
-  --bg: #070b14;
-  --panel: #0d1424;
-  --panel2: #10192a;
-  --edge: #1e2a44;
-  --muted: #71809b;
-  --copy: #e2e8f0;
-  --cyan: #22d3ee;
-  --green: #10b981;
-  --red: #ef4444;
-  --amber: #f59e0b;
+
+  /* Official HydroPulse 6-Token Brand Palette */
+  --hp-ink: #0B132B;
+  --hp-navy: #1C2541;
+  --hp-slate: #3A506B;
+  --hp-cyan: #5BC0DE;
+  --hp-sand: #F4D6B0;
+  --hp-amber: #D97706;
+
+  /* Semantic UI tokens */
+  --hp-bg: var(--hp-ink);
+  --hp-surface: var(--hp-navy);
+  --hp-surface-raised: var(--hp-slate);
+  --hp-accent: var(--hp-cyan);
+  --hp-text: var(--hp-sand);
+  --hp-warning: var(--hp-amber);
+
+  /* Semantic network status tokens */
+  --hp-leak: #EF4444;       /* Distinct danger red for bursts / leaks */
+  --hp-isolated: #64748B;   /* Slate neutral for isolated pipes / nodes */
+  --hp-sensor: #10B981;     /* Sentinel sensor emerald green */
+
+  /* Legacy variable mappings to maintain visual coherence across all panels */
+  --bg: var(--hp-ink);
+  --panel: var(--hp-navy);
+  --panel2: #16223B;
+  --edge: var(--hp-slate);
+  --muted: #8EA0B8;
+  --copy: var(--hp-sand);
+  --cyan: var(--hp-cyan);
+  --green: var(--hp-sensor);
+  --red: var(--hp-leak);
+  --amber: var(--hp-amber);
   --mono: 'JetBrains Mono', monospace;
 }
 * {
@@ -44,7 +67,7 @@ button {
 }
 button:focus-visible,
 input:focus-visible {
-  outline: 2px solid #38bdf8;
+  outline: 2px solid var(--hp-cyan);
   outline-offset: 2px;
 }
 button:disabled {
@@ -70,10 +93,10 @@ button:disabled {
   background:
     radial-gradient(
       ellipse at 48% 50%,
-      rgba(20, 42, 70, 0.16),
-      transparent 48%
+      rgba(28, 37, 65, 0.35),
+      transparent 55%
     ),
-    var(--bg);
+    var(--hp-bg);
   overflow: hidden;
 }
 .topbar {
@@ -83,8 +106,8 @@ button:disabled {
   align-items: center;
   padding: 0 20px;
   gap: 26px;
-  border-bottom: 1px solid #1a2538;
-  background: rgba(9, 14, 25, 0.97);
+  border-bottom: 1px solid var(--hp-slate);
+  background: rgba(11, 19, 43, 0.98);
   z-index: 600;
 }
 .brand {
@@ -2276,3 +2299,333 @@ kbd {
   .judge-row { padding: 6px 0; }
   .panel-foot { margin-top: 3px; }
 }
+
+/* Operations Topbar View Mode Switcher (2D Map / 3D Terrain / Schematic Studio) */
+.ops-view-switcher {
+  display: flex;
+  align-items: center;
+  background: var(--hp-navy);
+  border: 1px solid var(--hp-slate);
+  border-radius: 8px;
+  padding: 3px;
+  gap: 3px;
+  margin-left: auto;
+  margin-right: 18px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.ops-view-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #94A3B8;
+  font-size: 11.5px;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.ops-view-pill:hover {
+  color: var(--hp-sand);
+  background: rgba(58, 80, 107, 0.4);
+}
+
+.ops-view-pill.is-active {
+  background: var(--hp-cyan);
+  color: var(--hp-ink);
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(91, 192, 222, 0.35);
+}
+
+/* 3D Terrain in Operations Central Workspace */
+.terrain-workspace-view {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  border-radius: 10px;
+  border: 1px solid var(--hp-slate);
+  background: var(--hp-ink);
+}
+
+/* Map Entity HUD Inspector (2D Map View) */
+.map-entity-inspector {
+  position: absolute;
+  bottom: 28px;
+  left: 15px;
+  background: rgba(11, 19, 43, 0.94);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--hp-slate);
+  border-radius: 8px;
+  padding: 8px 14px;
+  z-index: 450;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  pointer-events: auto;
+}
+
+.inspector-pill-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--hp-sand);
+}
+
+.inspector-pill-title b {
+  color: var(--hp-cyan);
+  font-family: var(--mono);
+}
+
+.inspector-pill-title span {
+  font-size: 9px;
+  color: #8E9BAE;
+  background: #1C2541;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.inspector-pill-data {
+  display: flex;
+  gap: 10px;
+  font-size: 10px;
+  color: #CBD5E1;
+  font-family: var(--mono);
+}
+
+/* Mandatory Regulatory / Demonstration Disclaimer Watermark */
+.map-disclaimer-watermark {
+  position: absolute;
+  bottom: 6px;
+  right: 14px;
+  font-size: 8px;
+  font-family: var(--mono);
+  letter-spacing: 0.6px;
+  color: rgba(244, 214, 176, 0.55);
+  pointer-events: none;
+  z-index: 450;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+/* 3D Terrain HUD Inspector & Route Editor Overlay */
+.terrain-editor-hud {
+  position: absolute;
+  top: 60px;
+  right: 16px;
+  width: 310px;
+  background: rgba(11, 19, 43, 0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--hp-slate);
+  border-radius: 12px;
+  z-index: 100;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.65);
+  overflow: hidden;
+  color: var(--hp-sand);
+}
+
+.editor-hud-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: var(--hp-navy);
+  border-bottom: 1px solid var(--hp-slate);
+}
+
+.hud-title-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+}
+
+.hud-title-row b {
+  color: var(--hp-sand);
+  font-family: var(--mono);
+}
+
+.hud-type-badge {
+  font-size: 8.5px;
+  background: var(--hp-slate);
+  color: var(--hp-cyan);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.hud-close-btn {
+  background: transparent;
+  border: none;
+  color: #94A3B8;
+  cursor: pointer;
+  padding: 2px;
+}
+
+.hud-close-btn:hover {
+  color: #FFF;
+}
+
+.editor-hud-body {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hud-field-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+}
+
+.hud-field-row span {
+  color: #8E9BAE;
+}
+
+.hud-field-row b {
+  font-family: var(--mono);
+  color: #F8FAFC;
+}
+
+.hud-field-row select {
+  background: #111A2D;
+  border: 1px solid var(--hp-slate);
+  color: var(--hp-sand);
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+}
+
+.hud-actions-box {
+  background: rgba(28, 37, 65, 0.6);
+  border: 1px solid var(--hp-slate);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-top: 4px;
+}
+
+.hud-action-title {
+  display: block;
+  font-size: 9px;
+  color: var(--hp-cyan);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+
+.hud-btn-row {
+  display: flex;
+  gap: 6px;
+}
+
+.hud-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--hp-navy);
+  border: 1px solid var(--hp-slate);
+  color: var(--hp-sand);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 10.5px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.hud-action-btn:hover {
+  background: var(--hp-slate);
+  border-color: var(--hp-cyan);
+}
+
+.hud-action-btn.destructive:hover {
+  border-color: #EF4444;
+  color: #EF4444;
+}
+
+.hud-history-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(58, 80, 107, 0.4);
+}
+
+.hud-mini-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--hp-navy);
+  border: 1px solid var(--hp-slate);
+  color: #CBD5E1;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.hud-mini-btn:hover:not(:disabled) {
+  border-color: var(--hp-cyan);
+  color: #FFF;
+}
+
+.hud-mini-btn.primary {
+  background: rgba(91, 192, 222, 0.15);
+  border-color: var(--hp-cyan);
+  color: var(--hp-cyan);
+  font-weight: 600;
+}
+
+.hud-mini-btn.primary:hover {
+  background: var(--hp-cyan);
+  color: var(--hp-ink);
+}
+
+.hud-validation-alert {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 10px;
+  margin-top: 4px;
+}
+
+.hud-validation-alert.success {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #34D399;
+}
+
+.hud-validation-alert.warning {
+  background: rgba(217, 119, 6, 0.12);
+  border: 1px solid rgba(217, 119, 6, 0.3);
+  color: #FBBF24;
+}
+
+.hud-save-status {
+  font-size: 9px;
+  font-family: var(--mono);
+  color: var(--hp-sand);
+  background: rgba(91, 192, 222, 0.08);
+  border: 1px solid rgba(91, 192, 222, 0.25);
+  padding: 5px 8px;
+  border-radius: 6px;
+  line-height: 1.4;
+  margin-top: 4px;
+}
+
+.hud-note {
+  font-size: 10px;
+  color: #94A3B8;
+  line-height: 1.4;
+  margin: 4px 0 0;
+}
+
