@@ -26,9 +26,14 @@ permissions:
 
 jobs:
   backend-tests:
-    name: Python 3.11 Backend & Contract Suite
+    name: Python ${{ matrix.python-version }} Backend & Contract Suite
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.11 = project default; 3.12 = Ubuntu 24.04 system Python used on the EC2 host
+        python-version: ["3.11", "3.12"]
     env:
       HYDROPULSE_ENV: test
       HYDROPULSE_OPENROUTER_ENABLED: "false"
@@ -36,10 +41,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.11 (64-bit)
+      - name: Set up Python ${{ matrix.python-version }} (64-bit)
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
           cache: "pip"
 
       - name: Install dependencies from requirements.txt
@@ -49,6 +54,7 @@ jobs:
 
       - name: Verify Python syntax & schema/geo_mapper self-checks
         run: |
+          bash -n scripts/deploy-hydropulse-host.sh scripts/smoke_test.sh scripts/tunnel-url.sh scripts/run_backend.sh
           python -m py_compile backend/*.py data_utils/*.py
           python data_utils/geo_mapper.py
           python -c "from backend.config import load_config; cfg = load_config(); print(cfg.safe_summary())"

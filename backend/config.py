@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -53,6 +54,27 @@ def _parse_float(
     return parsed
 
 
+def _validate_cors_origin_regex(pattern: str, is_prod: bool) -> None:
+    """Reject CORS origin regexes that are unanchored, invalid, or effectively a wildcard."""
+    try:
+        compiled = re.compile(pattern)
+    except re.error as exc:
+        raise ValueError(f"HYDROPULSE_CORS_ORIGIN_REGEX is not a valid regex: {exc}") from exc
+    if not (pattern.startswith("^") and pattern.endswith("$")):
+        raise ValueError("HYDROPULSE_CORS_ORIGIN_REGEX must be anchored with '^' and '$'.")
+    if is_prod:
+        if not pattern.startswith("^https://"):
+            raise ValueError("HYDROPULSE_CORS_ORIGIN_REGEX must start with '^https://' in prod.")
+        # A pattern that also matches arbitrary unrelated origins is a wildcard in disguise.
+        for probe in ("https://evil.example", "https://attacker.vercel.app", "https://x.trycloudflare.com"):
+            if compiled.fullmatch(probe):
+                raise ValueError(
+                    "HYDROPULSE_CORS_ORIGIN_REGEX is too broad (it matches unrelated origins such as "
+                    f"{probe!r}). Pin it to your project/team, e.g. "
+                    r"'^https://hydropulse-[a-z0-9-]+-myteam[.]vercel[.]app$'."
+                )
+
+
 def resolve_repo_path(path_str: str | Path) -> Path:
     """Resolve a path relative to REPO_ROOT if it is not already absolute."""
     p = Path(path_str)
@@ -78,6 +100,9 @@ class BackendConfig:
         "http://localhost:4173",
         "http://127.0.0.1:4173",
     )
+    # Optional anchored regex for rotating origins such as Vercel Preview URLs
+    # (e.g. ^https://hydropulse-[a-z0-9-]+-myteam[.]vercel[.]app$). None = exact list only.
+    cors_origin_regex: str | None = None
 
     # File paths (always resolved against REPO_ROOT when relative)
     inp_path: Path = field(default_factory=lambda: resolve_repo_path("backend/bangalore_kengeri.inp"))
@@ -139,10 +164,21 @@ class BackendConfig:
                 "Specify explicit origins in HYDROPULSE_CORS_ORIGINS."
             )
 
+        if self.cors_origin_regex is not None:
+            _validate_cors_origin_regex(self.cors_origin_regex, is_prod=self.is_prod)
+
         if self.require_admin_auth and (not self.admin_token or len(self.admin_token.strip()) < 8):
             raise ValueError(
                 "HYDROPULSE_REQUIRE_ADMIN_AUTH=true requires a non-empty HYDROPULSE_ADMIN_TOKEN "
                 "(at least 8 characters)."
+            )
+
+        # The committed deploy template ships a >=8-char placeholder token. Booting with it would
+        # protect admin routes with a publicly known value, so refuse it outright in prod.
+        if self.is_prod and self.admin_token and "replace" in self.admin_token.lower():
+            raise ValueError(
+                "HYDROPULSE_ADMIN_TOKEN still contains the template placeholder. "
+                "Generate a real secret (e.g. `openssl rand -hex 32`)."
             )
 
         # Reject any accidental non-OpenRouter provider URL
@@ -163,6 +199,7 @@ class BackendConfig:
             "log_level": self.log_level,
             "reload": self.reload,
             "cors_origins": list(self.cors_origins),
+            "cors_origin_regex": self.cors_origin_regex,
             "inp_path": str(self.inp_path),
             "meta_path": str(self.meta_path),
             "presets_path": str(self.presets_path),
@@ -219,6 +256,8 @@ def load_config(environ: dict[str, str] | None = None) -> BackendConfig:
         )
     else:
         cors_origins = default_origins
+    cors_regex_raw = env_map.get("HYDROPULSE_CORS_ORIGIN_REGEX", "").strip()
+    cors_origin_regex = cors_regex_raw or None
 
     inp_raw = env_map.get("HYDROPULSE_INP", "backend/bangalore_kengeri.inp").strip()
     meta_raw = env_map.get("HYDROPULSE_META", "backend/network_meta.json").strip()
@@ -296,6 +335,7 @@ def load_config(environ: dict[str, str] | None = None) -> BackendConfig:
         log_level=log_level,
         reload=reload_flag,
         cors_origins=cors_origins,
+        cors_origin_regex=cors_origin_regex,
         inp_path=resolve_repo_path(inp_raw),
         meta_path=resolve_repo_path(meta_raw),
         presets_path=resolve_repo_path(presets_raw),
