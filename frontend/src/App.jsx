@@ -1,19 +1,20 @@
 import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
-import {
-  AlertTriangle,
-  X,
-} from 'lucide-react';
-import Header from './components/Header.jsx';
+import { ReactFlowProvider } from '@xyflow/react';
+import './styles/tokens.css';
+import './styles/base.css';
+import './styles/ops/shell.css';
+
+import AppShell from './components/AppShell.jsx';
 import ControlPanel from './components/ControlPanel.jsx';
 import MapCanvas from './components/MapCanvas.jsx';
 import IncidentPanel from './components/IncidentPanel.jsx';
-import PressureCharts from './components/PressureCharts.jsx';
-import RoiPanel from './components/RoiPanel.jsx';
-import StatusBanner from './components/StatusBanner.jsx';
-import NetworkStudio from './pages/NetworkStudio.jsx';
 import { useHydroPulse } from './hooks/useHydroPulse.js';
 
-// Lazy load Preview for dev-only UI primitive showcase
+// Lazy load NetworkStudio and PressureCharts with React.Suspense
+const NetworkStudio = lazy(() => import('./pages/NetworkStudio.jsx'));
+const PressureCharts = lazy(() => import('./components/PressureCharts.jsx'));
+
+// Dev-only UI primitive showcase
 const Preview = lazy(() => import('./ui/Preview.jsx'));
 
 export default function App() {
@@ -27,95 +28,208 @@ export default function App() {
     phase,
     lastResult,
     error,
-    load,
     simulate,
     isolate,
     reset,
   } = pulse;
-  const [selected, setSelected] = useState('J15'),
-    [area, setArea] = useState(25),
-    [noise, setNoise] = useState(1.5),
-    [judge, setJudge] = useState(false),
-    [revealed, setRevealed] = useState(false),
-    [chartsOpen, setChartsOpen] = useState(true),
-    [help, setHelp] = useState(false),
-    [roi, setRoi] = useState(false),
-    [focusNode, setFocusNode] = useState(null),
-    [toast, setToast] = useState('');
-  const [studioOpen, setStudioOpen] = useState(false);
-  const run = useCallback(
-    async (body, preset) => {
-      const req = { ...body, target_junction_id: selected };
-      if (preset) {
-        req.preset_scenario_id = preset.id;
-      }
-      try {
-        await simulate(req);
-      } catch {}
-    },
-    [simulate, network, selected],
-  );
-  useEffect(() => {
-    load();
-  }, [load]);
+
+  const [view, setView] = useState('operations'); // 'operations' | 'studio'
+  const [activeTab, setActiveTab] = useState('simulate'); // 'simulate' | 'incident' | 'sensors'
+  const [statusAnnouncement, setStatusAnnouncement] = useState('');
+  const [selected, setSelected] = useState('J15');
+  const [area, setArea] = useState(25);
+  const [noise, setNoise] = useState(1.5);
+  const [judge, setJudge] = useState(false);
+  const [revealed, setRevealed] = useState(false);
+  const [chartsOpen, setChartsOpen] = useState(true);
+  const [help, setHelp] = useState(false);
+  const [roi, setRoi] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+
+  // Auto-select Incident tab on simulation completion with polite live announcement
   useEffect(() => {
     if (lastResult) {
-      setJudge(false);
-      setRevealed(false);
+      setActiveTab('incident');
+      setStatusAnnouncement('Simulation completed. Incident panel selected.');
     }
   }, [lastResult]);
+
+  // Display error messages from useHydroPulse as banner toasts
   useEffect(() => {
     if (error) {
-      setToast(error);
-      const t = setTimeout(() => setToast(''), 5000);
-      return () => clearTimeout(t);
+      setToastMessage(error);
     }
   }, [error]);
+
+  // Node selection: sets target junction only when not in judge mode
+  const handleSelectNode = useCallback(
+    (nodeId) => {
+      if (!judge) {
+        setSelected(nodeId);
+      }
+    },
+    [judge],
+  );
+
+  const run = useCallback(
+    (params, preset) => {
+      const presetId = typeof preset === 'string' ? preset : preset?.id || null;
+      const targetId = params?.target_node_id || params?.target_junction_id || selected;
+      const leakArea = params?.leak_area_cm2 ?? params?.area_cm2 ?? area;
+      const noisePct = params?.noise_pct ?? noise;
+
+      if (!judge) {
+        setSelected(targetId);
+      }
+      setRevealed(false);
+      simulate(
+        {
+          target_node_id: targetId,
+          leak_area_cm2: Number(leakArea) || 25,
+          noise_pct: Number(noisePct) || 1.5,
+          seed: null,
+        },
+        presetId,
+      );
+    },
+    [judge, selected, area, noise, simulate],
+  );
+
+  // Keyboard shortcuts
   useEffect(() => {
-    const handler = (e) => {
-      if (studioOpen) return;
-      if (e.key === '1') run(presets[0], presets[0]);
-      if (e.key === '2') run(presets[1], presets[1]);
-      if (e.key === '3') run(presets[2], presets[2]);
-      if (e.key === ' ' && document.activeElement.tagName !== 'INPUT') {
+    const onKeyDown = (e) => {
+      // Ignore shortcuts when focus is inside input/select/textarea
+      const activeEl = document.activeElement;
+      const tag = activeEl?.tagName?.toLowerCase();
+      const isInput =
+        tag === 'input' ||
+        tag === 'select' ||
+        tag === 'textarea' ||
+        activeEl?.isContentEditable;
+      if (isInput) return;
+
+      // When Network Studio is open, all shortcuts are disabled except 'n'/'N' to exit
+      if (view === 'studio') {
+        if (e.key === 'n' || e.key === 'N') {
+          e.preventDefault();
+          setView('operations');
+        }
+        return;
+      }
+
+      // 'n' / 'N': Toggle view to/from Network Studio
+      if (e.key === 'n' || e.key === 'N') {
         e.preventDefault();
-        run(
-          { area_cm2: area, noise_pct: noise },
-          null,
-        );
+        setView('studio');
+        return;
       }
+
+      // '?' / '/': Help modal
+      if (e.key === '?' || e.key === '/') {
+        e.preventDefault();
+        setHelp((v) => !v);
+        return;
+      }
+
+      // 'Escape': Close modals
+      if (e.key === 'Escape') {
+        setHelp(false);
+        setRoi(false);
+        return;
+      }
+
+      // '1', '2', '3': Scenario presets
+      if (e.key === '1') {
+        e.preventDefault();
+        const p = presets?.[0];
+        if (p) run(p, p);
+        return;
+      }
+      if (e.key === '2') {
+        e.preventDefault();
+        const p = presets?.[1];
+        if (p) run(p, p);
+        return;
+      }
+      if (e.key === '3') {
+        e.preventDefault();
+        const p = presets?.[2];
+        if (p) run(p, p);
+        return;
+      }
+
+      // 'Space': Simulate custom burst
+      if (e.code === 'Space' || e.key === ' ') {
+        e.preventDefault();
+        run({ area_cm2: area, noise_pct: noise }, null);
+        return;
+      }
+
+      // 'i' / 'I': Isolate valves
       if (e.key === 'i' || e.key === 'I') {
+        e.preventDefault();
         isolate();
+        return;
       }
+
+      // 'r' / 'R': Reset incident
       if (e.key === 'r' || e.key === 'R') {
+        e.preventDefault();
         reset();
+        return;
       }
+
+      // 'j' / 'J': Toggle judge mode
       if (e.key === 'j' || e.key === 'J') {
+        e.preventDefault();
         setJudge((v) => !v);
         setRevealed(false);
+        return;
       }
+
+      // 'v' / 'V': Reveal/hide truth
       if (e.key === 'v' || e.key === 'V') {
-        setRevealed(true);
+        e.preventDefault();
+        setRevealed((v) => !v);
+        return;
       }
-      if (e.key === 'n' || e.key === 'N') {
-        setStudioOpen((v) => !v);
-      }
+
+      // 'b' / 'B': Toggle basemap
       if (e.key === 'b' || e.key === 'B') {
-        // Toggle basemap - handled by MapCanvas
+        e.preventDefault();
+        const basemapBtn = document.querySelector(
+          '[aria-label="Hide basemap"], [aria-label="Show basemap"]',
+        );
+        if (basemapBtn) {
+          basemapBtn.click();
+        }
+        return;
       }
+
+      // 'f' / 'F': Toggle fullscreen
       if (e.key === 'f' || e.key === 'F') {
-        // Toggle fullscreen - handled by MapCanvas
-      }
-      if (e.key === '?' || e.key === '/') {
-        setHelp((v) => !v);
+        e.preventDefault();
+        const fsBtn = document.querySelector(
+          '[aria-label="Enter fullscreen"], [aria-label="Exit fullscreen"]',
+        );
+        if (fsBtn) {
+          fsBtn.click();
+        } else if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen?.().catch(() => {});
+        } else {
+          document.exitFullscreen?.().catch(() => {});
+        }
+        return;
       }
     };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [presets, run, selected, area, noise, lastResult, isolate, reset, judge, studioOpen]);
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [view, presets, area, noise, run, isolate, reset]);
+
+  // Derived truth and candidate for distance/localization error calculation
   const truth = lastResult?.injected_node_id;
   const candidate = lastResult?.predicted_top_candidates?.[0]?.node_id;
-  // Older backend responses may omit localization_error_m, so derive distance from node coordinates.
   const distance =
     network?.nodes && truth && candidate
       ? (() => {
@@ -143,86 +257,134 @@ export default function App() {
   }
 
   return (
-    studioOpen ? (
-      <NetworkStudio
-        initialNetwork={network}
-        networkSource={networkSource}
-        onExit={() => setStudioOpen(false)}
-      />
-    ) : (
-    <main className='app-shell'>
-      <Header
-        network={network}
-        health={health}
-        mode={mode}
-        onStudioToggle={() => setStudioOpen(true)}
-        onHelpToggle={() => setHelp((v) => !v)}
-        onRoiToggle={() => setRoi((v) => !v)}
-      />
-      <ControlPanel
-        presets={presets}
-        selected={selected}
-        area={area}
-        noise={noise}
-        judge={judge}
-        onSelectedChange={setSelected}
-        onAreaChange={setArea}
-        onNoiseChange={setNoise}
-        onSimulate={(body, preset) => run(body, preset)}
-        onReset={reset}
-        onJudgeToggle={() => setJudge((v) => !v)}
-        network={network}
-      />
-      <MapCanvas
-        network={network}
-        selected={selected}
-        phase={phase}
-        lastResult={lastResult}
-        judge={judge}
-        showTruth={showTruth}
-        onSelect={setSelected}
-        onBasemapToggle={() => {}}
-        onFullscreenToggle={() => {}}
-      />
-      <IncidentPanel
-        phase={phase}
-        lastResult={lastResult}
-        judge={judge}
-        showTruth={showTruth}
-        errorMeters={errorMeters}
-        onIsolate={isolate}
-        onReset={reset}
-        onJudgeToggle={() => setJudge((v) => !v)}
-        onReveal={() => setRevealed(true)}
-      />
-      <PressureCharts
-        open={chartsOpen}
-        onToggle={() => setChartsOpen((v) => !v)}
-        lastResult={lastResult}
-      />
-      <RoiPanel open={roi} onClose={() => setRoi(false)} network={network} />
-      <StatusBanner message={toast} onDismiss={() => setToast('')} />
-      {help && (
-        <div className='help-modal'>
-          <div className='help-modal-content'>
-            <h2>Keyboard Shortcuts</h2>
-            <ul>
-              <li><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> — Quick scenarios</li>
-              <li><kbd>Space</kbd> — Simulate custom burst</li>
-              <li><kbd>I</kbd> — Isolate valves</li>
-              <li><kbd>R</kbd> — Reset incident</li>
-              <li><kbd>J</kbd> — Toggle judge mode</li>
-              <li><kbd>V</kbd> — Reveal truth</li>
-              <li><kbd>N</kbd> — Toggle Network Studio</li>
-              <li><kbd>B</kbd> — Toggle basemap</li>
-              <li><kbd>F</kbd> — Toggle fullscreen</li>
-              <li><kbd>?</kbd> — This help</li>
-            </ul>
-            <button onClick={() => setHelp(false)}>Close</button>
-          </div>
-        </div>
-      )}
-    </main>
-    )
+    <AppShell
+      view={view}
+      onViewChange={setView}
+      mode={mode}
+      networkSource={networkSource}
+      health={health}
+      network={network}
+      phase={phase}
+      lastResult={lastResult}
+      activeTab={activeTab}
+      onTabChange={setActiveTab}
+      statusAnnouncement={statusAnnouncement}
+      onSimulateBurst={() => run({ area_cm2: area, noise_pct: noise }, null)}
+      onHelp={() => setHelp(true)}
+      onRoi={() => setRoi(true)}
+      helpOpen={help}
+      onHelpClose={() => setHelp(false)}
+      roiOpen={roi}
+      onRoiClose={() => setRoi(false)}
+      statusMessage={toastMessage}
+      onDismissStatus={() => setToastMessage('')}
+      onRetryConnection={() => pulse.load()}
+      controlPanel={
+        <ControlPanel
+          presets={presets}
+          selected={selected}
+          area={area}
+          noise={noise}
+          judge={judge}
+          phase={phase}
+          onSelectedChange={handleSelectNode}
+          setSelected={handleSelectNode}
+          onAreaChange={setArea}
+          onNoiseChange={setNoise}
+          onSimulate={(body, preset) => run(body, preset)}
+          onReset={reset}
+          onIsolate={isolate}
+          onJudgeToggle={() => {
+            setJudge((v) => !v);
+            setRevealed(false);
+          }}
+          onReveal={() => setRevealed(true)}
+          revealed={revealed}
+          showTruth={showTruth}
+          network={network}
+          mode={mode}
+        />
+      }
+      mapCanvas={
+        <MapCanvas
+          network={network}
+          selected={selected}
+          phase={phase}
+          lastResult={lastResult}
+          result={lastResult}
+          isolatedValves={lastResult?.recommended_valves_to_close || []}
+          judge={judge}
+          showTruth={showTruth}
+          revealed={revealed}
+          onPick={handleSelectNode}
+          setSelected={handleSelectNode}
+          onSelect={handleSelectNode}
+        />
+      }
+      incidentPanel={
+        <IncidentPanel
+          network={network}
+          mode={mode}
+          onSimulate={simulate}
+          phase={phase}
+          result={lastResult}
+          lastResult={lastResult}
+          judge={judge}
+          showTruth={showTruth}
+          errorMeters={errorMeters}
+          error={error}
+          onIsolate={isolate}
+          onReset={reset}
+          onJudgeToggle={() => {
+            setJudge((v) => !v);
+            setRevealed(false);
+          }}
+          onReveal={() => setRevealed(true)}
+          onFocus={handleSelectNode}
+          onSelectNode={handleSelectNode}
+        />
+      }
+      pressureCharts={
+        <Suspense
+          fallback={
+            <div className="charts-loading" style={{ padding: 'var(--space-4)', color: 'var(--ink-muted)' }}>
+              Loading charts…
+            </div>
+          }
+        >
+          <PressureCharts
+            result={lastResult}
+            lastResult={lastResult}
+            open={chartsOpen || activeTab === 'sensors'}
+            onToggle={() => setChartsOpen((v) => !v)}
+          />
+        </Suspense>
+      }
+      studioShell={
+        <Suspense
+          fallback={
+            <div
+              className="studio-loading"
+              role="status"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: 'calc(100vh - 52px)',
+                color: 'var(--ink-muted)',
+                fontFamily: 'var(--font-sans)',
+              }}
+            >
+              Loading Network Studio…
+            </div>
+          }
+        >
+          <NetworkStudio
+            initialNetwork={network}
+            networkSource={networkSource}
+          />
+        </Suspense>
+      }
+    />
   );
 }

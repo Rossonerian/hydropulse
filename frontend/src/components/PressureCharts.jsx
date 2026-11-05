@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import {
   Bar,
   BarChart,
@@ -8,205 +9,206 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import { Activity, ChevronDown, ChevronUp } from 'lucide-react';
+import { EmptyState } from '../ui/index.js';
+import { getTokenValue, useTheme } from '../ui/useTheme.js';
 import { number } from '../lib/format.js';
-export default function PressureCharts({
-  result,
-  open,
-  onToggle,
-  sensorIds = [],
-}) {
-  // Baseline placeholders keep telemetry charts informative before the first event.
-  const data = (
-    result?.sensor_readings || [
-      {
-        sensor_id: sensorIds[0] || 'S1',
-        baseline_m: 42.5,
-        observed_m: 42.5,
-        drop_m: 0,
-      },
-      {
-        sensor_id: sensorIds[1] || 'S2',
-        baseline_m: 41.8,
-        observed_m: 41.8,
-        drop_m: 0,
-      },
-      {
-        sensor_id: sensorIds[2] || 'S3',
-        baseline_m: 40.2,
-        observed_m: 40.2,
-        drop_m: 0,
-      },
-      {
-        sensor_id: sensorIds[3] || 'S4',
-        baseline_m: 39.6,
-        observed_m: 39.6,
-        drop_m: 0,
-      },
-      {
-        sensor_id: sensorIds[4] || 'S5',
-        baseline_m: 38.9,
-        observed_m: 38.9,
-        drop_m: 0,
-      },
-    ]
-  ).map((d, i) => ({ ...d, label: `S${i + 1}` }));
+import '../styles/ops/charts_roi.css';
+
+const FONT_MONO = 'IBM Plex Mono, monospace';
+
+export default function PressureCharts({ result, open, onToggle }) {
+  const { theme } = useTheme();
+
+  // Recharts needs concrete colours; re-read tokens whenever the theme changes.
+  const colors = useMemo(
+    () => ({
+      grid: getTokenValue('--line'),
+      axis: getTokenValue('--line-strong'),
+      tick: getTokenValue('--ink-muted'),
+      baseline: getTokenValue('--ink-faint'),
+      observed: getTokenValue('--water'),
+      drop: getTokenValue('--valve'),
+      surface: getTokenValue('--surface-raised'),
+      ink: getTokenValue('--ink'),
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [theme],
+  );
+
+  const data = useMemo(
+    () =>
+      (result?.sensor_readings || []).map((d, i) => ({
+        ...d,
+        label: `S${i + 1}`,
+      })),
+    [result],
+  );
+
+  const tick = { fill: colors.tick, fontSize: 12, fontFamily: FONT_MONO };
+  const tooltipStyle = {
+    background: colors.surface,
+    border: `1px solid ${colors.axis}`,
+    borderRadius: 6,
+    color: colors.ink,
+    fontSize: 12,
+    fontFamily: FONT_MONO,
+  };
+
   return (
-    <section className={`charts-drawer ${open ? 'expanded' : 'collapsed'}`}>
-      <button className='drawer-handle' onClick={onToggle}>
-        <span className='handle-grip' />
-        <b>PRESSURE SIGNATURE</b>
-        <span className='drawer-caption'>SENTINEL SENSOR TELEMETRY</span>
-        <span className='drawer-result'>
-          {result ? 'POST-EVENT ANALYSIS' : 'BASELINE MONITORING'}
+    <section
+      className={`charts-drawer ${open ? 'expanded' : 'collapsed'}`}
+      aria-label="Sensor readings"
+    >
+      <button
+        type="button"
+        className="drawer-handle"
+        onClick={onToggle}
+        aria-expanded={Boolean(open)}
+      >
+        <span className="handle-grip" aria-hidden="true" />
+        <b>Sensor readings</b>
+        <span className="drawer-result">
+          {result ? 'Latest simulation' : 'Awaiting simulation'}
         </span>
-        <span className='drawer-chevron'>{open ? '⌄' : '⌃'}</span>
+        <span className="drawer-chevron" aria-hidden="true">
+          {open ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+        </span>
       </button>
       {open && (
-        <div className='charts-body'>
-          <div className='chart-block'>
-            <div className='chart-heading'>
-              <span>PRESSURE RESPONSE</span>
-              <small>
-                BASELINE VS OBSERVED <i>· m</i>
-              </small>
+        <div className="charts-body">
+          {data.length === 0 ? (
+            <div className="charts-empty">
+              <EmptyState
+                icon={Activity}
+                title="No readings yet"
+                body="Sensor readings appear after a simulation."
+              />
             </div>
-            <ResponsiveContainer width='100%' height='100%'>
-              <BarChart
-                data={data}
-                margin={{ top: 18, right: 12, left: -19, bottom: 0 }}
-                barGap={3}
-              >
-                <CartesianGrid
-                  stroke='#1E2A44'
-                  strokeDasharray='3 5'
-                  vertical={false}
-                />
-                <XAxis
-                  dataKey='label'
-                  tick={{
-                    fill: '#71809b',
-                    fontSize: 10,
-                    fontFamily: 'JetBrains Mono',
-                  }}
-                  axisLine={{ stroke: '#263247' }}
-                  tickLine={false}
-                />
-                <YAxis
-                  domain={[0, 'auto']}
-                  tick={{
-                    fill: '#71809b',
-                    fontSize: 9,
-                    fontFamily: 'JetBrains Mono',
-                  }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <Tooltip
-                  contentStyle={{
-                    background: '#10192a',
-                    border: '1px solid #263247',
-                    borderRadius: 8,
-                    color: '#e2e8f0',
-                    fontSize: 11,
-                  }}
-                />
-                <Bar
-                  dataKey='baseline_m'
-                  name='Baseline'
-                  fill='#344563'
-                  radius={[3, 3, 0, 0]}
-                  maxBarSize={24}
-                />
-                <Bar
-                  dataKey='observed_m'
-                  name='Observed'
-                  fill='#22D3EE'
-                  radius={[3, 3, 0, 0]}
-                  maxBarSize={24}
-                >
-                  <LabelList
-                    dataKey='drop_m'
-                    position='top'
-                    formatter={(value) => `−${number(value, 1)}`}
-                    fill='#f2b74a'
-                    fontSize={8}
-                    fontFamily='JetBrains Mono'
-                  />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          <div className='signature-block'>
-            <div className='chart-heading'>
-              <span>DROP SIGNATURE</span>
-              <small>
-                FINGERPRINT <i>· Δm</i>
-              </small>
-            </div>
-            <ResponsiveContainer width='100%' height='100%'>
-              <BarChart
-                data={data}
-                margin={{ top: 16, right: 5, left: -24, bottom: 0 }}
-              >
-                <CartesianGrid
-                  stroke='#1E2A44'
-                  strokeDasharray='3 5'
-                  vertical={false}
-                />
-                <XAxis
-                  dataKey='label'
-                  tick={{
-                    fill: '#71809b',
-                    fontSize: 9,
-                    fontFamily: 'JetBrains Mono',
-                  }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{
-                    fill: '#71809b',
-                    fontSize: 9,
-                    fontFamily: 'JetBrains Mono',
-                  }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <Tooltip
-                  contentStyle={{
-                    background: '#10192a',
-                    border: '1px solid #263247',
-                    borderRadius: 8,
-                    color: '#e2e8f0',
-                    fontSize: 11,
-                  }}
-                />
-                <Bar
-                  dataKey='drop_m'
-                  name='Pressure drop'
-                  fill='#F59E0B'
-                  radius={[3, 3, 0, 0]}
-                  maxBarSize={23}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          <div className='chart-insight'>
-            <div className='insight-mark'>⌁</div>
-            <div>
-              <b>
-                {result
-                  ? 'Distinctive pressure fingerprint detected'
-                  : 'System standing by'}
-              </b>
-              <span>
-                {result
-                  ? 'Cosine matcher aligned across five sentinel nodes'
-                  : 'Pressure drops will appear after a burst simulation'}
-              </span>
-            </div>
-            <span className='matcher-score'>{result ? '0.942' : '—'}</span>
-          </div>
+          ) : (
+            <>
+              <div className="chart-block">
+                <div className="chart-heading">
+                  <span>Pressure</span>
+                  <small>
+                    Baseline vs observed <i>m</i>
+                  </small>
+                </div>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={data}
+                    margin={{ top: 18, right: 12, left: 0, bottom: 0 }}
+                    barGap={3}
+                  >
+                    <CartesianGrid
+                      stroke={colors.grid}
+                      strokeDasharray="3 5"
+                      vertical={false}
+                    />
+                    <XAxis
+                      dataKey="label"
+                      tick={tick}
+                      axisLine={{ stroke: colors.axis }}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      domain={[0, 'auto']}
+                      tick={tick}
+                      axisLine={false}
+                      tickLine={false}
+                      width={36}
+                      label={{
+                        value: 'm',
+                        angle: -90,
+                        position: 'insideLeft',
+                        fill: colors.tick,
+                        fontSize: 12,
+                        fontFamily: FONT_MONO,
+                      }}
+                    />
+                    <Tooltip
+                      contentStyle={tooltipStyle}
+                      cursor={{ fill: colors.grid, fillOpacity: 0.4 }}
+                    />
+                    <Bar
+                      dataKey="baseline_m"
+                      name="Baseline"
+                      fill={colors.baseline}
+                      radius={[3, 3, 0, 0]}
+                      maxBarSize={24}
+                    />
+                    <Bar
+                      dataKey="observed_m"
+                      name="Observed"
+                      fill={colors.observed}
+                      radius={[3, 3, 0, 0]}
+                      maxBarSize={24}
+                    >
+                      <LabelList
+                        dataKey="drop_m"
+                        position="top"
+                        formatter={(value) => `−${number(value, 1)}`}
+                        fill={colors.drop}
+                        fontSize={12}
+                        fontFamily={FONT_MONO}
+                      />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="signature-block">
+                <div className="chart-heading">
+                  <span>Drop</span>
+                  <small>
+                    Pressure drop <i>Δm</i>
+                  </small>
+                </div>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={data}
+                    margin={{ top: 16, right: 8, left: 0, bottom: 0 }}
+                  >
+                    <CartesianGrid
+                      stroke={colors.grid}
+                      strokeDasharray="3 5"
+                      vertical={false}
+                    />
+                    <XAxis
+                      dataKey="label"
+                      tick={tick}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      tick={tick}
+                      axisLine={false}
+                      tickLine={false}
+                      width={36}
+                      label={{
+                        value: 'Δm',
+                        angle: -90,
+                        position: 'insideLeft',
+                        fill: colors.tick,
+                        fontSize: 12,
+                        fontFamily: FONT_MONO,
+                      }}
+                    />
+                    <Tooltip
+                      contentStyle={tooltipStyle}
+                      cursor={{ fill: colors.grid, fillOpacity: 0.4 }}
+                    />
+                    <Bar
+                      dataKey="drop_m"
+                      name="Pressure drop"
+                      fill={colors.drop}
+                      radius={[3, 3, 0, 0]}
+                      maxBarSize={24}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </>
+          )}
         </div>
       )}
     </section>

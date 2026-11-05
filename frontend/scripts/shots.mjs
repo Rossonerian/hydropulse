@@ -5,8 +5,9 @@
 //   PLAYWRIGHT_DIR=/tmp/hp-tools/node_modules node scripts/shots.mjs screenshots/redesign/after
 // Optional: BASE_URL (default http://127.0.0.1:5173), VIEWPORTS=1366x768,390x844, STATES=ops-idle,studio-map,
 // THEME=day (sets localStorage hp-theme before load).
+// BYPASS_FILE=<path> reads a Vercel protection-bypass secret and sends it only to BASE_URL requests.
 import { createRequire } from 'node:module';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 const require = createRequire(
@@ -16,6 +17,7 @@ const { chromium } = require('playwright');
 
 const outDir = resolve(process.argv[2] || 'screenshots/redesign/after');
 const baseUrl = process.env.BASE_URL || 'http://127.0.0.1:5173';
+const bypass = process.env.BYPASS_FILE ? readFileSync(process.env.BYPASS_FILE, 'utf8').trim() : null;
 const allViewports = [
   [1920, 1080],
   [1440, 900],
@@ -140,6 +142,16 @@ const report = [];
 const browser = await chromium.launch();
 for (const [w, h] of viewports) {
   const context = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 1 });
+  if (bypass)
+    await context.route(`${new URL(baseUrl).origin}/**`, (route) =>
+      route.continue({
+        headers: {
+          ...route.request().headers(),
+          'x-vercel-protection-bypass': bypass,
+          'x-vercel-set-bypass-cookie': 'true',
+        },
+      }),
+    );
   if (process.env.THEME)
     await context.addInitScript((t) => {
       try {
