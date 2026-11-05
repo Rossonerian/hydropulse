@@ -1,30 +1,52 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   CircleMarker,
   MapContainer,
-  Marker,
   Polygon,
   Polyline,
-  Popup,
   TileLayer,
   Tooltip,
   useMap,
 } from 'react-leaflet';
-import L from 'leaflet';
-import {
-  AlertTriangle,
-  Compass,
-  Database,
-  Eye,
-  EyeOff,
-  Filter,
-  Info,
-  Layers,
-  MapPin,
-  Maximize2,
-  Sliders,
-} from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
+import { Switch } from '../ui/index.js';
 import { KENGERI_AOI, REAL_WORLD_FEATURES } from '../lib/realWorldData.js';
+import '../styles/studio/mapviews.css';
+
+// Data colours: fixed hues for features that have no semantic token.
+// Mid-tone so they stay readable on both the dark and the light basemap.
+const SEWER_COLOUR = '#A855F7'; // data colour
+const STP_STROKE = '#C084FC'; // data colour
+const STP_FILL = '#7E22CE'; // data colour
+const PUMP_COLOUR = '#3B82F6'; // data colour
+const RAIN_COLOUR = '#3B82F6'; // data colour
+
+const readTheme = () =>
+  (typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme')) || 'night';
+
+// Re-render when the app theme flips so map colours track the tokens.
+function useThemeName() {
+  const [theme, setTheme] = useState(readTheme);
+  useEffect(() => {
+    const observer = new MutationObserver(() => setTheme(readTheme()));
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => observer.disconnect();
+  }, []);
+  return theme;
+}
+
+function readPalette() {
+  const style = getComputedStyle(document.documentElement);
+  const pick = (name) => style.getPropertyValue(name).trim();
+  return {
+    water: pick('--water'),
+    sensor: pick('--sensor'),
+    valve: pick('--valve'),
+    ink: pick('--ink'),
+    inkFaint: pick('--ink-faint'),
+    surface: pick('--surface'),
+  };
+}
 
 // Custom Map Bounds Fitter
 function MapBoundsManager({ center, zoom }) {
@@ -39,19 +61,20 @@ export default function GeographicMapCanvas({
   selectedFeature,
   onSelectFeature,
   visibleLayers = {},
-  onToggleLayer,
   stagedLayers = [],
 }) {
   const [basemapOn, setBasemapOn] = useState(true);
   const [tileError, setTileError] = useState(false);
-  const [layersOpen, setLayersOpen] = useState(true);
+  const theme = useThemeName();
+  const P = useMemo(readPalette, [theme]);
+  const tileStyle = theme === 'day' ? 'light_all' : 'dark_all';
 
   return (
-    <div className='geo-map-wrapper'>
+    <div className='stu-geo'>
       <MapContainer
         center={[KENGERI_AOI.center.lat, KENGERI_AOI.center.lng]}
         zoom={KENGERI_AOI.zoom}
-        className='geo-leaflet-map'
+        className='stu-geo__map'
         zoomControl={false}
         preferCanvas={true}
         attributionControl={false}
@@ -61,7 +84,8 @@ export default function GeographicMapCanvas({
         {/* Basemap Tiles with Offline Grid Fallback */}
         {basemapOn && !tileError && (
           <TileLayer
-            url='https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+            key={tileStyle}
+            url={`https://{s}.basemaps.cartocdn.com/${tileStyle}/{z}/{x}/{y}{r}.png`}
             subdomains='abcd'
             maxZoom={19}
             eventHandlers={{
@@ -77,10 +101,10 @@ export default function GeographicMapCanvas({
               key={b.id}
               positions={b.coordinates}
               pathOptions={{
-                color: '#64748B',
+                color: P.inkFaint,
                 weight: 2,
                 dashArray: '6 6',
-                fillColor: '#3B82F6',
+                fillColor: P.water,
                 fillOpacity: 0.04,
               }}
               eventHandlers={{
@@ -100,14 +124,14 @@ export default function GeographicMapCanvas({
                   key={wb.id}
                   positions={wb.coordinates}
                   pathOptions={{
-                    color: '#38BDF8',
+                    color: P.water,
                     weight: 2,
-                    fillColor: '#0284C7',
-                    fillOpacity: 0.45,
+                    fillColor: P.water,
+                    fillOpacity: 0.35,
                   }}
                   eventHandlers={{ click: () => onSelectFeature(wb) }}
                 >
-                  <Tooltip sticky>{wb.name} (Rejuvenated 2021)</Tooltip>
+                  <Tooltip sticky>{wb.name} (rejuvenated 2021)</Tooltip>
                 </Polygon>
               );
             }
@@ -116,7 +140,7 @@ export default function GeographicMapCanvas({
                 key={wb.id}
                 positions={wb.coordinates}
                 pathOptions={{
-                  color: '#38BDF8',
+                  color: P.water,
                   weight: 5,
                   opacity: 0.8,
                 }}
@@ -136,7 +160,7 @@ export default function GeographicMapCanvas({
                 key={pipe.id}
                 positions={pipe.coordinates}
                 pathOptions={{
-                  color: isSelected ? '#F59E0B' : '#A855F7',
+                  color: isSelected ? P.ink : SEWER_COLOUR,
                   weight: isSelected ? 5.5 : 3.5,
                   dashArray: '7 6',
                   opacity: 0.9,
@@ -144,7 +168,7 @@ export default function GeographicMapCanvas({
                 eventHandlers={{ click: () => onSelectFeature(pipe) }}
               >
                 <Tooltip sticky>
-                  {pipe.name} · Ø{pipe.properties.diameter_mm} mm (SEWER NON-POTABLE)
+                  {pipe.name} · Ø{pipe.properties.diameter_mm} mm (sewer, non-potable)
                 </Tooltip>
               </Polyline>
             );
@@ -158,9 +182,9 @@ export default function GeographicMapCanvas({
               center={stp.coordinates}
               radius={9}
               pathOptions={{
-                color: '#C084FC',
-                fillColor: '#7E22CE',
-                fillOpacity: 0.9,
+              color: STP_STROKE,
+              fillColor: STP_FILL,
+              fillOpacity: 0.9,
                 weight: 2.5,
               }}
               eventHandlers={{ click: () => onSelectFeature(stp) }}
@@ -184,7 +208,7 @@ export default function GeographicMapCanvas({
                 key={pipe.id}
                 positions={pipe.coordinates}
                 pathOptions={{
-                  color: isSelected ? '#F59E0B' : '#22D3EE',
+                  color: isSelected ? P.ink : P.water,
                   weight,
                   opacity: 0.92,
                 }}
@@ -209,8 +233,8 @@ export default function GeographicMapCanvas({
               center={v.coordinates}
               radius={5.5}
               pathOptions={{
-                color: '#FFFFFF',
-                fillColor: '#F59E0B',
+                color: P.surface,
+                fillColor: P.valve,
                 fillOpacity: 1.0,
                 weight: 1.5,
               }}
@@ -232,8 +256,8 @@ export default function GeographicMapCanvas({
               center={ps.coordinates}
               radius={7.5}
               pathOptions={{
-                color: '#FFFFFF',
-                fillColor: '#3B82F6',
+                color: P.surface,
+                fillColor: PUMP_COLOUR,
                 fillOpacity: 1.0,
                 weight: 2,
               }}
@@ -255,8 +279,8 @@ export default function GeographicMapCanvas({
               center={bw.coordinates}
               radius={5}
               pathOptions={{
-                color: '#0D1424',
-                fillColor: '#10B981',
+                color: P.surface,
+                fillColor: P.sensor,
                 fillOpacity: 0.95,
                 weight: 1.5,
               }}
@@ -265,7 +289,7 @@ export default function GeographicMapCanvas({
               <Tooltip sticky>
                 <b>{bw.name}</b>
                 <br />
-                Water Table: {bw.properties.water_level_mbgl} m bgl · Yield: {bw.properties.yield_lpm} LPM
+                Water table: {bw.properties.water_level_mbgl} m bgl · Yield: {bw.properties.yield_lpm} LPM
               </Tooltip>
             </CircleMarker>
           ))}
@@ -280,9 +304,9 @@ export default function GeographicMapCanvas({
                 center={st.coordinates}
                 radius={8}
                 pathOptions={{
-                  color: '#22D3EE',
-                  fillColor: '#0E7490',
-                  fillOpacity: 0.9,
+                  color: P.water,
+                  fillColor: P.water,
+                  fillOpacity: 0.6,
                   weight: 2,
                 }}
                 eventHandlers={{ click: () => onSelectFeature(st) }}
@@ -290,7 +314,7 @@ export default function GeographicMapCanvas({
                 <Tooltip sticky>
                   <b>{st.name}</b>
                   <br />
-                  6-Hourly Telemetry: {st.properties.latest_water_level_mbgl} m bgl
+                  6-hourly telemetry: {st.properties.latest_water_level_mbgl} m bgl
                 </Tooltip>
               </CircleMarker>
             ))}
@@ -302,9 +326,9 @@ export default function GeographicMapCanvas({
                 center={st.coordinates}
                 radius={8}
                 pathOptions={{
-                  color: '#34D399',
-                  fillColor: '#059669',
-                  fillOpacity: 0.9,
+                  color: P.sensor,
+                  fillColor: P.sensor,
+                  fillOpacity: 0.6,
                   weight: 2,
                 }}
                 eventHandlers={{ click: () => onSelectFeature(st) }}
@@ -324,9 +348,9 @@ export default function GeographicMapCanvas({
                 center={st.coordinates}
                 radius={8}
                 pathOptions={{
-                  color: '#60A5FA',
-                  fillColor: '#1D4ED8',
-                  fillOpacity: 0.9,
+                  color: RAIN_COLOUR,
+                  fillColor: RAIN_COLOUR,
+                  fillOpacity: 0.6,
                   weight: 2,
                 }}
                 eventHandlers={{ click: () => onSelectFeature(st) }}
@@ -334,7 +358,7 @@ export default function GeographicMapCanvas({
                 <Tooltip sticky>
                   <b>{st.name}</b>
                   <br />
-                  Annual Rainfall: {st.properties.annual_rainfall_2025_mm} mm
+                  Annual rainfall: {st.properties.annual_rainfall_2025_mm} mm
                 </Tooltip>
               </CircleMarker>
             ))}
@@ -342,124 +366,22 @@ export default function GeographicMapCanvas({
         )}
       </MapContainer>
 
-      {/* Floating Layer Control Drawer */}
-      <aside className={`geo-layer-control clay-panel ${layersOpen ? 'is-open' : 'is-collapsed'}`}>
-        <div className='geo-layer-header' onClick={() => setLayersOpen((o) => !o)}>
-          <div className='geo-layer-title'>
-            <Layers size={15} />
-            <b>Geographic Layers</b>
-          </div>
-          <span className='geo-layer-toggle-btn'>{layersOpen ? 'Hide' : 'Show'}</span>
-        </div>
-
-        {layersOpen && (
-          <div className='geo-layer-list'>
-            <label className='layer-check-item'>
-              <input
-                type='checkbox'
-                checked={visibleLayers.potable_water ?? true}
-                onChange={() => onToggleLayer('potable_water')}
-              />
-              <span className='layer-color-dot' style={{ background: '#22D3EE' }} />
-              <span className='layer-name'>Potable Mains (BWSSB)</span>
-              <span className='layer-count'>{REAL_WORLD_FEATURES.potablePipes.length}</span>
-            </label>
-
-            <label className='layer-check-item'>
-              <input
-                type='checkbox'
-                checked={visibleLayers.valves ?? true}
-                onChange={() => onToggleLayer('valves')}
-              />
-              <span className='layer-color-dot' style={{ background: '#F59E0B' }} />
-              <span className='layer-name'>Valves (Sluice & Air)</span>
-              <span className='layer-count'>{REAL_WORLD_FEATURES.valves.length}</span>
-            </label>
-
-            <label className='layer-check-item'>
-              <input
-                type='checkbox'
-                checked={visibleLayers.infrastructure ?? true}
-                onChange={() => onToggleLayer('infrastructure')}
-              />
-              <span className='layer-color-dot' style={{ background: '#3B82F6' }} />
-              <span className='layer-name'>Pumping Stations</span>
-              <span className='layer-count'>{REAL_WORLD_FEATURES.pumpingStations.length}</span>
-            </label>
-
-            <label className='layer-check-item'>
-              <input
-                type='checkbox'
-                checked={visibleLayers.groundwater ?? true}
-                onChange={() => onToggleLayer('groundwater')}
-              />
-              <span className='layer-color-dot' style={{ background: '#10B981' }} />
-              <span className='layer-name'>Public Borewells</span>
-              <span className='layer-count'>{REAL_WORLD_FEATURES.borewells.length}</span>
-            </label>
-
-            <label className='layer-check-item'>
-              <input
-                type='checkbox'
-                checked={visibleLayers.sewerage ?? true}
-                onChange={() => onToggleLayer('sewerage')}
-              />
-              <span className='layer-color-dot' style={{ background: '#A855F7' }} />
-              <span className='layer-name'>Sewerage (Non-Potable)</span>
-              <span className='layer-count'>{REAL_WORLD_FEATURES.sewerPipes.length + 1}</span>
-            </label>
-
-            <label className='layer-check-item'>
-              <input
-                type='checkbox'
-                checked={visibleLayers.surface_water ?? true}
-                onChange={() => onToggleLayer('surface_water')}
-              />
-              <span className='layer-color-dot' style={{ background: '#38BDF8' }} />
-              <span className='layer-name'>Hydrology & Lake</span>
-              <span className='layer-count'>{REAL_WORLD_FEATURES.waterBodies.length}</span>
-            </label>
-
-            <label className='layer-check-item'>
-              <input
-                type='checkbox'
-                checked={visibleLayers.monitors ?? true}
-                onChange={() => onToggleLayer('monitors')}
-              />
-              <span className='layer-color-dot' style={{ background: '#34D399' }} />
-              <span className='layer-name'>Telemetry & Monitors</span>
-              <span className='layer-count'>3</span>
-            </label>
-
-            <label className='layer-check-item'>
-              <input
-                type='checkbox'
-                checked={visibleLayers.admin_boundary ?? true}
-                onChange={() => onToggleLayer('admin_boundary')}
-              />
-              <span className='layer-color-dot' style={{ background: '#64748B' }} />
-              <span className='layer-name'>Ward 159 Boundary</span>
-              <span className='layer-count'>1</span>
-            </label>
-
-            <div className='geo-basemap-toggle-row'>
-              <span>CARTO Dark Basemap</span>
-              <button
-                className={`basemap-toggle-btn ${basemapOn ? 'is-active' : ''}`}
-                onClick={() => setBasemapOn((b) => !b)}
-              >
-                {basemapOn ? 'Enabled' : 'Off (Grid)'}
-              </button>
-            </div>
-          </div>
-        )}
-      </aside>
-
-      {/* Audit Caution Legend Pill */}
-      <div className='geo-audit-pill'>
-        <AlertTriangle size={13} />
-        <span>Source-Mapped GIS · Positional accuracy caveat per CAG 2022 Audit</span>
+      <div className='stu-geo__controls'>
+        <Switch
+          className='stu-geo__basemap'
+          label='Basemap tiles'
+          checked={basemapOn && !tileError}
+          onChange={(on) => {
+            if (on) setTileError(false);
+            setBasemapOn(on);
+          }}
+        />
       </div>
+
+      <p className='stu-geo__caveat'>
+        <AlertTriangle size={14} aria-hidden='true' />
+        <span>Source-mapped GIS · positional accuracy caveat per CAG 2022 audit</span>
+      </p>
     </div>
   );
 }
