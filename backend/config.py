@@ -260,8 +260,8 @@ def load_config(environ: dict[str, str] | None = None) -> BackendConfig:
         fallback_models = tuple(m.strip() for o in raw_fallbacks.split(",") if (m := o.strip()))
     else:
         fallback_models = (
-            "google/gemma-4-31b-it:free",
-            "google/gemma-4-26b-a4b-it:free",
+            "qwen/qwen-2.5-72b-instruct:free",
+            "mistralai/mistral-small-3.1-24b-instruct:free",
         )
     openrouter_base_url = (
         (env_map.get("HYDROPULSE_OPENROUTER_BASE_URL") or env_map.get("OPENROUTER_BASE_URL") or "https://openrouter.ai/api/v1").strip().rstrip("/")

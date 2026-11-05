@@ -12,7 +12,7 @@ import logging
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 
@@ -240,9 +240,13 @@ def what_if(req: WhatIfRequest) -> WhatIfResponse:
 
 
 @app.get("/api/ai/suggestions", response_model=AiSuggestionsResponse)
-def get_ai_suggestions() -> AiSuggestionsResponse:
+def get_ai_suggestions(
+    x_openrouter_key: str | None = Header(None, alias="X-OpenRouter-Key"),
+    openrouter_key: str | None = Query(None, alias="openrouter_key"),
+) -> AiSuggestionsResponse:
     """Return simulation-validated structural and sensor placement recommendations."""
-    return ai_advisor.get_suggestions(_engine())
+    effective_key = x_openrouter_key or openrouter_key
+    return ai_advisor.get_suggestions(_engine(), openrouter_api_key=effective_key)
 
 
 @app.post("/api/ai/apply-suggestion", response_model=ApplySuggestionResponse, dependencies=[Depends(require_admin)])
