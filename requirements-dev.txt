@@ -1,0 +1,11 @@
+# Development / test / data-generation dependencies.
+# Runtime deps live in requirements.txt (used by Dockerfile and deploy script).
+-r requirements.txt
+pytest>=8,<10
+requests>=2.31,<3
+# Only needed by backend/generate_bangalore_dma.py (OSM download) -- `make network`.
+osmnx>=1.9,<3
+# Tooling
+ruff>=0.5
+mypy>=1.8
+pre-commit>=3.7

@@ -47,7 +47,7 @@ fi
 # Upgrade pip and install requirements
 echo "Installing Python dependencies..."
 python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+python -m pip install -r requirements-dev.txt
 
 # Setup frontend if package.json exists
 if [ -f "frontend/package.json" ]; then

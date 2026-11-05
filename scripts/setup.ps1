@@ -50,7 +50,7 @@ if (-not (Test-Path ".venv")) {
 
 Write-Host "Installing Python dependencies..."
 & .\.venv\Scripts\python.exe -m pip install --upgrade pip
-& .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+& .\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
 
 if (Test-Path "frontend/package.json") {
     Write-Host "Installing npm dependencies in frontend..."
