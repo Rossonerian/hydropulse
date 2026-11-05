@@ -19,11 +19,12 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           const path = id.replaceAll('\\', '/');
+          if (path.includes('commonjsHelpers')) return 'react';
           if (!path.includes('/node_modules/')) return;
-          if (/\/(recharts|d3-[^/]+|victory-vendor)\//.test(path))
+          if (/\/node_modules\/(recharts|d3-[^/]+|victory-vendor)\//.test(path))
             return 'charts';
-          if (/\/(leaflet|react-leaflet)\//.test(path)) return 'map';
-          if (/\/(react|react-dom|scheduler)\//.test(path)) return 'react';
+          if (/\/node_modules\/(leaflet|react-leaflet)\//.test(path)) return 'map';
+          if (/\/node_modules\/(react|react-dom|scheduler)\//.test(path)) return 'react';
         },
       },
     },
