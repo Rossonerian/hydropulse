@@ -11,6 +11,7 @@ import Terrain3DViewer from './components/Terrain3DViewer.jsx';
 import IncidentPanel from './components/IncidentPanel.jsx';
 import WelcomeScreen from './components/WelcomeScreen.jsx';
 import NetworkImportModal from './components/NetworkImportModal.jsx';
+import GuidedTour from './components/GuidedTour.jsx';
 import { Toast } from './ui/index.js';
 import { useHydroPulse } from './hooks/useHydroPulse.js';
 
@@ -36,6 +37,22 @@ function writeEntry(v) {
     else localStorage.removeItem(ENTRY_KEY);
   } catch {
     /* storage unavailable: choice just isn't remembered */
+  }
+}
+
+const TOUR_KEY = 'hp-tour';
+function tourDone() {
+  try {
+    return localStorage.getItem(TOUR_KEY) === 'done';
+  } catch {
+    return false;
+  }
+}
+function markTourDone() {
+  try {
+    localStorage.setItem(TOUR_KEY, 'done');
+  } catch {
+    /* storage unavailable: tour may show again */
   }
 }
 
@@ -79,6 +96,7 @@ export default function App() {
   const [entry, setEntry] = useState(readEntry);
   const [importOpen, setImportOpen] = useState(false);
   const [notice, setNotice] = useState(null);
+  const [tourOpen, setTourOpen] = useState(() => readEntry() === 'demo' && !tourDone());
 
   const customData = !!health?.source && health.source !== 'synthetic';
 
@@ -86,6 +104,11 @@ export default function App() {
     writeEntry(choice);
     setEntry(choice);
     if (choice === 'import') setImportOpen(true);
+    if (choice === 'demo' && !tourDone()) setTourOpen(true);
+  }, []);
+  const closeTour = useCallback(() => {
+    markTourDone();
+    setTourOpen(false);
   }, []);
   const openDataSource = useCallback(() => {
     writeEntry(null);
@@ -355,6 +378,18 @@ export default function App() {
             onActivated={handleNetworkChanged}
             onNotify={(tone, message) => setNotice({ tone, message })}
           />
+          {tourOpen && entry === 'demo' && !importOpen && view === 'operations' && (
+            <GuidedTour
+              onClose={closeTour}
+              onPickPreset={() => {
+                const p = presets?.[0];
+                if (p) setSelected(p.target_node_id || selected);
+              }}
+              onRun={() => run({ area_cm2: area, noise_pct: noise }, null)}
+              onOpenStudio={() => setView('studio')}
+              canRun={!!network && phase !== 'simulating'}
+            />
+          )}
           {notice && (
             <Toast tone={notice.tone} message={notice.message} onDismiss={() => setNotice(null)} />
           )}
@@ -373,6 +408,7 @@ export default function App() {
       statusAnnouncement={statusAnnouncement}
       onSimulateBurst={() => run({ area_cm2: area, noise_pct: noise }, null)}
       onHelp={() => setHelp(true)}
+      onReplayTour={() => setTourOpen(true)}
       onRoi={() => setRoi(true)}
       helpOpen={help}
       onHelpClose={() => setHelp(false)}

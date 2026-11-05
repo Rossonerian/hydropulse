@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { CheckCircle2 } from 'lucide-react';
 import { Modal, Button, Field } from '../ui/index.js';
 import { client } from '../api/client.js';
 import '../styles/ops/import.css';
@@ -12,6 +13,52 @@ const SOURCE_LABELS = {
   ward_preset: 'Ward preset',
   net3_fallback: 'Fallback network',
 };
+
+// Tiny built-in EPANET network: 1 reservoir, 5 junctions. Coordinates are x = lng, y = lat (EPSG:4326).
+const SAMPLE_INP = `[TITLE]
+HydroPulse sample network
+
+[JUNCTIONS]
+;ID  Elev  Demand
+J1   900   2
+J2   898   2
+J3   897   2
+J4   896   2
+J5   895   2
+
+[RESERVOIRS]
+;ID  Head
+R1   935
+
+[PIPES]
+;ID Node1 Node2 Length Diameter Roughness MinorLoss Status
+P1  R1    J1    300    200      130       0         Open
+P2  J1    J2    250    150      130       0         Open
+P3  J2    J3    250    150      130       0         Open
+P4  J2    J4    250    100      130       0         Open
+P5  J4    J5    250    100      130       0         Open
+
+[OPTIONS]
+Units    LPS
+Headloss H-W
+
+[TIMES]
+Duration 0
+
+[COORDINATES]
+;Node  X        Y
+R1     77.4838  12.9081
+J1     77.4846  12.9081
+J2     77.4852  12.9081
+J3     77.4860  12.9081
+J4     77.4852  12.9073
+J5     77.4852  12.9065
+
+[END]
+`;
+const SAMPLE_NAME = 'hydropulse-sample.inp';
+
+const STEPS = ['Upload', 'Validate', 'Activate'];
 
 function detectFormat(name) {
   const lower = name.toLowerCase();
@@ -36,6 +83,8 @@ export default function NetworkImportModal({
   const [token, setToken] = useState('');
   const [busy, setBusy] = useState(''); // '' | 'commit' | 'reset'
   const [error, setError] = useState('');
+  const [done, setDone] = useState('');
+  const [isSample, setIsSample] = useState(false);
   const fileRef = useRef(null);
   const seq = useRef(0);
 
@@ -52,31 +101,21 @@ export default function NetworkImportModal({
     setToken('');
     setBusy('');
     setError('');
+    setDone('');
+    setIsSample(false);
   }, [open]);
 
   const notify = (tone, message) => onNotify?.(tone, message);
 
-  const handleFile = async (event) => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) return;
+  const runPreview = async ({ name, format, content, sample }) => {
     const mine = ++seq.current;
     setPreview(null);
     setError('');
-    setFileName(file.name);
-    const format = detectFormat(file.name);
-    if (!format) {
-      setError('Unsupported file type. Choose a .inp, .geojson or .json file.');
-      return;
-    }
-    if (file.size > MAX_BYTES) {
-      setError(`File is too large (${(file.size / 1e6).toFixed(1)} MB). The limit is 2 MB.`);
-      return;
-    }
+    setFileName(name);
+    setIsSample(!!sample);
     setChecking(true);
     try {
-      const content = await file.text();
-      const result = await client.importPreview({ format, filename: file.name, content });
+      const result = await client.importPreview({ format, filename: name, content });
       if (mine !== seq.current) return;
       setPreview(result);
     } catch (e) {
@@ -87,6 +126,30 @@ export default function NetworkImportModal({
     }
   };
 
+  const handleFile = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    seq.current += 1;
+    setPreview(null);
+    setError('');
+    setIsSample(false);
+    setFileName(file.name);
+    const format = detectFormat(file.name);
+    if (!format) {
+      setError('Unsupported file type. Choose a .inp, .geojson or .json file.');
+      return;
+    }
+    if (file.size > MAX_BYTES) {
+      setError(`File is too large (${(file.size / 1e6).toFixed(1)} MB). The limit is 2 MB.`);
+      return;
+    }
+    const content = await file.text();
+    await runPreview({ name: file.name, format, content });
+  };
+
+  const trySample = () => runPreview({ name: SAMPLE_NAME, format: 'inp', content: SAMPLE_INP, sample: true });
+
   const finish = async (message) => {
     setToken('');
     try {
@@ -95,7 +158,8 @@ export default function NetworkImportModal({
       /* reload errors surface through the hook's own error state */
     }
     notify('water', message);
-    onClose?.();
+    setDone(message);
+    setBusy('');
   };
 
   const activate = async () => {
@@ -133,7 +197,14 @@ export default function NetworkImportModal({
   const canActivate = live && preview?.valid && token.trim() && !busy && !checking;
   const needsToken = live && (preview?.valid || customActive || !preview);
 
-  const footer = (
+  // 1 Upload, 2 Validate, 3 Activate. 4 means everything is complete.
+  const stepNow = done ? 4 : preview?.valid ? 3 : preview || checking ? 2 : 1;
+
+  const footer = done ? (
+    <Button variant="primary" onClick={onClose}>
+      Run a leak
+    </Button>
+  ) : (
     <>
       <Button variant="ghost" onClick={onClose} disabled={!!busy}>
         Cancel
@@ -147,6 +218,32 @@ export default function NetworkImportModal({
   return (
     <Modal open={open} onClose={onClose} title="Use your own data" footer={footer} initialFocusRef={fileRef}>
       <div className="import">
+        <ol className="import__steps" aria-label="Import progress">
+          {STEPS.map((label, i) => {
+            const n = i + 1;
+            const state = n < stepNow ? 'done' : n === stepNow ? 'current' : 'todo';
+            return (
+              <li
+                key={label}
+                className={`import__step import__step--${state}`}
+                aria-current={state === 'current' ? 'step' : undefined}
+              >
+                <span className="import__step-num" aria-hidden="true">{state === 'done' ? '✓' : n}</span>
+                <span>{label}</span>
+                {state === 'done' && <span className="sr-only"> (complete)</span>}
+              </li>
+            );
+          })}
+        </ol>
+
+        {done ? (
+          <div className="import__success" role="status">
+            <CheckCircle2 size={28} aria-hidden="true" />
+            <h3 className="import__success-title">{done}</h3>
+            <p className="import__reset-text">Pick a leak preset or press Simulate burst to see how the network responds.</p>
+          </div>
+        ) : (
+          <>
         {!live && (
           <p className="import__msg import__msg--warn" role="alert">
             Import needs the live backend. The app is currently running on recorded or generated data.
@@ -168,6 +265,27 @@ export default function NetworkImportModal({
             disabled={!live || checking || !!busy}
           />
         </Field>
+
+        <div className="import__sample">
+          <Button variant="secondary" size="sm" onClick={trySample} disabled={!live || checking || !!busy}>
+            Try a sample file
+          </Button>
+          <span className="import__reset-hint">Built-in 5-junction demo network (sample data). Nothing is uploaded from your device.</span>
+        </div>
+
+        <details className="import__guide">
+          <summary>File format guide</summary>
+          <ul className="import__list">
+            <li>Accepted: EPANET <code>.inp</code> and GeoJSON (<code>.geojson</code>, <code>.json</code>).</li>
+            <li>Maximum size: 2 MB.</li>
+            <li>Coordinates must be longitude and latitude in EPSG:4326.</li>
+            <li>Nothing changes until you press Use this data.</li>
+          </ul>
+        </details>
+
+        {isSample && fileName && (
+          <p className="import__msg">Using the built-in sample file ({fileName}). It is example data, not your network.</p>
+        )}
 
         {checking && (
           <p className="import__msg" role="status">
@@ -261,6 +379,8 @@ export default function NetworkImportModal({
           </Button>
           {live && !token.trim() && <span className="import__reset-hint"> Enter the admin token above to enable.</span>}
         </div>
+          </>
+        )}
       </div>
     </Modal>
   );

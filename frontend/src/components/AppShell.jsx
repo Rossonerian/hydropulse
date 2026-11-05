@@ -37,6 +37,7 @@ export default function AppShell({
   customData = false,
   onDataSource,
   onResetCustom,
+  onReplayTour,
   extra,
 }) {
   return (
@@ -143,7 +144,7 @@ export default function AppShell({
         </div>
       )}
 
-      <HelpModal open={helpOpen} onClose={onHelpClose} />
+      <HelpModal open={helpOpen} onClose={onHelpClose} onReplayTour={onReplayTour} />
       <RoiPanel
         open={roiOpen}
         onClose={onRoiClose}

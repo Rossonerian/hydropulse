@@ -1,8 +1,7 @@
-import { Modal } from '../ui/index.js';
-import { Kbd } from '../ui/index.js';
+import { Modal, Kbd, Button } from '../ui/index.js';
 import '../styles/ops/charts_roi.css';
 
-export default function HelpModal({ open, onClose }) {
+export default function HelpModal({ open, onClose, onReplayTour }) {
   const shortcuts = [
     { keys: ['1', '2', '3'], action: 'Select scenario presets' },
     { keys: ['Space'], action: 'Simulate burst' },
@@ -30,6 +29,20 @@ export default function HelpModal({ open, onClose }) {
           </div>
         ))}
       </div>
+      {onReplayTour && (
+        <div className='help-replay'>
+          <Button
+            variant='secondary'
+            size='sm'
+            onClick={() => {
+              onClose?.();
+              onReplayTour();
+            }}
+          >
+            Replay tour
+          </Button>
+        </div>
+      )}
     </Modal>
   );
 }
