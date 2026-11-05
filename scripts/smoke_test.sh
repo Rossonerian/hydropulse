@@ -2,11 +2,23 @@
 set -e
 
 BASE="${BASE:-http://localhost:8000}"
+# Production hosts (Ubuntu 24.04) ship `python3` only; prefer the repo venv when present.
+if [ -z "${PYTHON:-}" ]; then
+    if [ -x ".venv/bin/python" ]; then PYTHON=".venv/bin/python";
+    elif command -v python >/dev/null 2>&1; then PYTHON="$(command -v python)";
+    elif command -v python3 >/dev/null 2>&1; then PYTHON="$(command -v python3)";
+    else PYTHON=python3; fi
+fi
+python() { command "$PYTHON" "$@"; }
+
+# Against a prod deployment (HYDROPULSE_REQUIRE_ADMIN_AUTH=true) pass ADMIN_TOKEN=... so the
+# demo telemetry tick and the auto-valve safety gate can be exercised.
 ADMIN_TOKEN="${ADMIN_TOKEN:-}"
 AUTH_HEADER=()
-if [ -n "$ADMIN_TOKEN" ]; then
-    AUTH_HEADER=(-H "X-Admin-Token: $ADMIN_TOKEN")
+if [ -n "${ADMIN_TOKEN}" ]; then
+    AUTH_HEADER=(-H "X-Admin-Token: ${ADMIN_TOKEN}")
 fi
+ADMIN_HEADER=("${AUTH_HEADER[@]}")
 echo "=================================================="
 echo "    HydroPulse API Smoke Test (Target: $BASE)    "
 echo "=================================================="
@@ -118,7 +130,7 @@ echo "PASSED (recommended_diameter=${ISENSE_DIAM}mm)"
 
 # 9. IoT state & Pipe Condition / RUL transparency (v1.1)
 echo -n "[9/11] Testing GET /api/iot/state & GET /api/pipes/condition ... "
-IOT_RES=$(curl -s -f ${AUTH_HEADER[@]+"${AUTH_HEADER[@]}"} "$BASE/api/iot/state?demo_tick=true&seed=42")
+IOT_RES=$(curl -s -f "${ADMIN_HEADER[@]}" "$BASE/api/iot/state?demo_tick=true&seed=42")
 echo "$IOT_RES" | python -c "import sys, json; d=json.load(sys.stdin); assert len(d.get('latest_readings',{})) >= 5"
 PIPE_RES=$(curl -s -f "$BASE/api/pipes/condition")
 PIPE_COUNT=$(echo "$PIPE_RES" | python -c "import sys, json; d=json.load(sys.stdin); assert d.get('rul_available') is False; print(len(d.get('pipes',[])))")
@@ -126,15 +138,14 @@ echo "PASSED (pipes=$PIPE_COUNT, rul_honest=true)"
 
 # 10. Auto-Valve safety gate (v1.1)
 echo -n "[10/11] Testing POST /api/iot/auto-valve safety gate ... "
-AV_RES=$(curl -s -f -X POST "$BASE/api/iot/auto-valve" \
-    ${AUTH_HEADER[@]+"${AUTH_HEADER[@]}"} \
+AV_RES=$(curl -s -f -X POST "${ADMIN_HEADER[@]}" "$BASE/api/iot/auto-valve" \
     -H "Content-Type: application/json" \
     -d '{"action":"confirm_close","confirm":false}')
 AV_STATUS=$(echo "$AV_RES" | python -c "import sys, json; d=json.load(sys.stdin); assert d.get('status') == 'refused'; print(d.get('status',''))")
 if [ "$AV_STATUS" = "refused" ]; then
     echo "PASSED (unconfirmed close refused safely)"
 else
-    echo "FAILED (expected 422, got $AV_CODE)"
+    echo "FAILED (expected status=refused, got ${AV_STATUS:-<empty>})"
     exit 1
 fi
 

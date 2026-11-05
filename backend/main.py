@@ -94,6 +94,7 @@ async def lifespan(app_instance: FastAPI):
     for mw in app_instance.user_middleware:
         if mw.cls is CORSMiddleware:
             mw.kwargs["allow_origins"] = list(cfg.cors_origins)
+            mw.kwargs["allow_origin_regex"] = cfg.cors_origin_regex
     app_instance.middleware_stack = app_instance.build_middleware_stack()
     cache_file = (
         cfg.cache_dir / "sensitivity_matrix_net3.npy"
@@ -132,6 +133,7 @@ app.add_middleware(SecurityAndTracingMiddleware, get_config=get_config)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=list(config.cors_origins),
+    allow_origin_regex=config.cors_origin_regex,
     allow_credentials=False,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "X-Admin-Token", "X-Request-ID"],

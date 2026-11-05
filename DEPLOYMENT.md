@@ -1,6 +1,6 @@
 # HydroPulse Backend — AWS EC2 Host Deployment Guide
 
-This document covers production deployment on AWS EC2 (Ubuntu 24.04 LTS x86_64, Python 3.11) using systemd service management, native virtual environment, and Git-based rollback. The backend runs as a single-worker Uvicorn process bound to loopback only, with secrets stored in `/etc/hydropulse/hydropulse.env` (mode 0600) and persistence in `/var/lib/hydropulse`.
+This document covers production deployment on AWS EC2 (Ubuntu 24.04 LTS or 22.04 LTS x86_64, Python 3.12 from the distro, or 3.11 if installed) using systemd service management, native virtual environment, and Git-based rollback. The backend runs as a single-worker Uvicorn process bound to loopback only, with secrets stored in `/etc/hydropulse/hydropulse.env` (mode 0600) and persistence in `/var/lib/hydropulse`.
 
 ---
 
@@ -8,17 +8,28 @@ This document covers production deployment on AWS EC2 (Ubuntu 24.04 LTS x86_64, 
 
 ### EC2 Instance Requirements
 
-- **OS**: Ubuntu 24.04 LTS or 22.04 LTS x86_64
-- **Python**: 3.11 (system package or pyenv)
-- **Network**: Public IP with security group allowing inbound SSH (port 22) and optional temporary tunneling
-- **Storage**: At least 10 GB GP3 for repository, venv, sensitivity matrix caches, and persisted state
-- **Public IP Cost Caution**: Assigning a public IP to an EC2 instance incurs hourly data transfer charges; consider using a VPC endpoint or NAT gateway for cost optimization in production.
+- **OS**: Ubuntu 24.04 LTS or 22.04 LTS x86_64 (the deploy script requires Ubuntu 22.04 or 24.04 x86_64)
+- **Instance type**: `t3.small` (2 vCPU, 2 GiB) is free-tier eligible on AWS accounts created on or after
+  15 July 2025 and is the recommended size. `t3.micro` (1 GiB) works for the API (~270 MB RSS measured
+  on the Kengeri network) but add 2 GiB of swap before `pip install`. Confirm what *your* account allows:
+  `aws ec2 describe-instance-types --filters Name=free-tier-eligible,Values=true --query "InstanceTypes[*].InstanceType" --output text`
+- **Python**: Ubuntu 24.04 ships **3.12** (`python3.11` is not in the 24.04 archive). The deploy script
+  uses `python3.11` if present, otherwise `python3.12`. CI runs the full suite on both.
+- **Security group**: inbound **SSH (22) from your own IP only**. Do **not** open 8000: Uvicorn binds to
+  127.0.0.1 and the Cloudflare tunnel is an *outbound* connection, so no other inbound rule is needed.
+- **Storage**: 10–20 GB gp3 for repository, venv, sensitivity-matrix cache and persisted state.
+- **Cost caution**: AWS bills public IPv4 addresses hourly (on the Free account plan this draws down your
+  credits). Stop the instance when no one is testing. Do not add a NAT gateway or load balancer for
+  staging; both cost far more than the instance.
 
 ### System Packages
 
 ```bash
 sudo apt update
-sudo apt install -y python3.11 python3.11-venv python3-pip git curl
+sudo apt install -y python3.12 python3.12-venv git curl  # or python3.11 python3.11-venv on Ubuntu 22.04
+# t3.micro only: add swap so pip/scipy installs and the cold matrix build do not OOM
+# sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
+# echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 ```
 
 ### Service User
@@ -142,14 +153,15 @@ sudo bash scripts/deploy-hydropulse-host.sh
 ```
 
 The script performs:
-1. Validates Ubuntu 24.04, Python 3.11, and systemd availability
+1. Validates Ubuntu 22.04 or 24.04 x86_64, Python 3.11/3.12 with venv support, curl, and systemd
 2. Creates the `hydropulse` service user and `/var/lib/hydropulse` persistent directory
 3. Creates `/etc/hydropulse/hydropulse.env` from template on first run (exits for operator to add secrets)
 4. Validates base configuration including rejection of CORS placeholder values
 5. Creates or updates the virtual environment (`.venv` in repository root)
 6. Installs dependencies from `requirements.txt`
-7. Installs and enables the systemd service unit
-8. Restarts the service
+7. Validates the full env file with the backend's own `load_config()` (fails before restarting the service)
+8. Installs, enables and restarts the systemd service unit
+9. Waits up to 180 s for `GET /api/ready` to return 200 and prints recent logs if it does not
 
 All operations are idempotent; the script can be rerun safely after updating the repository or configuration.
 
@@ -221,22 +233,61 @@ Returns HTTP `200` with `status: "ready"` when the hydraulic baseline and sensit
 
 ---
 
-## 8. Temporary Tunneling (Cloudflare Quick Tunnel)
+## 8. Public Staging URL (Cloudflare Quick Tunnel) and Vercel Wiring
 
-For temporary access without a stable hostname or production control plane, use Cloudflare Quick Tunnel targeting the loopback address:
+For manual testing without a domain, expose the loopback-only API through a Cloudflare Quick Tunnel.
+The tunnel dials **out** from the instance, so no inbound security-group rule is needed.
+
+### 8.1 Install cloudflared and the tunnel unit
+
+Install `cloudflared` from Cloudflare's official package repository or `.deb` release (see Cloudflare's
+docs), confirm `/usr/bin/cloudflared --version` works, then:
 
 ```bash
-cloudflared tunnel --url http://127.0.0.1:8000
+sudo install -o root -g root -m 0644 /opt/hydropulse/deploy/systemd/hydropulse-tunnel.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now hydropulse-tunnel.service
+sudo bash /opt/hydropulse/scripts/tunnel-url.sh     # prints https://<words>.trycloudflare.com and checks /api/ready
 ```
 
-**Limitations**:
-- Provides a temporary, ephemeral public URL
-- No stable hostname
-- No production-grade control plane or access controls
-- Suitable only for short-lived testing or demos
-- Must be terminated after use
+The unit uses `Wants=` (not `Requires=`) on `hydropulse.service`, so redeploying the backend does **not**
+restart the tunnel. The URL changes only when the tunnel unit restarts or the instance reboots.
 
-For production deployment, use a reverse proxy (nginx, Apache) or an Application Load Balancer with proper TLS termination and origin controls.
+### 8.2 Point the Vercel frontend at the tunnel
+
+1. Vercel → Project → Settings → Environment Variables: set `VITE_API_BASE` to the tunnel URL
+   **without a trailing slash** (a trailing slash produces `//api/...` → 404). Scope it to the
+   environment you are testing (Preview is safer than Production for first runs).
+2. Redeploy: Vite inlines `VITE_*` at build time, so the change has no effect until a new build.
+3. Put the exact frontend origin(s) in `/etc/hydropulse/hydropulse.env`:
+   `HYDROPULSE_CORS_ORIGINS=https://<your-project>.vercel.app` (comma-separate several). For rotating
+   Preview URLs, also set an anchored, team-pinned regex, written **without backslashes** so systemd,
+   bash and Python all read it identically:
+   `HYDROPULSE_CORS_ORIGIN_REGEX=^https://<project>-[a-z0-9-]+-<team>[.]vercel[.]app$`
+   Over-broad patterns (any `*.vercel.app`, any tunnel, `.*`) are rejected at boot.
+4. Rerun `sudo bash scripts/deploy-hydropulse-host.sh` (validates and restarts; the tunnel URL is kept).
+
+### 8.3 Verify through the public URL
+
+```bash
+URL=https://<words>.trycloudflare.com
+curl -fsS "$URL/api/ready"
+# CORS preflight as the browser will send it
+curl -si -X OPTIONS "$URL/api/simulate-leak" -H "Origin: https://<your-project>.vercel.app" \
+     -H "Access-Control-Request-Method: POST" | grep -i access-control-allow-origin
+# Full smoke test (ADMIN_TOKEN is required in prod for the IoT demo tick and auto-valve steps)
+BASE="$URL" ADMIN_TOKEN='<value from /etc/hydropulse/hydropulse.env>' bash scripts/smoke_test.sh
+```
+
+**What testers can and cannot do through the UI.** The deployed frontend calls only the v1.0 endpoints
+(`/api/health`, `/api/network`, `/api/presets`, `/api/simulate-leak`, `/api/isolate`), none of which
+need the admin token. The v1.1 endpoints are not wired into the UI yet; test them with `curl`, or set
+`HYDROPULSE_DOCS_ENABLED=true` on a short-lived staging host to use `/docs`. Never put the admin token
+in a `VITE_*` variable — anything in the bundle is public.
+
+**Limitations**: random URL with no uptime guarantee, no access control in front of the public read and
+simulation endpoints, and no rate limiting. Stop the tunnel (`sudo systemctl stop hydropulse-tunnel`)
+when testing ends. For anything longer-lived, use a named Cloudflare Tunnel on a domain you own.
 
 ---
 
@@ -247,11 +298,14 @@ For production deployment, use a reverse proxy (nginx, Apache) or an Application
 To rollback to a previous Git revision:
 
 ```bash
-cd /opt/hydropulse/repo
+cd /opt/hydropulse
 sudo -u hydropulse git log --oneline -10
 sudo -u hydropulse git checkout <revision-hash>
-sudo systemctl restart hydropulse.service
+sudo bash scripts/deploy-hydropulse-host.sh   # reinstalls deps for that revision and waits for /api/ready
 ```
+
+To return to the latest code: `sudo -u hydropulse git checkout main && sudo -u hydropulse git pull --ff-only`
+then rerun the deploy script.
 
 The persisted state in `/var/lib/hydropulse` survives across restarts. If you need to reset the active network to baseline:
 
@@ -296,9 +350,12 @@ sudo journalctl -u hydropulse.service --since "1 hour ago" | grep -i error
 
 ### Validate Configuration
 
+`load_config()` reads the process environment, so load the env file into it first (as root, because the
+file is mode 0600):
+
 ```bash
-sudo -u hydropulse /opt/hydropulse/.venv/bin/python -c \
-  "from backend.config import load_config; print(load_config().safe_summary())"
+cd /opt/hydropulse
+sudo bash -c 'set -a; . /etc/hydropulse/hydropulse.env; set +a; .venv/bin/python -c "from backend.config import load_config; print(load_config().safe_summary())"'
 ```
 
 ### Verify File Permissions
@@ -384,6 +441,8 @@ For a complete environment variable reference, see `.env.example` in the reposit
 | `HYDROPULSE_PORT` | `8000` | TCP port |
 | `HYDROPULSE_RELOAD` | `false` | Auto-reload forbidden |
 | `HYDROPULSE_CORS_ORIGINS` | **exact frontend origin** | No wildcard in prod |
+| `HYDROPULSE_CORS_ORIGIN_REGEX` | *(optional)* anchored, team-pinned | For rotating Vercel Preview URLs; §8.2 |
+| `HYDROPULSE_DOCS_ENABLED` | `false` (staging: optional `true`) | Swagger UI at `/docs` |
 | `HYDROPULSE_REQUIRE_ADMIN_AUTH` | `true` | Admin token required |
 | `HYDROPULSE_ADMIN_TOKEN` | **secret** | >= 8 characters |
 | `HYDROPULSE_PERSIST_ACTIVE_STATE` | `true` | Persist across restarts |
@@ -398,9 +457,9 @@ For a complete environment variable reference, see `.env.example` in the reposit
 ### Service Fails to Start
 
 1. Check logs: `sudo journalctl -u hydropulse.service -n 50`
-2. Validate configuration: `sudo -u hydropulse /opt/hydropulse/venv/bin/python -c "from backend.config import load_config; load_config()"`
+2. Validate configuration: rerun `sudo bash scripts/deploy-hydropulse-host.sh` — it validates `/etc/hydropulse/hydropulse.env` with `load_config()` and prints the error. (Running `load_config()` by hand as the `hydropulse` user does *not* read the env file, so it validates dev defaults instead.)
 3. Verify environment file permissions: `ls -la /etc/hydropulse/hydropulse.env`
-4. Ensure Python 3.11 venv is activated and dependencies installed
+4. Ensure the venv exists at `/opt/hydropulse/.venv` and dependencies are installed (the deploy script does both)
 
 ### CORS Errors in Frontend
 

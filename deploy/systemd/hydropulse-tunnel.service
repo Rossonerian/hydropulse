@@ -1,0 +1,26 @@
+[Unit]
+Description=HydroPulse temporary public URL (Cloudflare Quick Tunnel -> 127.0.0.1:8000)
+Documentation=https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/do-more-with-tunnels/trycloudflare/
+Wants=network-online.target
+After=network-online.target hydropulse.service
+# Wants (not Requires): restarting hydropulse.service on a redeploy must NOT restart the tunnel,
+# otherwise every backend deploy would rotate the public URL.
+Wants=hydropulse.service
+
+# STAGING ONLY. A Quick Tunnel gets a NEW random https://<words>.trycloudflare.com URL every time
+# this unit starts, so the Vercel VITE_API_BASE and HYDROPULSE_CORS_ORIGINS stay correct only while
+# it keeps running. Print the current URL with: sudo bash scripts/tunnel-url.sh
+
+[Service]
+Type=simple
+DynamicUser=true
+ExecStart=/usr/bin/cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8000
+Restart=on-failure
+RestartSec=10s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+
+[Install]
+WantedBy=multi-user.target
