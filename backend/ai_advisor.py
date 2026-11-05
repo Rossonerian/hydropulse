@@ -63,12 +63,33 @@ class AiAdvisorService:
         self._suggestions_cache: Dict[str, AiSuggestionsResponse] = {}
         self._matrix_cache: Dict[str, np.ndarray] = {}
 
-    def get_suggestions(self, engine: Any) -> AiSuggestionsResponse:
+    def get_suggestions(
+        self,
+        engine: Any,
+        openrouter_api_key: Optional[str] = None,
+    ) -> AiSuggestionsResponse:
         """Return cached or newly evaluated AI suggestions for current engine network_revision."""
         rev = engine.network_revision
+        cached_resp: Optional[AiSuggestionsResponse] = None
         with self._lock:
             if rev in self._suggestions_cache:
-                return self._suggestions_cache[rev]
+                cached_resp = self._suggestions_cache[rev]
+
+        if cached_resp is not None:
+            clean_key = (openrouter_api_key or "").strip()
+            if clean_key:
+                try:
+                    or_client = get_openrouter_client()
+                    if or_client.config.openrouter_enabled:
+                        enriched_sugs = or_client.enrich_suggestions(
+                            cached_resp.suggestions,
+                            network_revision=rev,
+                            api_key=clean_key,
+                        )
+                        return cached_resp.model_copy(update={"suggestions": enriched_sugs})
+                except Exception as exc:
+                    log.warning("Caller OpenRouter enrichment failed on cached response: %s", type(exc).__name__)
+            return cached_resp
 
         t0 = time.perf_counter()
         suggestions: List[AiSuggestion] = []
@@ -85,11 +106,16 @@ class AiAdvisorService:
         sensor_sugs, sensor_benchmark = self._evaluate_sensor_placement(engine)
         suggestions.extend(sensor_sugs)
 
-        # Optional server-side OpenRouter narrative enrichment (strictly bounded, deterministic fallback)
+        # Optional OpenRouter narrative enrichment (caller-provided key or server default, strictly bounded)
+        clean_key = (openrouter_api_key or "").strip()
         try:
             or_client = get_openrouter_client()
-            if or_client.is_active:
-                suggestions = or_client.enrich_suggestions(suggestions, network_revision=rev)
+            if or_client.config.openrouter_enabled and (clean_key or or_client.is_active):
+                suggestions = or_client.enrich_suggestions(
+                    suggestions,
+                    network_revision=rev,
+                    api_key=clean_key or None,
+                )
         except Exception as exc:
             log.warning("Optional OpenRouter enrichment skipped: %s", type(exc).__name__)
 
@@ -673,9 +699,9 @@ class AiAdvisorService:
 _advisor_service = AiAdvisorService()
 
 
-def get_suggestions(engine: Any) -> AiSuggestionsResponse:
+def get_suggestions(engine: Any, openrouter_api_key: Optional[str] = None) -> AiSuggestionsResponse:
     """Module-level helper to obtain AI suggestions."""
-    return _advisor_service.get_suggestions(engine)
+    return _advisor_service.get_suggestions(engine, openrouter_api_key=openrouter_api_key)
 
 
 def apply_suggestion(engine: Any, req: ApplySuggestionRequest) -> ApplySuggestionResponse:
