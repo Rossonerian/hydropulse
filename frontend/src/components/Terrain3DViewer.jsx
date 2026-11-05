@@ -1,16 +1,38 @@
 import { useEffect, useRef, useState } from 'react';
-import {
-  Compass,
-  Eye,
-  Layers,
-  Maximize2,
-  Minimize2,
-  RotateCcw,
-  Sliders,
-  ZoomIn,
-  ZoomOut,
-} from 'lucide-react';
+import { Compass, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
+import { IconButton, MapControlStack, MapLegend, Switch } from '../ui/index.js';
 import { KENGERI_AOI, REAL_WORLD_FEATURES, projectToMetricScene } from '../lib/realWorldData.js';
+import '../styles/studio/mapviews.css';
+
+// Data colours: fixed hues for rendered features, mid-tone so they read on both themes.
+const SEWER_COLOUR = '#A855F7'; // data colour
+const PUMP_COLOUR = '#3B82F6'; // data colour
+
+// Canvas cannot resolve var(); read computed token values at draw time.
+const readTokens = () => {
+  const style = getComputedStyle(document.documentElement);
+  const pick = (name) => style.getPropertyValue(name).trim();
+  return {
+    ground: pick('--ground'),
+    sunken: pick('--surface-sunken'),
+    lineStrong: pick('--line-strong'),
+    water: pick('--water'),
+    valve: pick('--valve'),
+    sensor: pick('--sensor'),
+    ink: pick('--ink'),
+    surface: pick('--surface'),
+  };
+};
+
+const readTheme = () => document.documentElement.getAttribute('data-theme') || 'night';
+
+const LEGEND_ITEMS = [
+  { key: 'potable', swatch: 'pipe', label: 'Potable mains (BWSSB)' },
+  { key: 'sewer', swatch: 'sewer', label: 'Sewer outfall (non-potable)' },
+  { key: 'valve', swatch: 'valve', label: 'Sluice valves' },
+  { key: 'pump', swatch: 'pump', label: 'Booster stations' },
+  { key: 'borewell', swatch: 'node', label: 'Borewells' },
+];
 
 export default function Terrain3DViewer({
   selectedFeature,
@@ -25,6 +47,12 @@ export default function Terrain3DViewer({
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const dragStart = useRef({ x: 0, y: 0, azimuth: 45, elevation: 35, panX: 0, panY: 0 });
+  const [theme, setTheme] = useState(readTheme);
+  useEffect(() => {
+    const observer = new MutationObserver(() => setTheme(readTheme()));
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => observer.disconnect();
+  }, []);
 
   // Generate synthetic DEM terrain grid points across Kengeri AOI (808m to 838m)
   const terrainGrid = useRef([]);
@@ -88,18 +116,18 @@ export default function Terrain3DViewer({
 
     ctx.clearRect(0, 0, width, height);
 
-    // 1. Draw Background Sky Gradient & Atmospheric Haze
+    // 1. Draw background (token colours)
+    const T = readTokens();
     const bg = ctx.createLinearGradient(0, 0, 0, height);
-    bg.addColorStop(0, '#070B14');
-    bg.addColorStop(0.65, '#0C1322');
-    bg.addColorStop(1, '#111A2E');
+    bg.addColorStop(0, T.sunken);
+    bg.addColorStop(1, T.ground);
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, width, height);
 
     // 2. Draw Terrain Wireframe & Elevation Contours
     const grid = terrainGrid.current;
     if (grid.length > 0 && (visibleLayers.terrain ?? true)) {
-      ctx.strokeStyle = '#1E2D4A44';
+      ctx.strokeStyle = T.lineStrong;
       ctx.lineWidth = 1;
 
       // Draw rows
@@ -132,7 +160,7 @@ export default function Terrain3DViewer({
       REAL_WORLD_FEATURES.waterBodies.forEach((wb) => {
         if (wb.type === 'line') {
           ctx.beginPath();
-          ctx.strokeStyle = '#38BDF899';
+          ctx.strokeStyle = T.water;
           ctx.lineWidth = 5;
           wb.coordinates.forEach((coord, idx) => {
             const pt = projectToMetricScene(coord[0], coord[1], 808);
@@ -150,7 +178,7 @@ export default function Terrain3DViewer({
       ctx.save();
       REAL_WORLD_FEATURES.sewerPipes.forEach((pipe) => {
         ctx.beginPath();
-        ctx.strokeStyle = '#A855F7';
+        ctx.strokeStyle = SEWER_COLOUR;
         ctx.lineWidth = 3;
         ctx.setLineDash([6, 5]);
         const depthOffset = showIllustrativeDepth ? -12 : 0;
@@ -170,11 +198,9 @@ export default function Terrain3DViewer({
       REAL_WORLD_FEATURES.potablePipes.forEach((pipe) => {
         const isSelected = selectedFeature?.id === pipe.id;
         ctx.beginPath();
-        ctx.strokeStyle = isSelected ? '#F59E0B' : '#22D3EE';
+        ctx.strokeStyle = isSelected ? T.ink : T.water;
         ctx.lineWidth = isSelected ? 5.5 : pipe.properties.diameter_mm >= 450 ? 4.5 : 3;
         ctx.lineCap = 'round';
-        ctx.shadowColor = isSelected ? '#F59E0B88' : '#22D3EE66';
-        ctx.shadowBlur = isSelected ? 12 : 6;
 
         const depthOffset = showIllustrativeDepth ? -8 : 0;
 
@@ -197,9 +223,9 @@ export default function Terrain3DViewer({
         const sc = project(pt.x, pt.y + depthOffset, pt.z, width, height);
         ctx.beginPath();
         ctx.arc(sc.x, sc.y, 4.5, 0, Math.PI * 2);
-        ctx.fillStyle = '#F59E0B';
+        ctx.fillStyle = T.valve;
         ctx.fill();
-        ctx.strokeStyle = '#FFFFFF';
+        ctx.strokeStyle = T.surface;
         ctx.lineWidth = 1.5;
         ctx.stroke();
       });
@@ -210,9 +236,9 @@ export default function Terrain3DViewer({
       REAL_WORLD_FEATURES.pumpingStations.forEach((ps) => {
         const pt = projectToMetricScene(ps.coordinates[0], ps.coordinates[1], 816);
         const sc = project(pt.x, pt.y + 4, pt.z, width, height);
-        ctx.fillStyle = '#3B82F6';
+        ctx.fillStyle = PUMP_COLOUR;
         ctx.fillRect(sc.x - 7, sc.y - 7, 14, 14);
-        ctx.strokeStyle = '#FFFFFF';
+        ctx.strokeStyle = T.surface;
         ctx.lineWidth = 2;
         ctx.strokeRect(sc.x - 7, sc.y - 7, 14, 14);
       });
@@ -222,14 +248,14 @@ export default function Terrain3DViewer({
         const sc = project(pt.x, pt.y + 2, pt.z, width, height);
         ctx.beginPath();
         ctx.arc(sc.x, sc.y, 5, 0, Math.PI * 2);
-        ctx.fillStyle = '#10B981';
+        ctx.fillStyle = T.sensor;
         ctx.fill();
-        ctx.strokeStyle = '#050912';
+        ctx.strokeStyle = T.surface;
         ctx.lineWidth = 1.5;
         ctx.stroke();
       });
     }
-  }, [rotation, zoom, pan, selectedFeature, showIllustrativeDepth, visibleLayers]);
+  }, [rotation, zoom, pan, selectedFeature, showIllustrativeDepth, visibleLayers, theme]);
 
   // Mouse Interaction: Orbit, Pan & Zoom
   const handleMouseDown = (e) => {
@@ -280,65 +306,40 @@ export default function Terrain3DViewer({
   };
 
   return (
-    <div className='terrain-3d-container' onWheel={handleWheel}>
+    <div className='stu-terr' onWheel={handleWheel}>
       <canvas
         ref={canvasRef}
-        className='terrain-3d-canvas'
+        className='stu-terr__canvas'
+        role='img'
+        aria-label='Illustrative 3D terrain of the Kengeri area. Drag to orbit, shift-drag to pan, scroll to zoom.'
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
       />
 
-      {/* 3D View Controls HUD */}
-      <div className='terrain-3d-hud'>
-        <div className='hud-compass'>
-          <Compass size={15} style={{ transform: `rotate(${-rotation.azimuth}deg)` }} />
-          <span>{Math.round(rotation.azimuth)}° Az · {Math.round(rotation.elevation)}° El</span>
+      <div className='stu-terr__hud'>
+        <div className='stu-terr__compass'>
+          <Compass size={16} aria-hidden='true' style={{ transform: `rotate(${-rotation.azimuth}deg)` }} />
+          <span>{Math.round(rotation.azimuth)}° az · {Math.round(rotation.elevation)}° el</span>
         </div>
-
-        <div className='hud-button-group'>
-          <button className='studio-icon-button' onClick={() => setZoom((z) => Math.min(3.5, z * 1.2))} title='Zoom In'>
-            <ZoomIn size={15} />
-          </button>
-          <button className='studio-icon-button' onClick={() => setZoom((z) => Math.max(0.4, z / 1.2))} title='Zoom Out'>
-            <ZoomOut size={15} />
-          </button>
-          <button className='studio-icon-button' onClick={resetCamera} title='Reset Camera'>
-            <RotateCcw size={15} />
-          </button>
-        </div>
-
-        {/* Depth Stratification Toggle */}
-        <div className='hud-depth-control'>
-          <button
-            className={`depth-toggle-pill ${showIllustrativeDepth ? 'is-active' : ''}`}
-            onClick={onToggleDepth}
-            title='Toggle between ground surface and assumed -2.5m depth'
-          >
-            <Layers size={13} />
-            <span>{showIllustrativeDepth ? 'Depth: Illustrative (-2.5m)' : 'Depth: Flattened'}</span>
-          </button>
-        </div>
+        <Switch
+          className='stu-terr__depth'
+          label={showIllustrativeDepth ? 'Illustrative depth (−2.5 m)' : 'Flattened to ground'}
+          checked={showIllustrativeDepth}
+          onChange={() => onToggleDepth?.()}
+          title='Toggle between ground surface and assumed −2.5 m depth'
+        />
       </div>
 
-      {/* 3D Legend & Caveat Bar */}
-      <div className='terrain-3d-legend'>
-        <span className='legend-item'>
-          <i style={{ background: '#22D3EE' }} /> Potable Mains (BWSSB)
-        </span>
-        <span className='legend-item'>
-          <i style={{ background: '#A855F7' }} /> Sewer Outfall (Non-Potable)
-        </span>
-        <span className='legend-item'>
-          <i style={{ background: '#F59E0B' }} /> Sluice Valves
-        </span>
-        <span className='legend-item'>
-          <i style={{ background: '#3B82F6' }} /> Booster Stations
-        </span>
-        <span className='legend-item'>
-          <i style={{ background: '#10B981' }} /> Borewells
-        </span>
+      <MapControlStack>
+        <IconButton label='Zoom in' icon={ZoomIn} onClick={() => setZoom((z) => Math.min(3.5, z * 1.2))} />
+        <IconButton label='Zoom out' icon={ZoomOut} onClick={() => setZoom((z) => Math.max(0.4, z / 1.2))} />
+        <IconButton label='Reset camera' icon={RotateCcw} onClick={resetCamera} />
+      </MapControlStack>
+
+      <div className='stu-terr__legend'>
+        <MapLegend items={LEGEND_ITEMS} />
       </div>
     </div>
   );
