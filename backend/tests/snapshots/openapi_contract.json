@@ -1,0 +1,1026 @@
+{
+  "paths": {
+    "/api/ai/apply-suggestion": {
+      "post": {
+        "admin": true,
+        "query_params": [],
+        "request_body": "application/json:ApplySuggestionRequest",
+        "responses": {
+          "200": "application/json:ApplySuggestionResponse",
+          "422": "application/json:HTTPValidationError"
+        }
+      }
+    },
+    "/api/ai/suggestions": {
+      "get": {
+        "admin": false,
+        "query_params": [
+          "openrouter_key"
+        ],
+        "request_body": null,
+        "responses": {
+          "200": "application/json:AiSuggestionsResponse",
+          "422": "application/json:HTTPValidationError"
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "admin": false,
+        "query_params": [],
+        "request_body": null,
+        "responses": {
+          "200": "application/json:HealthResponse"
+        }
+      }
+    },
+    "/api/iot/auto-valve": {
+      "post": {
+        "admin": true,
+        "query_params": [],
+        "request_body": "application/json:AutoValveRequest",
+        "responses": {
+          "200": "application/json:AutoValveResponse",
+          "422": "application/json:HTTPValidationError"
+        }
+      }
+    },
+    "/api/iot/ingest": {
+      "post": {
+        "admin": true,
+        "query_params": [],
+        "request_body": "application/json:TelemetryIngestRequest",
+        "responses": {
+          "200": "application/json:TelemetryIngestResponse",
+          "422": "application/json:HTTPValidationError"
+        }
+      }
+    },
+    "/api/iot/state": {
+      "get": {
+        "admin": false,
+        "query_params": [
+          "demo_tick",
+          "seed"
+        ],
+        "request_body": null,
+        "responses": {
+          "200": "application/json:IoTStateResponse",
+          "422": "application/json:HTTPValidationError"
+        }
+      }
+    },
+    "/api/isolate": {
+      "post": {
+        "admin": false,
+        "query_params": [],
+        "request_body": "application/json:IsolationRequest",
+        "responses": {
+          "200": "application/json:IsolationResponse",
+          "422": "application/json:HTTPValidationError"
+        }
+      }
+    },
+    "/api/network": {
+      "get": {
+        "admin": false,
+        "query_params": [],
+        "request_body": null,
+        "responses": {
+          "200": "application/json:NetworkResponse"
+        }
+      }
+    },
+    "/api/network/build/commit": {
+      "post": {
+        "admin": true,
+        "query_params": [],
+        "request_body": "application/json:NetworkBuildCommitRequest",
+        "responses": {
+          "200": "application/json:NetworkRevisionCommitResponse",
+          "422": "application/json:HTTPValidationError"
+        }
+      }
+    },
+    "/api/network/build/preview": {
+      "post": {
+        "admin": false,
+        "query_params": [],
+        "request_body": "application/json:NetworkBuildPreviewRequest",
+        "responses": {
+          "200": "application/json:NetworkBuildPreviewResponse",
+          "422": "application/json:HTTPValidationError"
+        }
+      }
+    },
+    "/api/network/import": {
+      "post": {
+        "admin": true,
+        "query_params": [],
+        "request_body": "application/json:NetworkImportPreviewRequest",
+        "responses": {
+          "200": "application/json:NetworkImportPreviewResponse",
+          "422": "application/json:HTTPValidationError"
+        }
+      }
+    },
+    "/api/network/import/commit": {
+      "post": {
+        "admin": true,
+        "query_params": [],
+        "request_body": "application/json:NetworkImportCommitRequest",
+        "responses": {
+          "200": "application/json:NetworkRevisionCommitResponse",
+          "422": "application/json:HTTPValidationError"
+        }
+      }
+    },
+    "/api/network/import/preview": {
+      "post": {
+        "admin": false,
+        "query_params": [],
+        "request_body": "application/json:NetworkImportPreviewRequest",
+        "responses": {
+          "200": "application/json:NetworkImportPreviewResponse",
+          "422": "application/json:HTTPValidationError"
+        }
+      }
+    },
+    "/api/network/intellisense": {
+      "post": {
+        "admin": false,
+        "query_params": [],
+        "request_body": "application/json:IntelliSenseRequest",
+        "responses": {
+          "200": "application/json:IntelliSenseResponse",
+          "422": "application/json:HTTPValidationError"
+        }
+      }
+    },
+    "/api/network/presets": {
+      "get": {
+        "admin": false,
+        "query_params": [],
+        "request_body": null,
+        "responses": {
+          "200": "application/json:NetworkPresetsListResponse"
+        }
+      }
+    },
+    "/api/network/reset": {
+      "post": {
+        "admin": true,
+        "query_params": [],
+        "request_body": "application/json:NetworkResetRequest",
+        "responses": {
+          "200": "application/json:NetworkRevisionCommitResponse",
+          "422": "application/json:HTTPValidationError"
+        }
+      }
+    },
+    "/api/pipes/condition": {
+      "get": {
+        "admin": false,
+        "query_params": [],
+        "request_body": null,
+        "responses": {
+          "200": "application/json:PipeConditionResponse"
+        }
+      }
+    },
+    "/api/presets": {
+      "get": {
+        "admin": false,
+        "query_params": [],
+        "request_body": null,
+        "responses": {
+          "200": "application/json:PresetsResponse"
+        }
+      }
+    },
+    "/api/ready": {
+      "get": {
+        "admin": false,
+        "query_params": [],
+        "request_body": null,
+        "responses": {
+          "200": "application/json:object"
+        }
+      }
+    },
+    "/api/simulate-leak": {
+      "post": {
+        "admin": false,
+        "query_params": [],
+        "request_body": "application/json:LeakSimulationRequest",
+        "responses": {
+          "200": "application/json:LeakSimulationResponse",
+          "422": "application/json:HTTPValidationError"
+        }
+      }
+    },
+    "/api/what-if": {
+      "post": {
+        "admin": false,
+        "query_params": [],
+        "request_body": "application/json:WhatIfRequest",
+        "responses": {
+          "200": "application/json:WhatIfResponse",
+          "422": "application/json:HTTPValidationError"
+        }
+      }
+    }
+  },
+  "schemas": {
+    "AiSuggestion": {
+      "properties": {
+        "affected_node_ids": "array[string]",
+        "affected_pipe_ids": "array[string]",
+        "baseline_metrics": "object",
+        "category": "enum",
+        "proposed_parameters": "object",
+        "rationale": "string",
+        "simulated_after_metrics": "object",
+        "source_network_revision": "string",
+        "status": "enum",
+        "suggestion_id": "string",
+        "title": "string",
+        "uncertainty_note": "string"
+      },
+      "required": [
+        "affected_node_ids",
+        "affected_pipe_ids",
+        "baseline_metrics",
+        "category",
+        "proposed_parameters",
+        "rationale",
+        "simulated_after_metrics",
+        "source_network_revision",
+        "status",
+        "suggestion_id",
+        "title",
+        "uncertainty_note"
+      ]
+    },
+    "AiSuggestionsResponse": {
+      "properties": {
+        "compute_time_ms": "number",
+        "network_revision": "string",
+        "sensor_benchmark": "object",
+        "suggestions": "array[AiSuggestion]"
+      },
+      "required": [
+        "compute_time_ms",
+        "network_revision",
+        "sensor_benchmark",
+        "suggestions"
+      ]
+    },
+    "ApplySuggestionRequest": {
+      "properties": {
+        "confirm": "boolean",
+        "expected_network_revision": "string",
+        "suggestion_id": "string"
+      },
+      "required": [
+        "confirm",
+        "expected_network_revision",
+        "suggestion_id"
+      ]
+    },
+    "ApplySuggestionResponse": {
+      "properties": {
+        "applied": "boolean",
+        "metrics_after": "object",
+        "metrics_before": "object",
+        "mutation_summary": "string",
+        "new_network_revision": "string",
+        "previous_network_revision": "string",
+        "suggestion_id": "string"
+      },
+      "required": [
+        "applied",
+        "metrics_after",
+        "metrics_before",
+        "mutation_summary",
+        "new_network_revision",
+        "previous_network_revision",
+        "suggestion_id"
+      ]
+    },
+    "AutoValveRequest": {
+      "properties": {
+        "action": "enum",
+        "confirm": "boolean",
+        "enable_auto_valve": "boolean|null",
+        "expected_network_revision": "null|string",
+        "leak_area_cm2": "number",
+        "proposal_id": "null|string",
+        "target_node_id": "null|string"
+      },
+      "required": [
+        "action"
+      ]
+    },
+    "AutoValveResponse": {
+      "properties": {
+        "action_taken": "string",
+        "active_valve_closures": "array[string]",
+        "auto_valve_enabled": "boolean",
+        "emergency_stop": "boolean",
+        "message": "string",
+        "network_revision": "string",
+        "proposal": "null|object",
+        "simulation_only": "boolean",
+        "status": "enum"
+      },
+      "required": [
+        "action_taken",
+        "active_valve_closures",
+        "auto_valve_enabled",
+        "emergency_stop",
+        "message",
+        "network_revision",
+        "status"
+      ]
+    },
+    "BuildProposedNode": {
+      "properties": {
+        "base_demand_lps": "number",
+        "elevation_m": "null|number",
+        "id": "string",
+        "lat": "number",
+        "lng": "number"
+      },
+      "required": [
+        "id",
+        "lat",
+        "lng"
+      ]
+    },
+    "BuildProposedPipe": {
+      "properties": {
+        "diameter_mm": "number",
+        "from_node": "string",
+        "id": "string",
+        "road_class": "enum",
+        "roughness": "number",
+        "to_node": "string"
+      },
+      "required": [
+        "diameter_mm",
+        "from_node",
+        "id",
+        "to_node"
+      ]
+    },
+    "CandidateNode": {
+      "properties": {
+        "confidence_pct": "number",
+        "estimated_leak_area_cm2": "number",
+        "estimated_loss_lpm": "number",
+        "node_id": "string",
+        "tankers_lost_per_day": "number"
+      },
+      "required": [
+        "confidence_pct",
+        "estimated_leak_area_cm2",
+        "estimated_loss_lpm",
+        "node_id",
+        "tankers_lost_per_day"
+      ]
+    },
+    "Center": {
+      "properties": {
+        "lat": "number",
+        "lng": "number"
+      },
+      "required": [
+        "lat",
+        "lng"
+      ]
+    },
+    "HTTPValidationError": {
+      "properties": {
+        "detail": "array[ValidationError]"
+      },
+      "required": []
+    },
+    "HealthResponse": {
+      "properties": {
+        "can_rollback": "boolean",
+        "matrix_ready": "boolean",
+        "network_name": "string",
+        "network_revision": "null|string",
+        "num_junctions": "integer",
+        "num_pipes": "integer",
+        "sensor_ids": "array[string]",
+        "source": "null|string",
+        "status": "string"
+      },
+      "required": [
+        "matrix_ready",
+        "network_name",
+        "num_junctions",
+        "num_pipes",
+        "sensor_ids"
+      ]
+    },
+    "IntelliSenseRequest": {
+      "properties": {
+        "expected_network_revision": "null|string",
+        "from_node_id": "string",
+        "new_junction_lat": "null|number",
+        "new_junction_lng": "null|number",
+        "roughness": "number",
+        "target_velocity_ms": "number",
+        "to_node_id": "null|string"
+      },
+      "required": [
+        "from_node_id"
+      ]
+    },
+    "IntelliSenseResponse": {
+      "properties": {
+        "elevation_diff_m": "number",
+        "elevation_from_m": "number",
+        "elevation_provenance": "string",
+        "elevation_to_m": "number",
+        "estimated_downstream_demand_lps": "number",
+        "estimated_households": "integer",
+        "length_m": "number",
+        "loop_candidates": "array[object]",
+        "network_revision": "string",
+        "predicted_headloss_m": "number",
+        "predicted_velocity_ms": "number",
+        "recommended_diameter_mm": "integer",
+        "slope_pct": "number",
+        "target_velocity_ms": "number",
+        "warnings": "array[string]"
+      },
+      "required": [
+        "elevation_diff_m",
+        "elevation_from_m",
+        "elevation_provenance",
+        "elevation_to_m",
+        "estimated_downstream_demand_lps",
+        "estimated_households",
+        "length_m",
+        "loop_candidates",
+        "network_revision",
+        "predicted_headloss_m",
+        "predicted_velocity_ms",
+        "recommended_diameter_mm",
+        "slope_pct",
+        "target_velocity_ms",
+        "warnings"
+      ]
+    },
+    "IoTStateResponse": {
+      "properties": {
+        "active_valve_closures": "array[string]",
+        "auto_valve_enabled": "boolean",
+        "buffer_size": "integer",
+        "emergency_stop": "boolean",
+        "latest_readings": "object",
+        "network_revision": "string",
+        "pending_valve_proposal": "null|object",
+        "seed": "integer",
+        "stream_enabled": "boolean",
+        "stream_mode": "enum"
+      },
+      "required": [
+        "active_valve_closures",
+        "auto_valve_enabled",
+        "buffer_size",
+        "emergency_stop",
+        "latest_readings",
+        "network_revision",
+        "seed",
+        "stream_enabled",
+        "stream_mode"
+      ]
+    },
+    "IsolationRequest": {
+      "properties": {
+        "leak_area_cm2": "number",
+        "target_node_id": "string",
+        "valve_ids": "array[string]"
+      },
+      "required": [
+        "leak_area_cm2",
+        "target_node_id",
+        "valve_ids"
+      ]
+    },
+    "IsolationResponse": {
+      "properties": {
+        "min_pressure_m": "number",
+        "node_pressures": "object",
+        "nodes_without_supply": "array[string]"
+      },
+      "required": [
+        "min_pressure_m",
+        "node_pressures",
+        "nodes_without_supply"
+      ]
+    },
+    "LeakSimulationRequest": {
+      "properties": {
+        "leak_area_cm2": "number",
+        "noise_pct": "number",
+        "seed": "integer|null",
+        "target_node_id": "string"
+      },
+      "required": [
+        "target_node_id"
+      ]
+    },
+    "LeakSimulationResponse": {
+      "properties": {
+        "actual_loss_lpm": "number",
+        "affected_households_after_isolation": "integer",
+        "compute_time_ms": "number",
+        "injected_leak_area_cm2": "number",
+        "injected_node_id": "string",
+        "isolated_node_ids": "array[string]",
+        "localization_error_m": "number",
+        "network_revision": "null|string",
+        "node_heatmap": "object",
+        "predicted_top_candidates": "array[CandidateNode]",
+        "recommended_valves_to_close": "array[string]",
+        "sensor_readings": "array[SensorReading]"
+      },
+      "required": [
+        "actual_loss_lpm",
+        "affected_households_after_isolation",
+        "compute_time_ms",
+        "injected_leak_area_cm2",
+        "injected_node_id",
+        "isolated_node_ids",
+        "localization_error_m",
+        "node_heatmap",
+        "predicted_top_candidates",
+        "recommended_valves_to_close",
+        "sensor_readings"
+      ]
+    },
+    "NetworkBuildCommitRequest": {
+      "properties": {
+        "confirm": "boolean",
+        "expected_network_revision": "string",
+        "preview_token": "string"
+      },
+      "required": [
+        "expected_network_revision",
+        "preview_token"
+      ]
+    },
+    "NetworkBuildPreviewRequest": {
+      "properties": {
+        "expected_network_revision": "null|string",
+        "new_nodes": "array[BuildProposedNode]",
+        "new_pipes": "array[BuildProposedPipe]"
+      },
+      "required": [
+        "new_pipes"
+      ]
+    },
+    "NetworkBuildPreviewResponse": {
+      "properties": {
+        "after_metrics": "WhatIfMetrics|null",
+        "before_metrics": "WhatIfMetrics|null",
+        "errors": "array[string]",
+        "preview_token": "null|string",
+        "source_network_revision": "string",
+        "valid": "boolean",
+        "warnings": "array[string]"
+      },
+      "required": [
+        "source_network_revision",
+        "valid"
+      ]
+    },
+    "NetworkImportCommitRequest": {
+      "properties": {
+        "confirm": "boolean",
+        "expected_network_revision": "string",
+        "preview_token": "string"
+      },
+      "required": [
+        "expected_network_revision",
+        "preview_token"
+      ]
+    },
+    "NetworkImportPreviewRequest": {
+      "properties": {
+        "content": "string",
+        "filename": "string",
+        "format": "enum",
+        "network_name": "null|string"
+      },
+      "required": [
+        "content",
+        "filename",
+        "format"
+      ]
+    },
+    "NetworkImportPreviewResponse": {
+      "properties": {
+        "errors": "array[string]",
+        "preview_token": "null|string",
+        "proposed_meta": "NetworkRevisionMeta|null",
+        "source_network_revision": "string",
+        "valid": "boolean",
+        "warnings": "array[string]"
+      },
+      "required": [
+        "source_network_revision",
+        "valid"
+      ]
+    },
+    "NetworkNode": {
+      "properties": {
+        "base_demand_lps": "number",
+        "base_pressure_m": "number",
+        "elevation_m": "number",
+        "households": "integer",
+        "id": "string",
+        "is_sensor": "boolean",
+        "lat": "number",
+        "leak_probability": "number",
+        "lng": "number",
+        "type": "enum"
+      },
+      "required": [
+        "base_demand_lps",
+        "base_pressure_m",
+        "elevation_m",
+        "households",
+        "id",
+        "is_sensor",
+        "lat",
+        "lng",
+        "type"
+      ]
+    },
+    "NetworkPipe": {
+      "properties": {
+        "diameter_mm": "number",
+        "flow_m3h": "number",
+        "id": "string",
+        "length_m": "number",
+        "road_class": "enum",
+        "source": "string",
+        "status": "enum",
+        "target": "string"
+      },
+      "required": [
+        "diameter_mm",
+        "flow_m3h",
+        "id",
+        "length_m",
+        "road_class",
+        "source",
+        "target"
+      ]
+    },
+    "NetworkPresetInfo": {
+      "properties": {
+        "available": "boolean",
+        "description": "string",
+        "name": "string",
+        "num_nodes": "integer",
+        "num_pipes": "integer",
+        "preset_id": "string",
+        "provenance": "string",
+        "source_type": "enum"
+      },
+      "required": [
+        "available",
+        "description",
+        "name",
+        "num_nodes",
+        "num_pipes",
+        "preset_id",
+        "provenance",
+        "source_type"
+      ]
+    },
+    "NetworkPresetsListResponse": {
+      "properties": {
+        "active_network_revision": "string",
+        "presets": "array[NetworkPresetInfo]"
+      },
+      "required": [
+        "active_network_revision",
+        "presets"
+      ]
+    },
+    "NetworkResetRequest": {
+      "properties": {
+        "confirm": "boolean",
+        "target": "enum"
+      },
+      "required": []
+    },
+    "NetworkResponse": {
+      "properties": {
+        "center": "$Center",
+        "network_name": "string",
+        "network_revision": "null|string",
+        "nodes": "array[NetworkNode]",
+        "pipes": "array[NetworkPipe]",
+        "revision_meta": "NetworkRevisionMeta|null",
+        "sensor_ids": "array[string]"
+      },
+      "required": [
+        "center",
+        "network_name",
+        "nodes",
+        "pipes",
+        "sensor_ids"
+      ]
+    },
+    "NetworkRevisionCommitResponse": {
+      "properties": {
+        "committed": "boolean",
+        "message": "string",
+        "new_network_revision": "string",
+        "previous_network_revision": "string",
+        "revision_meta": "$NetworkRevisionMeta"
+      },
+      "required": [
+        "committed",
+        "message",
+        "new_network_revision",
+        "previous_network_revision",
+        "revision_meta"
+      ]
+    },
+    "NetworkRevisionMeta": {
+      "properties": {
+        "can_rollback": "boolean",
+        "created_at_utc": "string",
+        "crs": "string",
+        "network_id": "string",
+        "network_revision": "string",
+        "num_nodes": "integer",
+        "num_pipes": "integer",
+        "sha256": "null|string",
+        "source_filename": "null|string",
+        "source_type": "enum",
+        "validation_summary": "object"
+      },
+      "required": [
+        "created_at_utc",
+        "network_id",
+        "network_revision",
+        "num_nodes",
+        "num_pipes"
+      ]
+    },
+    "PipeConditionItem": {
+      "properties": {
+        "diameter_mm": "number",
+        "flow_m3h": "number",
+        "from_node": "string",
+        "headloss_m_per_km": "number",
+        "hoop_stress_mpa": "null|number",
+        "illustrative_stress_index": "number",
+        "joukowsky_surge_m": "null|number",
+        "length_m": "number",
+        "missing_inputs": "array[string]",
+        "pipe_id": "string",
+        "provenance_note": "string",
+        "rul_status": "enum",
+        "rul_years": "null|number",
+        "to_node": "string",
+        "velocity_ms": "number"
+      },
+      "required": [
+        "diameter_mm",
+        "flow_m3h",
+        "from_node",
+        "headloss_m_per_km",
+        "illustrative_stress_index",
+        "length_m",
+        "missing_inputs",
+        "pipe_id",
+        "provenance_note",
+        "to_node",
+        "velocity_ms"
+      ]
+    },
+    "PipeConditionResponse": {
+      "properties": {
+        "methodology_note": "string",
+        "network_revision": "string",
+        "pipes": "array[PipeConditionItem]",
+        "rul_available": "boolean"
+      },
+      "required": [
+        "methodology_note",
+        "network_revision",
+        "pipes"
+      ]
+    },
+    "PipeWarning": {
+      "properties": {
+        "message": "string",
+        "pipe_id": "string",
+        "unit": "string",
+        "value": "number",
+        "warning_type": "enum"
+      },
+      "required": [
+        "message",
+        "pipe_id",
+        "unit",
+        "value",
+        "warning_type"
+      ]
+    },
+    "Preset": {
+      "properties": {
+        "description": "string",
+        "id": "string",
+        "label": "string",
+        "leak_area_cm2": "number",
+        "noise_pct": "number",
+        "target_node_id": "string"
+      },
+      "required": [
+        "description",
+        "id",
+        "label",
+        "leak_area_cm2",
+        "noise_pct",
+        "target_node_id"
+      ]
+    },
+    "PresetsResponse": {
+      "properties": {
+        "presets": "array[Preset]"
+      },
+      "required": [
+        "presets"
+      ]
+    },
+    "SensorReading": {
+      "properties": {
+        "baseline_m": "number",
+        "drop_m": "number",
+        "observed_m": "number",
+        "sensor_id": "string"
+      },
+      "required": [
+        "baseline_m",
+        "drop_m",
+        "observed_m",
+        "sensor_id"
+      ]
+    },
+    "TelemetryIngestRequest": {
+      "properties": {
+        "packets": "array[TelemetryPacket]"
+      },
+      "required": [
+        "packets"
+      ]
+    },
+    "TelemetryIngestResponse": {
+      "properties": {
+        "accepted": "integer",
+        "active_network_revision": "string",
+        "deduplicated": "integer",
+        "errors": "array[string]",
+        "rejected": "integer"
+      },
+      "required": [
+        "accepted",
+        "active_network_revision",
+        "deduplicated",
+        "errors",
+        "rejected"
+      ]
+    },
+    "TelemetryPacket": {
+      "properties": {
+        "measurement_type": "enum",
+        "network_revision": "string",
+        "observed_at_utc": "string",
+        "quality": "enum",
+        "sequence_id": "integer",
+        "source_id": "string",
+        "source_type": "enum",
+        "target_id": "string",
+        "unit": "enum",
+        "value": "number"
+      },
+      "required": [
+        "measurement_type",
+        "network_revision",
+        "observed_at_utc",
+        "sequence_id",
+        "source_id",
+        "target_id",
+        "unit",
+        "value"
+      ]
+    },
+    "ValidationError": {
+      "properties": {
+        "ctx": "object",
+        "input": "any",
+        "loc": "array[integer|string]",
+        "msg": "string",
+        "type": "string"
+      },
+      "required": [
+        "loc",
+        "msg",
+        "type"
+      ]
+    },
+    "WhatIfLeakInjection": {
+      "properties": {
+        "leak_area_cm2": "number",
+        "node_id": "string"
+      },
+      "required": [
+        "node_id"
+      ]
+    },
+    "WhatIfMetrics": {
+      "properties": {
+        "affected_households": "integer",
+        "avg_pressure_m": "number",
+        "max_pressure_m": "number",
+        "min_pressure_m": "number",
+        "pressure_deficit_nodes": "integer",
+        "tankers_lost_per_day": "number",
+        "total_leak_loss_lpm": "number",
+        "unsupplied_nodes": "array[string]"
+      },
+      "required": [
+        "affected_households",
+        "avg_pressure_m",
+        "max_pressure_m",
+        "min_pressure_m",
+        "pressure_deficit_nodes",
+        "tankers_lost_per_day",
+        "total_leak_loss_lpm",
+        "unsupplied_nodes"
+      ]
+    },
+    "WhatIfPipeOverride": {
+      "properties": {
+        "diameter_mm": "null|number",
+        "pipe_id": "string",
+        "roughness": "null|number",
+        "status": "null|string"
+      },
+      "required": [
+        "pipe_id"
+      ]
+    },
+    "WhatIfRequest": {
+      "properties": {
+        "demand_multiplier": "number",
+        "expected_network_revision": "null|string",
+        "leaks": "array[WhatIfLeakInjection]",
+        "pipe_overrides": "array[WhatIfPipeOverride]",
+        "reservoir_head_delta_m": "number",
+        "seed": "integer|null"
+      },
+      "required": []
+    },
+    "WhatIfResponse": {
+      "properties": {
+        "baseline": "$WhatIfMetrics",
+        "compute_time_ms": "number",
+        "converged": "boolean",
+        "limitations": "array[string]",
+        "network_revision": "string",
+        "node_pressure_deltas_m": "object",
+        "pipe_warnings": "array[PipeWarning]",
+        "scenario": "$WhatIfMetrics",
+        "scenario_node_pressures_m": "object",
+        "solver_message": "string"
+      },
+      "required": [
+        "baseline",
+        "compute_time_ms",
+        "converged",
+        "limitations",
+        "network_revision",
+        "node_pressure_deltas_m",
+        "pipe_warnings",
+        "scenario",
+        "scenario_node_pressures_m",
+        "solver_message"
+      ]
+    }
+  }
+}
