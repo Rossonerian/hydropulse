@@ -69,6 +69,7 @@ export default function ControlPanel({
   revealed = false,
   showTruth,
   mode = 'mock',
+  simulateCooldown = 0,
 }) {
   const [query, setQuery] = useState(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -388,16 +389,23 @@ export default function ControlPanel({
             size="md"
             className="simulate-button control-btn-full"
             busy={phase === 'simulating'}
-            disabled={!network || phase === 'simulating'}
+            disabled={!network || phase === 'simulating' || simulateCooldown > 0}
             icon={Activity}
             kbd="Space"
             onClick={handleSimulateBurst}
+            title={
+              simulateCooldown > 0
+                ? `Simulation cooldown active (${simulateCooldown}s)`
+                : 'Execute Torricelli leak burst simulation (Space)'
+            }
           >
             {!network
               ? 'Connecting…'
               : phase === 'simulating'
                 ? 'Scanning network…'
-                : 'Simulate burst'}
+                : simulateCooldown > 0
+                  ? `Cooldown (${simulateCooldown}s)`
+                  : 'Simulate burst'}
           </Button>
 
           <div className="action-row-split">

@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useState, useCallback } from 'react';
+import { memo, useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import {
   CircleMarker,
   MapContainer,
@@ -10,11 +10,39 @@ import {
 } from 'react-leaflet';
 import L from 'leaflet';
 import { Layers2, Crosshair, Maximize2, Minimize2 } from 'lucide-react';
+import SkeletonLoader from './SkeletonLoader.jsx';
 import { MapControlStack, MapLegend, IconButton } from '../ui/index.js';
 import { useTheme, getTokenValue } from '../ui/useTheme.js';
 
 const CARTO_DARK_URL = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
 const CARTO_LIGHT_URL = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+
+// Fit network bounds strictly once upon initial valid data receipt
+function InitialFitBounds({ network }) {
+  const map = useMap();
+  const hasFitted = useRef(false);
+
+  useEffect(() => {
+    if (hasFitted.current) return;
+    if (network?.nodes && network.nodes.length > 0) {
+      const validNodes = network.nodes.filter(
+        (n) => Number.isFinite(n.lat) && Number.isFinite(n.lng) && (n.lat !== 0 || n.lng !== 0),
+      );
+      if (validNodes.length > 0) {
+        const lats = validNodes.map((n) => n.lat);
+        const lngs = validNodes.map((n) => n.lng);
+        const bounds = [
+          [Math.min(...lats), Math.min(...lngs)],
+          [Math.max(...lats), Math.max(...lngs)],
+        ];
+        map.fitBounds(bounds, { padding: [35, 35], maxZoom: 17 });
+        hasFitted.current = true;
+      }
+    }
+  }, [network, map]);
+
+  return null;
+}
 
 function FlyTo({ node }) {
   const map = useMap();
@@ -240,6 +268,7 @@ function MapCanvas({
           }}
           opacity={basemap && !tilesFailed ? 1 : 0}
         />
+        <InitialFitBounds network={network} />
         <FlyTo node={focusNode} />
         <Recenter center={network?.center} revision={recenterRevision} />
 
@@ -250,6 +279,7 @@ function MapCanvas({
           if (!a || !b) return null;
           const active = valving.has(p.id);
           const isolatedPipe = isolated.has(p.source) || isolated.has(p.target);
+          const isSelected = selected === p.id;
           const width =
             p.diameter_mm >= 400 ? 5 : p.diameter_mm >= 250 ? 3 : 1.5;
           return (
@@ -260,10 +290,16 @@ function MapCanvas({
                 [b.lat, b.lng],
               ]}
               pathOptions={{
-                color: isolatedPipe ? colors.inkFaint : active ? colors.valve : colors.water,
-                weight: width,
+                color: isSelected ? colors.sensor : isolatedPipe ? colors.inkFaint : active ? colors.valve : colors.water,
+                weight: isSelected ? width + 2 : width,
                 opacity: isolatedPipe ? 0.4 : active ? 0.9 : 0.7,
                 dashArray: isolatedPipe ? '6 6' : active ? '8 8' : null,
+              }}
+              eventHandlers={{
+                click: () => {
+                  setSelected?.(p.id);
+                  onPick?.(p);
+                },
               }}
             >
               <Tooltip sticky>
@@ -494,6 +530,15 @@ function MapCanvas({
 
       {/* Legend */}
       <MapLegend items={legendItems} />
+
+      {/* Mandatory Regulatory / Demonstration Disclaimer Watermark */}
+      <div className='map-disclaimer-watermark'>
+        SIMULATED NETWORK · DEMO GEOGRAPHIC PLACEMENT · NOT VERIFIED BWSSB GEOMETRY
+      </div>
+
+      {(!network?.nodes || network.nodes.length === 0) && (
+        <SkeletonLoader variant='map-veil' />
+      )}
     </section>
   );
 }

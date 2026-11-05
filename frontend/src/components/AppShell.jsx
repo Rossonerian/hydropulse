@@ -25,6 +25,10 @@ export default function AppShell({
   statusMessage,
   onDismissStatus,
   onRetryConnection,
+  lastUpdated,
+  isRefreshing,
+  isCached,
+  onClearCache,
   controlPanel,
   mapCanvas,
   incidentPanel,
@@ -145,6 +149,10 @@ export default function AppShell({
         message={statusMessage}
         onDismiss={onDismissStatus}
         onRetry={onRetryConnection}
+        lastUpdated={lastUpdated}
+        isRefreshing={isRefreshing}
+        isCached={isCached}
+        onClearCache={onClearCache}
       />
     </main>
   );

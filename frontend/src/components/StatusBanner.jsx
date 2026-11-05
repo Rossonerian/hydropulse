@@ -1,9 +1,18 @@
-import { AlertTriangle, RefreshCw, X } from 'lucide-react';
+import { memo } from 'react';
+import { AlertTriangle, Clock, RefreshCw, Trash2, X } from 'lucide-react';
 
-export default function StatusBanner({
+/**
+ * StatusBanner (Section 17.4, 18.5, 21.3 of HydroPulse Interaction Plan)
+ * Communicates data freshness, connection state, error toasts, and recovery actions.
+ */
+function StatusBanner({
   mode,
   networkSource,
+  lastUpdated,
+  isRefreshing,
+  isCached,
   onRetry,
+  onClearCache,
   message,
   onDismiss,
 }) {
@@ -21,23 +30,62 @@ export default function StatusBanner({
     );
   }
 
-  // Make connection state explicit because offline mode can use live snapshots or local demo data.
+  const formattedTime = lastUpdated
+    ? new Date(lastUpdated).toLocaleTimeString('en-IN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      })
+    : null;
+
   if (mode === 'offline') {
     const sourceLabel =
       networkSource === 'recorded'
-        ? 'running on recorded data'
+        ? 'using recorded baseline snapshot'
         : networkSource === 'live'
-          ? 'using the last network snapshot with local simulation'
-          : 'running on generated demo data';
+          ? 'using cached live snapshot'
+          : 'using local demo model';
+
     return (
-      <div className="status-banner status-banner--offline" role="status">
+      <div className="status-banner status-banner--offline" role="status" aria-live="polite">
         <AlertTriangle size={16} aria-hidden="true" />
         <span>
           <b>Backend offline:</b> {sourceLabel}
+          {formattedTime && ` (last valid update: ${formattedTime})`}
         </span>
-        {onRetry && (
-          <button type="button" onClick={onRetry} aria-label="Retry backend connection">
-            <RefreshCw size={14} aria-hidden="true" /> Retry connection
+        <div className="status-banner-actions" style={{ display: 'flex', gap: '8px', marginLeft: 'auto' }}>
+          {onRetry && (
+            <button type="button" onClick={onRetry} aria-label="Retry backend connection">
+              <RefreshCw size={14} className={isRefreshing ? 'spin-icon' : ''} aria-hidden="true" /> Retry connection
+            </button>
+          )}
+          {onClearCache && (
+            <button type="button" onClick={onClearCache} aria-label="Clear local cache and reload" className="secondary">
+              <Trash2 size={12} aria-hidden="true" /> Clear cache
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (isRefreshing && mode !== 'loading') {
+    return (
+      <div className="status-banner status-banner--refreshing" role="status" aria-live="polite">
+        <RefreshCw size={14} className="spin-icon" aria-hidden="true" />
+        <span>Revalidating network telemetry in background…</span>
+      </div>
+    );
+  }
+
+  if (isCached && formattedTime) {
+    return (
+      <div className="status-banner status-banner--cached" role="status">
+        <Clock size={14} aria-hidden="true" />
+        <span>Showing cached network data · Synchronized at {formattedTime}</span>
+        {onClearCache && (
+          <button type="button" onClick={onClearCache} aria-label="Clear local cache" style={{ marginLeft: 'auto' }}>
+            <Trash2 size={12} aria-hidden="true" /> Clear cache
           </button>
         )}
       </div>
@@ -46,11 +94,13 @@ export default function StatusBanner({
 
   if (mode === 'loading') {
     return (
-      <div className="status-banner status-banner--loading" role="status">
-        Connecting to the network API…
+      <div className="status-banner status-banner--loading" role="status" aria-busy="true">
+        <span>CONNECTING TO KENGERI WATER NETWORK API…</span>
       </div>
     );
   }
 
   return null;
 }
+
+export default memo(StatusBanner);

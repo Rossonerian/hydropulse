@@ -7,6 +7,7 @@ import './styles/ops/shell.css';
 import AppShell from './components/AppShell.jsx';
 import ControlPanel from './components/ControlPanel.jsx';
 import MapCanvas from './components/MapCanvas.jsx';
+import Terrain3DViewer from './components/Terrain3DViewer.jsx';
 import IncidentPanel from './components/IncidentPanel.jsx';
 import { useHydroPulse } from './hooks/useHydroPulse.js';
 
@@ -28,12 +29,21 @@ export default function App() {
     phase,
     lastResult,
     error,
+    lastUpdated,
+    isRefreshing,
+    isCached,
+    simulateCooldown,
+    load,
     simulate,
     isolate,
     reset,
+    clearCache,
   } = pulse;
 
   const [view, setView] = useState('operations'); // 'operations' | 'studio'
+  const [viewMode, setViewMode] = useState('2d'); // '2d' | '3d'
+  const [activeDraft, setActiveDraft] = useState(null);
+  const activeNetwork = activeDraft || network;
   const [activeTab, setActiveTab] = useState('simulate'); // 'simulate' | 'incident' | 'sensors'
   const [statusAnnouncement, setStatusAnnouncement] = useState('');
   const [selected, setSelected] = useState('J15');
@@ -194,6 +204,13 @@ export default function App() {
         return;
       }
 
+      // 'm' / 'M': Toggle 2D Map / 3D Terrain view
+      if (e.key === 'm' || e.key === 'M') {
+        e.preventDefault();
+        setViewMode((v) => (v === '2d' ? '3d' : '2d'));
+        return;
+      }
+
       // 'b' / 'B': Toggle basemap
       if (e.key === 'b' || e.key === 'B') {
         e.preventDefault();
@@ -263,7 +280,7 @@ export default function App() {
       mode={mode}
       networkSource={networkSource}
       health={health}
-      network={network}
+      network={activeNetwork}
       phase={phase}
       lastResult={lastResult}
       activeTab={activeTab}
@@ -279,6 +296,10 @@ export default function App() {
       statusMessage={toastMessage}
       onDismissStatus={() => setToastMessage('')}
       onRetryConnection={() => pulse.load()}
+      lastUpdated={lastUpdated}
+      isRefreshing={isRefreshing}
+      isCached={isCached}
+      onClearCache={clearCache}
       controlPanel={
         <ControlPanel
           presets={presets}
@@ -301,29 +322,46 @@ export default function App() {
           onReveal={() => setRevealed(true)}
           revealed={revealed}
           showTruth={showTruth}
-          network={network}
+          network={activeNetwork}
           mode={mode}
+          simulateCooldown={simulateCooldown}
         />
       }
       mapCanvas={
-        <MapCanvas
-          network={network}
-          selected={selected}
-          phase={phase}
-          lastResult={lastResult}
-          result={lastResult}
-          isolatedValves={lastResult?.recommended_valves_to_close || []}
-          judge={judge}
-          showTruth={showTruth}
-          revealed={revealed}
-          onPick={handleSelectNode}
-          setSelected={handleSelectNode}
-          onSelect={handleSelectNode}
-        />
+        viewMode === '2d' ? (
+          <MapCanvas
+            network={activeNetwork}
+            selected={selected}
+            phase={phase}
+            lastResult={lastResult}
+            result={lastResult}
+            isolatedValves={lastResult?.recommended_valves_to_close || []}
+            judge={judge}
+            showTruth={showTruth}
+            revealed={revealed}
+            onPick={handleSelectNode}
+            setSelected={handleSelectNode}
+            onSelect={handleSelectNode}
+          />
+        ) : (
+          <div className="map-canvas terrain-workspace-view" style={{ width: '100%', height: '100%', position: 'relative' }}>
+            <Terrain3DViewer
+              network={activeNetwork}
+              result={lastResult}
+              phase={phase}
+              selected={selected}
+              setSelected={handleSelectNode}
+              judge={judge}
+              revealed={revealed}
+              mode={mode}
+              onUpdateDraft={(updated) => setActiveDraft(updated)}
+            />
+          </div>
+        )
       }
       incidentPanel={
         <IncidentPanel
-          network={network}
+          network={activeNetwork}
           mode={mode}
           onSimulate={simulate}
           phase={phase}
@@ -380,7 +418,7 @@ export default function App() {
           }
         >
           <NetworkStudio
-            initialNetwork={network}
+            initialNetwork={activeNetwork}
             networkSource={networkSource}
           />
         </Suspense>
