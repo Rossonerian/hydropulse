@@ -131,6 +131,18 @@ class BackendConfig:
     openrouter_connect_timeout_s: float = 2.0
     openrouter_max_retries: int = 1
 
+    # CARTO basemap tile proxy (key stays server-side; never exposed to the browser)
+    carto_api_key: str | None = field(default=None, repr=False)
+    carto_tile_url: str = "https://basemaps.cartocdn.com/rastertiles/{style}/{z}/{x}/{y}.png"
+    carto_auth_mode: str = "query"  # none | bearer | query
+    carto_auth_param: str = "key"  # query parameter name when carto_auth_mode == "query"
+    basemap_cache_ttl_s: int = 86400
+    basemap_cache_max_tiles: int = 2000
+
+    @property
+    def basemap_proxy_enabled(self) -> bool:
+        return bool(self.carto_api_key and self.carto_api_key.strip() and self.carto_auth_mode != "none")
+
     @property
     def is_prod(self) -> bool:
         return self.env == "prod"
@@ -214,6 +226,7 @@ class BackendConfig:
             "openrouter_api_key_configured": bool(self.openrouter_api_key),
             "openrouter_model": self.openrouter_model,
             "openrouter_timeout_s": self.openrouter_timeout_s,
+            "carto_api_key_configured": bool(self.carto_api_key),
         }
 
 
@@ -290,6 +303,24 @@ def load_config(environ: dict[str, str] | None = None) -> BackendConfig:
         env_map.get("OPENROUTER_API_KEY") or env_map.get("HYDROPULSE_OPENROUTER_API_KEY") or ""
     ).strip()
     openrouter_api_key = openrouter_key_raw if openrouter_key_raw else None
+    carto_key_raw = (
+        env_map.get("HYDROPULSE_CARTO_API_KEY") or env_map.get("CARTO_API_KEY") or ""
+    ).strip()
+    carto_api_key = carto_key_raw if carto_key_raw else None
+    carto_tile_url = (
+        env_map.get("HYDROPULSE_CARTO_TILE_URL")
+        or "https://basemaps.cartocdn.com/rastertiles/{style}/{z}/{x}/{y}.png"
+    ).strip()
+    carto_auth_mode = (env_map.get("HYDROPULSE_CARTO_AUTH_MODE") or "query").strip().lower()
+    if carto_auth_mode not in ("none", "bearer", "query"):
+        raise ValueError("HYDROPULSE_CARTO_AUTH_MODE must be one of: none, bearer, query")
+    carto_auth_param = (env_map.get("HYDROPULSE_CARTO_AUTH_PARAM") or "key").strip() or "key"
+    basemap_cache_ttl_s = _parse_int(
+        "HYDROPULSE_BASEMAP_CACHE_TTL_S", env_map.get("HYDROPULSE_BASEMAP_CACHE_TTL_S"), 86400, min_val=1, max_val=31_536_000
+    )
+    basemap_cache_max_tiles = _parse_int(
+        "HYDROPULSE_BASEMAP_CACHE_MAX_TILES", env_map.get("HYDROPULSE_BASEMAP_CACHE_MAX_TILES"), 2000, min_val=1, max_val=100_000
+    )
     openrouter_model = (
         (env_map.get("HYDROPULSE_OPENROUTER_MODEL") or env_map.get("OPENROUTER_MODEL") or "nvidia/nemotron-3.5-lightning:free").strip()
         or "nvidia/nemotron-3.5-lightning:free"
@@ -354,6 +385,12 @@ def load_config(environ: dict[str, str] | None = None) -> BackendConfig:
         openrouter_timeout_s=openrouter_timeout_s,
         openrouter_connect_timeout_s=openrouter_connect_timeout_s,
         openrouter_max_retries=openrouter_max_retries,
+        carto_api_key=carto_api_key,
+        carto_tile_url=carto_tile_url,
+        carto_auth_mode=carto_auth_mode,
+        carto_auth_param=carto_auth_param,
+        basemap_cache_ttl_s=basemap_cache_ttl_s,
+        basemap_cache_max_tiles=basemap_cache_max_tiles,
     )
     cfg.validate()
     return cfg

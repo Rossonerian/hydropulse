@@ -24,6 +24,17 @@
         }
       }
     },
+    "/api/basemap/{style}/{z}/{x}/{y}": {
+      "get": {
+        "admin": false,
+        "query_params": [],
+        "request_body": null,
+        "responses": {
+          "200": "image/png:None",
+          "422": "application/json:HTTPValidationError"
+        }
+      }
+    },
     "/api/health": {
       "get": {
         "admin": false,
@@ -408,6 +419,7 @@
     },
     "HealthResponse": {
       "properties": {
+        "basemap_proxy": "boolean",
         "can_rollback": "boolean",
         "matrix_ready": "boolean",
         "network_name": "string",

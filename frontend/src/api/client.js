@@ -1,6 +1,8 @@
 // Keep the API base configurable while Vite proxies /api locally.
 const BASE = import.meta.env.VITE_API_BASE ?? '';
 const forced = import.meta.env.VITE_USE_MOCK === 'true';
+// Same-origin-aware tile URL for the backend basemap proxy (CARTO key stays server-side).
+export const basemapProxyUrl = (style) => `${BASE}/api/basemap/${style}/{z}/{x}/{y}`;
 // Fail over quickly so an unreachable backend does not leave the control room waiting.
 const timeout = 4000;
 // Vite injects fixture filenames so absent optional mocks do not produce avoidable 404s.
