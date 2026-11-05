@@ -10,12 +10,34 @@ import {
 } from 'react-leaflet';
 import L from 'leaflet';
 import { Layers2, Crosshair, Maximize2, Minimize2 } from 'lucide-react';
+import '../styles/ops/map-controls.css';
 import SkeletonLoader from './SkeletonLoader.jsx';
 import { MapControlStack, MapLegend, IconButton } from '../ui/index.js';
 import { useTheme, getTokenValue } from '../ui/useTheme.js';
 
 const CARTO_DARK_URL = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
 const CARTO_LIGHT_URL = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+
+function networkBounds(network) {
+  const valid = (network?.nodes || []).filter(
+    (n) => Number.isFinite(n.lat) && Number.isFinite(n.lng) && (n.lat !== 0 || n.lng !== 0),
+  );
+  if (!valid.length) return null;
+  const lats = valid.map((n) => n.lat);
+  const lngs = valid.map((n) => n.lng);
+  return [
+    [Math.min(...lats), Math.min(...lngs)],
+    [Math.max(...lats), Math.max(...lngs)],
+  ];
+}
+
+const LAYER_DEFS = [
+  ['basemap', 'Basemap'],
+  ['pipes', 'Pipes'],
+  ['sensors', 'Sensors'],
+  ['heat', 'Heatmap'],
+  ['candidates', 'Leak candidates'],
+];
 
 // Fit network bounds strictly once upon initial valid data receipt
 function InitialFitBounds({ network }) {
@@ -50,43 +72,6 @@ function FlyTo({ node }) {
     if (node) map.flyTo([node.lat, node.lng], 18, { duration: 0.6 });
   }, [node, map]);
   return null;
-}
-
-function Recenter({ center, revision }) {
-  const map = useMap();
-  useEffect(() => {
-    if (center && revision > 0) map.flyTo([center.lat, center.lng], 16, { duration: 0.55 });
-  }, [center, revision, map]);
-  return null;
-}
-
-function FullscreenControl() {
-  const map = useMap();
-  const [isFullscreen, setIsFullscreen] = useState(false);
-
-  const toggleFullscreen = useCallback(() => {
-    const container = map.getContainer();
-    if (!document.fullscreenElement) {
-      container.requestFullscreen?.().then(() => setIsFullscreen(true)).catch(() => {});
-    } else {
-      document.exitFullscreen?.().then(() => setIsFullscreen(false)).catch(() => {});
-    }
-  }, [map]);
-
-  useEffect(() => {
-    const onChange = () => setIsFullscreen(!!document.fullscreenElement);
-    document.addEventListener('fullscreenchange', onChange);
-    return () => document.removeEventListener('fullscreenchange', onChange);
-  }, []);
-
-  return (
-    <IconButton
-      label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
-      icon={isFullscreen ? Minimize2 : Maximize2}
-      size='sm'
-      onClick={toggleFullscreen}
-    />
-  );
 }
 
 function isProviderErrorTile(tile) {
@@ -126,7 +111,6 @@ function MapCanvas({
   phase,
   result,
   selected,
-  setSelected,
   judge,
   revealed,
   mode,
@@ -134,9 +118,78 @@ function MapCanvas({
   focusNode,
 }) {
   const { theme } = useTheme();
-  const [basemap, setBasemap] = useState(true);
+  const [layers, setLayers] = useState({
+    basemap: true,
+    pipes: true,
+    sensors: true,
+    heat: true,
+    candidates: true,
+  });
+  const basemap = layers.basemap;
   const [tilesFailed, setTilesFailed] = useState(false);
-  const [recenterRevision, setRecenterRevision] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const mapRef = useRef(null);
+  const sectionRef = useRef(null);
+  const layersBtnRef = useRef(null);
+  const fsBtnRef = useRef(null);
+  const toggleLayer = useCallback(
+    (key) => setLayers((l) => ({ ...l, [key]: !l[key] })),
+    [],
+  );
+
+  const recenter = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const bounds = networkBounds(network);
+    if (bounds) map.flyToBounds(bounds, { padding: [35, 35], maxZoom: 17, duration: 0.5 });
+    else if (network?.center) map.flyTo([network.center.lat, network.center.lng], 16, { duration: 0.5 });
+  }, [network]);
+
+  // Fullscreen the whole map pane; fall back to a CSS overlay when the API is unavailable.
+  const toggleFullscreen = useCallback(() => {
+    const el = sectionRef.current;
+    if (!el) return;
+    if (document.fullscreenElement || isFullscreen) {
+      if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+      else setIsFullscreen(false);
+    } else if (el.requestFullscreen) {
+      el.requestFullscreen().catch(() => setIsFullscreen(true));
+    } else {
+      setIsFullscreen(true);
+    }
+    fsBtnRef.current?.focus();
+  }, [isFullscreen]);
+
+  useEffect(() => {
+    const onBase = () => toggleLayer('basemap');
+    window.addEventListener('hp:toggle-basemap', onBase);
+    return () => window.removeEventListener('hp:toggle-basemap', onBase);
+  }, [toggleLayer]);
+
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
+  }, []);
+
+  useEffect(() => {
+    // Esc closes the layer menu, or the CSS-fallback fullscreen (native fullscreen handles Esc itself).
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return;
+      if (menuOpen) setMenuOpen(false);
+      else if (isFullscreen && !document.fullscreenElement) setIsFullscreen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [menuOpen, isFullscreen]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return undefined;
+    const t = setTimeout(() => map.invalidateSize(), 80);
+    return () => clearTimeout(t);
+  }, [isFullscreen]);
 
   // Index nodes once because every pipe and overlay resolves endpoints by id.
   const byId = useMemo(
@@ -246,7 +299,10 @@ function MapCanvas({
   const fallback = !basemap || tilesFailed;
 
   return (
-    <section className={`map-canvas ${fallback ? 'no-tiles' : ''}`}>
+    <section
+      ref={sectionRef}
+      className={`map-canvas ${fallback ? 'no-tiles' : ''} ${isFullscreen ? 'map-canvas--fs' : ''}`}
+    >
       <MapContainer
         center={[
           network?.center?.lat || 12.9081,
@@ -255,6 +311,7 @@ function MapCanvas({
         zoom={16}
         zoomControl={false}
         preferCanvas
+        ref={mapRef}
       >
         <TileLayer
           crossOrigin='anonymous'
@@ -270,10 +327,9 @@ function MapCanvas({
         />
         <InitialFitBounds network={network} />
         <FlyTo node={focusNode} />
-        <Recenter center={network?.center} revision={recenterRevision} />
 
         {/* Pipes */}
-        {(network?.pipes || []).map((p) => {
+        {(layers.pipes ? network?.pipes || [] : []).map((p) => {
           const a = byId[p.source];
           const b = byId[p.target];
           if (!a || !b) return null;
@@ -296,10 +352,7 @@ function MapCanvas({
                 dashArray: isolatedPipe ? '6 6' : active ? '8 8' : null,
               }}
               eventHandlers={{
-                click: () => {
-                  setSelected?.(p.id);
-                  onPick?.(p);
-                },
+                click: () => onPick?.(p),
               }}
             >
               <Tooltip sticky>
@@ -314,7 +367,7 @@ function MapCanvas({
         })}
 
         {/* Heat circles */}
-        {Object.entries(heat).map(([id, value]) => {
+        {Object.entries(layers.heat ? heat : {}).map(([id, value]) => {
           const n = byId[id];
           if (!n || value < 0.05) return null;
           const heatColor =
@@ -349,7 +402,7 @@ function MapCanvas({
           const hiddenTarget = judge && phase === 'idle' && selected === n.id;
           const picked = selected === n.id && !judge;
           const isIsolated = isolated.has(n.id);
-          const isTopCandidate = topRank === 0;
+          const isTopCandidate = layers.candidates && topRank === 0;
 
           const fill = isIsolated
             ? colors.inkFaint
@@ -375,15 +428,12 @@ function MapCanvas({
                 dashArray: isIsolated ? '4 3' : null,
               }}
               eventHandlers={{
-                click: () => {
-                  setSelected(n.id);
-                  onPick?.(n);
-                },
+                click: () => onPick?.(n),
               }}
             >
-              {(picked || truth || (result && topRank >= 0 && topRank < 5)) && (
+              {(picked || truth || (layers.candidates && result && topRank >= 0 && topRank < 5)) && (
                 <Tooltip
-                  permanent={result && topRank >= 0 && topRank < 5}
+                  permanent={layers.candidates && result && topRank >= 0 && topRank < 5}
                   direction='top'
                   offset={[0, -8]}
                   className={
@@ -406,7 +456,7 @@ function MapCanvas({
         })}
 
         {/* Sensor nodes with permanent labels */}
-        {(network?.nodes || [])
+        {(layers.sensors ? network?.nodes || [] : [])
           .filter((n) => sensors.has(n.id) || n.is_sensor)
           .map((n) => {
             const sensorIndex = sensors.get(n.id) || 1;
@@ -417,7 +467,7 @@ function MapCanvas({
               <CircleMarker
                 key={`sensor-${n.id}`}
                 center={[n.lat, n.lng]}
-                radius={8}
+                radius={selected === n.id ? 11 : 8}
                 pathOptions={{
                   color: colors.sensor,
                   fillColor: colors.sensor,
@@ -426,10 +476,7 @@ function MapCanvas({
                   opacity: isIsolated ? 0.4 : 1,
                 }}
                 eventHandlers={{
-                  click: () => {
-                    setSelected(n.id);
-                    onPick?.(n);
-                  },
+                  click: () => onPick?.(n),
                 }}
               >
                 <Tooltip
@@ -458,6 +505,7 @@ function MapCanvas({
               key={`r${n.id}`}
               position={[n.lat, n.lng]}
               icon={reservoirIcon}
+              eventHandlers={{ click: () => onPick?.(n) }}
             >
               <Tooltip>
                 {n.type === 'reservoir' ? 'Reservoir' : 'Tank'} · {n.id}
@@ -479,7 +527,7 @@ function MapCanvas({
         ))}
 
         {/* Top candidate leak ring */}
-        {result?.predicted_top_candidates?.[0] && byId[result.predicted_top_candidates[0].node_id] && (
+        {layers.candidates && result?.predicted_top_candidates?.[0] && byId[result.predicted_top_candidates[0].node_id] && (
           <Marker
             position={[byId[result.predicted_top_candidates[0].node_id].lat, byId[result.predicted_top_candidates[0].node_id].lng]}
             icon={leakRingIcon}
@@ -502,30 +550,51 @@ function MapCanvas({
             <Tooltip permanent direction='bottom' className='truth-chip'>Injected node</Tooltip>
           </CircleMarker>
         )}
-        {/* Control stack */}
-        <MapControlStack>
-          <IconButton
-            label={basemap && !tilesFailed ? 'Hide basemap' : 'Show basemap'}
-            icon={Layers2}
-            size='sm'
-            pressed={basemap && !tilesFailed}
-            onClick={() => {
-              setBasemap(tilesFailed ? true : !basemap);
-              setTilesFailed(false);
-            }}
-          />
-          <IconButton
-            label='Center map'
-            icon={Crosshair}
-            size='sm'
-            onClick={() => {
-              setSelected(null);
-              setRecenterRevision((revision) => revision + 1);
-            }}
-          />
-          <FullscreenControl />
-        </MapControlStack>
       </MapContainer>
+      <MapControlStack>
+        <IconButton
+          ref={layersBtnRef}
+          label='Map layers'
+          icon={Layers2}
+          size='sm'
+          pressed={menuOpen}
+          aria-expanded={menuOpen}
+          aria-haspopup='true'
+          onClick={() => setMenuOpen((v) => !v)}
+        />
+        <IconButton
+          label='Recenter on network'
+          icon={Crosshair}
+          size='sm'
+          onClick={recenter}
+        />
+        <IconButton
+          ref={fsBtnRef}
+          label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+          icon={isFullscreen ? Minimize2 : Maximize2}
+          size='sm'
+          pressed={isFullscreen}
+          aria-pressed={isFullscreen}
+          onClick={toggleFullscreen}
+        />
+      </MapControlStack>
+      {menuOpen && (
+        <div className='map-layer-menu' role='group' aria-label='Map layers'>
+          {LAYER_DEFS.map(([key, label]) => (
+            <label key={key} className='map-layer-menu__row'>
+              <input
+                type='checkbox'
+                checked={layers[key]}
+                onChange={() => toggleLayer(key)}
+              />
+              {label}
+            </label>
+          ))}
+          {tilesFailed && (
+            <p className='map-layer-menu__note'>Basemap offline, showing plain background.</p>
+          )}
+        </div>
+      )}
 
 
       {/* Legend */}

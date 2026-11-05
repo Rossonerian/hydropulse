@@ -33,6 +33,20 @@ import {
   interpolateMidpoint,
 } from '../lib/realWorldData.js';
 
+// Site palette: read at runtime from tokens.css, re-read when data-theme changes.
+const PALETTE_TOKENS = { leak: '--leak', sensor: '--sensor', valve: '--valve', water: '--water' };
+const PALETTE_FALLBACK = { leak: '#EC8C16', sensor: '#4FD1B5', valve: '#F4D6B0', water: '#5BC0DE' };
+
+function readSitePalette() {
+  if (typeof document === 'undefined') return PALETTE_FALLBACK;
+  const styles = getComputedStyle(document.documentElement);
+  const out = {};
+  for (const [key, token] of Object.entries(PALETTE_TOKENS)) {
+    out[key] = styles.getPropertyValue(token).trim() || PALETTE_FALLBACK[key];
+  }
+  return out;
+}
+
 export default function Terrain3DViewer({
   network,
   result,
@@ -73,6 +87,14 @@ export default function Terrain3DViewer({
   const [dirty, setDirty] = useState(false);
   const [validationMsg, setValidationMsg] = useState(null);
   const [saveStatus, setSaveStatus] = useState('');
+  const [palette, setPalette] = useState(readSitePalette);
+
+  useEffect(() => {
+    if (typeof MutationObserver === 'undefined') return undefined;
+    const observer = new MutationObserver(() => setPalette(readSitePalette()));
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => observer.disconnect();
+  }, []);
 
   // Keep draft in sync if external network updates and no local edits have been made
   useEffect(() => {
@@ -491,7 +513,7 @@ export default function Terrain3DViewer({
       REAL_WORLD_FEATURES.waterBodies.forEach((wb) => {
         if (wb.type === 'line') {
           ctx.beginPath();
-          ctx.strokeStyle = '#5BC0DE66';
+          ctx.strokeStyle = `${palette.water}66`;
           ctx.lineWidth = 4;
           wb.coordinates.forEach((coord, idx) => {
             const pt = projectToMetricScene(coord[0], coord[1], 808);
@@ -528,12 +550,12 @@ export default function Terrain3DViewer({
 
       ctx.beginPath();
       ctx.strokeStyle = isSelected
-        ? '#F4D6B0'
+        ? palette.valve
         : isValving
-          ? '#D97706'
+          ? palette.valve
           : isClosed
             ? '#64748B'
-            : '#5BC0DE';
+            : palette.water;
       ctx.lineWidth = isSelected ? 6.5 : isValving ? 5 : p.diameter_mm >= 400 ? 4.5 : 2.5;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
@@ -557,7 +579,7 @@ export default function Terrain3DViewer({
           const sc = project(pt.x, pt.y + depthOffset, pt.z, width, height);
           ctx.beginPath();
           ctx.arc(sc.x, sc.y, idx === 0 || idx === allPts.length - 1 ? 5.5 : 7, 0, Math.PI * 2);
-          ctx.fillStyle = idx === 0 || idx === allPts.length - 1 ? '#5BC0DE' : '#D97706';
+          ctx.fillStyle = idx === 0 || idx === allPts.length - 1 ? palette.water : palette.valve;
           ctx.fill();
           ctx.strokeStyle = '#FFFFFF';
           ctx.lineWidth = 2;
@@ -587,18 +609,18 @@ export default function Terrain3DViewer({
         : isRevealedTruth
           ? '#FFFFFF'
           : isTopLeak
-            ? '#EF4444'
+            ? palette.leak
             : isSensor
-              ? '#10B981'
+              ? palette.sensor
               : '#3A506B';
       ctx.fill();
-      ctx.strokeStyle = isSelected ? '#F4D6B0' : '#1C2541';
+      ctx.strokeStyle = isSelected ? palette.valve : '#1C2541';
       ctx.lineWidth = isSelected ? 3 : 1.5;
       ctx.stroke();
 
       // Sensor Tag
       if (isSensor) {
-        ctx.fillStyle = '#10B981';
+        ctx.fillStyle = palette.sensor;
         ctx.font = 'bold 9px monospace';
         ctx.fillText(`S${sensors.get(n.id) || 1}`, sc.x + 9, sc.y - 4);
       }
@@ -607,7 +629,7 @@ export default function Terrain3DViewer({
       if (isTopLeak) {
         ctx.beginPath();
         ctx.arc(sc.x, sc.y, 18, 0, Math.PI * 2);
-        ctx.strokeStyle = '#EF444499';
+        ctx.strokeStyle = `${palette.leak}99`;
         ctx.lineWidth = 2;
         ctx.setLineDash([4, 4]);
         ctx.stroke();
@@ -642,6 +664,7 @@ export default function Terrain3DViewer({
     visibleLayers,
     interactionMode,
     project,
+    palette,
   ]);
 
   // Mouse Input Handling: Orbit, Pan, Zoom and Handle Dragging
@@ -1163,16 +1186,16 @@ export default function Terrain3DViewer({
       {/* 3D Legend & Attribution Bar */}
       <div className='terrain-3d-legend'>
         <span className='legend-item'>
-          <i style={{ background: '#5BC0DE' }} /> Potable Mains (BWSSB Kengeri)
+          <i style={{ background: palette.water }} /> Potable Mains (BWSSB Kengeri)
         </span>
         <span className='legend-item'>
-          <i style={{ background: '#10B981' }} /> Sentinel Sensors
+          <i style={{ background: palette.sensor }} /> Sentinel Sensors
         </span>
         <span className='legend-item'>
-          <i style={{ background: '#D97706' }} /> Valves / Low Pressure
+          <i style={{ background: palette.valve }} /> Valves / Low Pressure
         </span>
         <span className='legend-item'>
-          <i style={{ background: '#EF4444' }} /> Leak Candidate
+          <i style={{ background: palette.leak }} /> Leak Candidate
         </span>
         <span className='legend-item'>
           <i style={{ background: '#64748B' }} /> Isolated Pipeline

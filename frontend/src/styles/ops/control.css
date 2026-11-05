@@ -343,7 +343,7 @@
 
 /* Skeleton Loaders (§17) */
 .skeleton-block {
-  background: linear-gradient(90deg, #1C2541 25%, #3A506B 50%, #1C2541 75%);
+  background: linear-gradient(90deg, var(--shimmer-a) 25%, var(--shimmer-b) 50%, var(--shimmer-a) 75%);
   background-size: 200% 100%;
   animation: hp-shimmer 1.8s infinite linear;
   border-radius: 4px;
@@ -357,7 +357,7 @@
 .skeleton-map-veil {
   position: absolute;
   inset: 0;
-  background: rgba(11, 19, 43, 0.88);
+  background: var(--scrim);
   backdrop-filter: blur(4px);
   display: flex;
   flex-direction: column;
@@ -365,9 +365,9 @@
   justify-content: center;
   gap: 14px;
   z-index: 1000;
-  color: var(--hp-cyan, #5BC0DE);
+  color: var(--water);
   font-family: var(--font-mono, monospace);
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0.08em;
   font-weight: 600;
 }
@@ -375,8 +375,8 @@
 .map-veil-spinner {
   width: 28px;
   height: 28px;
-  border: 3px solid rgba(91, 192, 222, 0.2);
-  border-top-color: var(--hp-cyan, #5BC0DE);
+  border: 3px solid var(--water-line);
+  border-top-color: var(--water);
   border-radius: 50%;
   animation: hp-spin 0.9s linear infinite;
 }
@@ -408,8 +408,8 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: rgba(28, 37, 65, 0.4);
-  border: 1px solid rgba(58, 80, 107, 0.3);
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+  border: 1px solid var(--line);
   border-radius: 6px;
   padding: 10px 12px;
 }
@@ -428,29 +428,29 @@
   gap: 5px;
   padding: 4px 10px;
   border-radius: 6px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  background: rgba(255, 255, 255, 0.1);
-  color: #FFF;
+  border: 1px solid color-mix(in srgb, var(--ink) 30%, transparent);
+  background: color-mix(in srgb, var(--ink) 10%, transparent);
+  color: var(--ink);
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .status-banner-actions button:hover {
-  background: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.4);
+  background: color-mix(in srgb, var(--ink) 18%, transparent);
+  border-color: color-mix(in srgb, var(--ink) 45%, transparent);
 }
 
 .status-banner-actions button.secondary {
   background: transparent;
-  border-color: rgba(255, 255, 255, 0.15);
-  color: #CBD5E1;
+  border-color: var(--line-strong);
+  color: var(--ink-muted);
 }
 
 .status-banner-actions button.secondary:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: #FFF;
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  color: var(--ink);
 }
 
 .refreshing-banner {
@@ -458,10 +458,10 @@
   align-items: center;
   gap: 8px;
   padding: 6px 16px;
-  background: rgba(91, 192, 222, 0.1);
-  border-bottom: 1px solid rgba(91, 192, 222, 0.25);
-  color: var(--hp-cyan, #5BC0DE);
-  font-size: 11px;
+  background: var(--water-wash);
+  border-bottom: 1px solid var(--water-line);
+  color: var(--water);
+  font-size: 12px;
   font-family: var(--font-mono, monospace);
 }
 
@@ -470,17 +470,17 @@
   align-items: center;
   gap: 8px;
   padding: 5px 16px;
-  background: rgba(58, 80, 107, 0.2);
-  border-bottom: 1px solid rgba(58, 80, 107, 0.35);
-  color: #94A3B8;
-  font-size: 10.5px;
+  background: var(--surface-sunken);
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-muted);
+  font-size: 12px;
   font-family: var(--font-mono, monospace);
 }
 
 /* Danger Zone (§21.5) */
 .danger-zone-box {
-  background: rgba(239, 68, 68, 0.06);
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  background: var(--leak-wash);
+  border: 1px solid color-mix(in srgb, var(--leak) 45%, transparent);
   border-radius: 8px;
   padding: 10px 12px;
   margin-top: 10px;
@@ -490,15 +490,15 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
-  color: #EF4444;
+  color: var(--leak);
 }
 
 .danger-zone-desc {
-  font-size: 10px;
-  color: #94A3B8;
+  font-size: 12px;
+  color: var(--ink-muted);
   line-height: 1.4;
   margin: 4px 0 8px;
 }
@@ -513,39 +513,39 @@
   width: 100%;
   padding: 8px 12px;
   border-radius: 6px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
-  border: 1px solid var(--hp-slate, #3A506B);
-  background: var(--hp-navy, #1C2541);
-  color: var(--hp-sand, #F4D6B0);
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--brand);
   cursor: pointer;
   user-select: none;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 
 .hold-confirm-btn:hover {
-  background: var(--hp-slate, #3A506B);
+  background: var(--surface-raised);
 }
 
 .hold-confirm-btn.variant-danger {
-  border-color: rgba(239, 68, 68, 0.4);
-  color: #F87171;
-  background: rgba(28, 37, 65, 0.8);
+  border-color: color-mix(in srgb, var(--leak) 55%, transparent);
+  color: var(--leak);
+  background: var(--surface);
 }
 
 .hold-confirm-btn.variant-danger:hover {
-  border-color: #EF4444;
-  background: rgba(239, 68, 68, 0.1);
+  border-color: var(--leak);
+  background: var(--leak-wash);
 }
 
 .hold-confirm-btn.is-holding {
-  border-color: #EF4444;
+  border-color: var(--leak);
 }
 
 .hold-confirm-btn.is-triggered {
-  background: #EF4444 !important;
-  color: #0B132B !important;
-  border-color: #EF4444 !important;
+  background: var(--leak) !important;
+  color: var(--on-leak) !important;
+  border-color: var(--leak) !important;
 }
 
 .hold-progress-fill {
@@ -553,7 +553,7 @@
   top: 0;
   bottom: 0;
   left: 0;
-  background: rgba(239, 68, 68, 0.35);
+  background: color-mix(in srgb, var(--leak) 35%, transparent);
   pointer-events: none;
   z-index: 0;
 }
@@ -591,7 +591,7 @@
 @media (prefers-reduced-motion: reduce) {
   .skeleton-block {
     animation: none;
-    background: #243354;
+    background: var(--surface-raised);
   }
 
   .map-veil-spinner,

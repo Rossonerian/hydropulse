@@ -50,7 +50,7 @@ body {
   height: 100vh;
   min-height: 100vh;
   overflow: hidden;
-  background: var(--ground);
+  background: var(--atmosphere), var(--ground);
   color: var(--ink);
   position: relative;
 }
@@ -160,7 +160,7 @@ body {
   background: var(--surface);
   color: var(--ink);
   font-weight: 600;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-soft);
 }
 
 .topbar-badge-wrap {
@@ -575,7 +575,7 @@ body {
     color: var(--ink);
     font-weight: 600;
     border-color: var(--water);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    box-shadow: var(--shadow-soft);
   }
 
   .ops-panel--control,
@@ -701,7 +701,7 @@ body {
     color: var(--ink);
     font-weight: 600;
     border-color: var(--water);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    box-shadow: var(--shadow-soft);
   }
 
   .ops-panel--control,

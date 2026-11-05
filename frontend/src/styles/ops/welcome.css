@@ -4,7 +4,7 @@
   align-items: center;
   justify-content: center;
   padding: var(--space-6) var(--space-4);
-  background: var(--ground);
+  background: var(--atmosphere), var(--ground);
   color: var(--ink);
   font-family: var(--font-sans);
 }

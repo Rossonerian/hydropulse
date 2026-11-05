@@ -9,6 +9,8 @@ import ControlPanel from './components/ControlPanel.jsx';
 import MapCanvas from './components/MapCanvas.jsx';
 import Terrain3DViewer from './components/Terrain3DViewer.jsx';
 import IncidentPanel from './components/IncidentPanel.jsx';
+import FeatureCard from './components/FeatureCard.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
 import WelcomeScreen from './components/WelcomeScreen.jsx';
 import NetworkImportModal from './components/NetworkImportModal.jsx';
 import GuidedTour from './components/GuidedTour.jsx';
@@ -84,7 +86,8 @@ export default function App() {
   const activeNetwork = activeDraft || network;
   const [activeTab, setActiveTab] = useState('simulate'); // 'simulate' | 'incident' | 'sensors'
   const [statusAnnouncement, setStatusAnnouncement] = useState('');
-  const [selected, setSelected] = useState('J15');
+  const [selected, setSelected] = useState('J15'); // target junction id (always a string)
+  const [inspected, setInspected] = useState(null); // { kind: 'node' | 'pipe', id }
   const [area, setArea] = useState(25);
   const [noise, setNoise] = useState(1.5);
   const [judge, setJudge] = useState(false);
@@ -128,6 +131,7 @@ export default function App() {
     reset();
     setRevealed(false);
     setSelected('');
+    setInspected(null);
   }, [pulse, reset]);
 
   // Keep the selected junction valid for whichever network is active.
@@ -155,15 +159,40 @@ export default function App() {
     }
   }, [error]);
 
-  // Node selection: sets target junction only when not in judge mode
+  // Single entry point for every pick (map, 3D, schematic, candidate list, search).
+  // Accepts a node/pipe object or a bare id string, never stores objects in state.
+  // Junctions become the simulation target (except in judge mode, which hides it).
   const handleSelectNode = useCallback(
-    (nodeId) => {
-      if (!judge) {
-        setSelected(nodeId);
+    (picked) => {
+      const id = picked && typeof picked === 'object' ? picked.id : picked;
+      if (id == null || id === '') {
+        setInspected(null);
+        return;
       }
+      const key = String(id);
+      const node = activeNetwork?.nodes?.find((n) => n.id === key);
+      if (node) {
+        if (!judge && (node.type === 'junction' || !node.type)) setSelected(key);
+        setInspected({ kind: 'node', id: key });
+      } else if (activeNetwork?.pipes?.some((p) => p.id === key)) {
+        setInspected({ kind: 'pipe', id: key });
+      } else if (!judge) {
+        setSelected(key);
+        setInspected(null);
+      }
+      setActiveTab((t) => (t === 'simulate' ? 'incident' : t));
     },
-    [judge],
+    [judge, activeNetwork],
   );
+
+  const inspectedFeature = (() => {
+    if (!inspected) return null;
+    const item =
+      inspected.kind === 'pipe'
+        ? activeNetwork?.pipes?.find((p) => p.id === inspected.id)
+        : activeNetwork?.nodes?.find((n) => n.id === inspected.id);
+    return item ? { kind: inspected.kind, item } : null;
+  })();
 
   const run = useCallback(
     (params, preset) => {
@@ -298,12 +327,7 @@ export default function App() {
       // 'b' / 'B': Toggle basemap
       if (e.key === 'b' || e.key === 'B') {
         e.preventDefault();
-        const basemapBtn = document.querySelector(
-          '[aria-label="Hide basemap"], [aria-label="Show basemap"]',
-        );
-        if (basemapBtn) {
-          basemapBtn.click();
-        }
+        window.dispatchEvent(new Event('hp:toggle-basemap'));
         return;
       }
 
@@ -422,6 +446,7 @@ export default function App() {
       isCached={isCached}
       onClearCache={clearCache}
       controlPanel={
+        <ErrorBoundary label='controls' title='Controls failed to draw'>
         <ControlPanel
           presets={presets}
           selected={selected}
@@ -447,12 +472,14 @@ export default function App() {
           mode={mode}
           simulateCooldown={simulateCooldown}
         />
+        </ErrorBoundary>
       }
       mapCanvas={
-        viewMode === '2d' ? (
+        <ErrorBoundary label='map' title='The map failed to draw' resetKeys={[viewMode, activeNetwork]}>
+        {viewMode === '2d' ? (
           <MapCanvas
             network={activeNetwork}
-            selected={selected}
+            selected={inspected?.id || selected}
             phase={phase}
             lastResult={lastResult}
             result={lastResult}
@@ -461,8 +488,6 @@ export default function App() {
             showTruth={showTruth}
             revealed={revealed}
             onPick={handleSelectNode}
-            setSelected={handleSelectNode}
-            onSelect={handleSelectNode}
           />
         ) : (
           <div className="map-canvas terrain-workspace-view" style={{ width: '100%', height: '100%', position: 'relative' }}>
@@ -470,7 +495,7 @@ export default function App() {
               network={activeNetwork}
               result={lastResult}
               phase={phase}
-              selected={selected}
+              selected={inspected?.id || selected}
               setSelected={handleSelectNode}
               judge={judge}
               revealed={revealed}
@@ -478,9 +503,19 @@ export default function App() {
               onUpdateDraft={(updated) => setActiveDraft(updated)}
             />
           </div>
-        )
+        )}
+        </ErrorBoundary>
       }
       incidentPanel={
+        <ErrorBoundary label='inspector' title='Inspector failed to draw' resetKeys={[inspected?.id, lastResult]}>
+        <FeatureCard
+          feature={inspectedFeature}
+          result={lastResult}
+          phase={phase}
+          judge={judge}
+          onClose={() => setInspected(null)}
+          onSimulateHere={(id) => run({ target_node_id: id })}
+        />
         <IncidentPanel
           network={activeNetwork}
           mode={mode}
@@ -502,6 +537,7 @@ export default function App() {
           onFocus={handleSelectNode}
           onSelectNode={handleSelectNode}
         />
+        </ErrorBoundary>
       }
       pressureCharts={
         <Suspense

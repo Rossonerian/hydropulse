@@ -3,83 +3,132 @@
  * Raw color values, spacing, typography, motion, and z-index tokens.
  */
 
+/*
+ * Palette (user-provided): #0B132B deep navy, #1C2541 navy, #3A506B slate blue,
+ * #5BC0DE sky blue, #F4D6B0 warm cream, #D97706 amber.
+ * Every colour in the app lives here; components only use var(--...).
+ * Status is never colour-only: components pair these with icons/labels.
+ */
 :root,
 [data-theme='night'] {
   /* Ground - page background */
-  --ground: #0d171c;
+  --ground: #0b132b;
 
   /* Surface - card, panel, modal backgrounds */
-  --surface: #13222a;
-  --surface-raised: #1a2e37;
-  --surface-sunken: #0a1216;
+  --surface: #1c2541;
+  --surface-raised: #24314d;
+  --surface-sunken: #070c1c;
 
-  /* Line - borders, dividers */
-  --line: #24404b;
-  --line-strong: #55808f;
+  /* Line - borders, dividers (slate blue) */
+  --line: #3a506b;
+  --line-strong: #7a93ae;
 
-  /* Ink - text colors */
-  --ink: #e6eef0;
-  --ink-muted: #9db2b9;
-  --ink-faint: #7d959e;
+  /* Ink - text colors (cream-tinted) */
+  --ink: #f8e6cf;
+  --ink-muted: #d2c2ae;
+  --ink-faint: #b3a898;
 
   /* Semantic colors */
-  --water: #3bc4d6;
-  --on-water: #06232a;
-  --sensor: #3dd68c;
-  --leak: #ff6b6f;
-  --on-leak: #06232a;
-  --valve: #f2b23a;
-  --focus: #8fe6f2;
-  --leak-wash: rgba(255, 107, 111, 0.14);
+  --water: #5bc0de; /* primary accent / interactive (sky) */
+  --on-water: #0b132b;
+  --sensor: #4fd1b5; /* ok (teal-sky family) */
+  --leak: #ec8c16; /* alert: amber, text-safe on every night surface */
+  --on-leak: #0b132b;
+  --valve: #f4d6b0; /* warn / highlight (cream) */
+  --focus: #5bc0de;
+  --leak-wash: rgba(217, 119, 6, 0.18);
+  --brand: #f4d6b0; /* brand + heading emphasis */
+  --amber: #d97706; /* raw palette amber for fills/graphics */
 
-  /* Heat map gradient colors */
-  --heat-0: #2a3e47;
-  --heat-1: #6e4a55;
-  --heat-2: #a84e5a;
-  --heat-3: #e0585f;
-  --heat-4: #ff6b6f;
+  /* Aliases used by legacy control.css rules */
+  --hp-cyan: var(--water);
+  --hp-slate: var(--line);
+  --hp-navy: var(--surface);
+  --hp-sand: var(--brand);
+
+  /* Heat map ramp: slate -> sky -> cream -> amber */
+  --heat-0: #3a506b;
+  --heat-1: #5bc0de;
+  --heat-2: #f4d6b0;
+  --heat-3: #e8a03c;
+  --heat-4: #d97706;
+
+  /* Atmosphere (welcome + shell only) */
+  --glow-sky: rgba(91, 192, 222, 0.14);
+  --glow-amber: rgba(217, 119, 6, 0.1);
+
+  /* Overlays */
+  --scrim: rgba(11, 19, 43, 0.88);
+  --shimmer-a: #1c2541;
+  --shimmer-b: #3a506b;
+  --water-wash: rgba(91, 192, 222, 0.12);
+  --water-line: rgba(91, 192, 222, 0.3);
+  --shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.3);
 
   /* Shadow */
-  --shadow-overlay: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-overlay: 0 8px 24px rgba(0, 0, 0, 0.45);
 }
 
 [data-theme='day'] {
-  /* Ground - page background */
-  --ground: #eef2f1;
+  /* Ground - warm tint of cream */
+  --ground: #fdf6ee;
 
   /* Surface - card, panel, modal backgrounds */
   --surface: #ffffff;
-  --surface-raised: #f7f9f9;
-  --surface-sunken: #e3e9e8;
+  --surface-raised: #fffcf8;
+  --surface-sunken: #faeddb;
 
-  /* Line - borders, dividers */
-  --line: #d3dcdb;
-  --line-strong: #788c8f;
+  /* Line - borders, dividers (slate blue, low opacity) */
+  --line: rgba(58, 80, 107, 0.22);
+  --line-strong: #6b7f95;
 
   /* Ink - text colors */
-  --ink: #10202a;
-  --ink-muted: #43585f;
-  --ink-faint: #566a72;
+  --ink: #0b132b;
+  --ink-muted: #34465f;
+  --ink-faint: #4a5c74;
 
-  /* Semantic colors */
-  --water: #0a6e7c;
+  /* Semantic colors: sky darkened to a text-safe ink; raw sky kept for fills */
+  --water: #16708c;
   --on-water: #ffffff;
-  --sensor: #11774a;
-  --leak: #c0262e;
+  --sensor: #0f6f63;
+  --leak: #a64b00; /* amber darkened for AA text; raw amber is --amber */
   --on-leak: #ffffff;
-  --valve: #935a06;
-  --focus: #0a5e6b;
-  --leak-wash: rgba(192, 38, 46, 0.08);
+  --valve: #6e5600;
+  --focus: #16708c;
+  --leak-wash: rgba(217, 119, 6, 0.12);
+  --brand: #1c2541;
+  --amber: #d97706;
 
-  /* Heat map gradient colors */
-  --heat-0: #c9d3d2;
-  --heat-1: #d9a3a6;
-  --heat-2: #d3787c;
-  --heat-3: #c9484f;
-  --heat-4: #c0262e;
+  --hp-cyan: var(--water);
+  --hp-slate: var(--line-strong);
+  --hp-navy: var(--surface);
+  --hp-sand: var(--brand);
+
+  /* Heat map ramp: sky -> cream -> amber (graphics need >= 3:1 on light) */
+  --heat-0: #8cc7dc;
+  --heat-1: #3a9fc0;
+  --heat-2: #d9b07a;
+  --heat-3: #e08a14;
+  --heat-4: #c26400;
+
+  --glow-sky: rgba(91, 192, 222, 0.2);
+  --glow-amber: rgba(217, 119, 6, 0.1);
+
+  --scrim: rgba(253, 246, 238, 0.88);
+  --shimmer-a: #faeddb;
+  --shimmer-b: #ffffff;
+  --water-wash: rgba(22, 112, 140, 0.1);
+  --water-line: rgba(22, 112, 140, 0.35);
+  --shadow-soft: 0 1px 3px rgba(11, 19, 43, 0.15);
 
   /* Shadow */
-  --shadow-overlay: 0 8px 24px rgba(16, 32, 42, 0.16);
+  --shadow-overlay: 0 8px 24px rgba(11, 19, 43, 0.16);
+}
+
+/* Subtle atmosphere: sky glow left, amber glow right (static, no animation) */
+:root {
+  --atmosphere: radial-gradient(60% 50% at 0% 0%, var(--glow-sky), transparent 70%),
+    radial-gradient(55% 45% at 100% 100%, var(--glow-amber), transparent 70%);
 }
 
 /* Spacing scale */

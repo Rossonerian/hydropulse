@@ -18,8 +18,8 @@ import '../styles/studio/mapviews.css';
 const SEWER_COLOUR = '#A855F7'; // data colour
 const STP_STROKE = '#C084FC'; // data colour
 const STP_FILL = '#7E22CE'; // data colour
-const PUMP_COLOUR = '#3B82F6'; // data colour
-const RAIN_COLOUR = '#3B82F6'; // data colour
+const PUMP_COLOUR = '#EC4899'; // data colour
+const RAIN_COLOUR = '#4F46E5'; // data colour
 
 const readTheme = () =>
   (typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme')) || 'night';
