@@ -9,25 +9,34 @@ import { IconButton } from './IconButton.jsx';
 
 export function Drawer({ open, onClose, title, side = 'right', width = 480, children }) {
   const drawerRef = useRef(null);
+  const openerRef = useRef(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!open) return;
 
+    openerRef.current = document.activeElement;
+
     const handleEscape = (e) => {
       if (e.key === 'Escape') {
-        onClose?.();
+        onCloseRef.current?.();
       }
     };
 
     document.addEventListener('keydown', handleEscape);
     document.body.style.overflow = 'hidden';
 
+    if (!drawerRef.current?.contains(document.activeElement)) {
+      drawerRef.current?.focus();
+    }
+
     return () => {
       document.removeEventListener('keydown', handleEscape);
       document.body.style.overflow = '';
+      openerRef.current?.focus();
     };
-  }, [open, onClose]);
-
+  }, [open]);
   if (!open) return null;
 
   const sideClass = side === 'left' ? 'drawer--left' : '';

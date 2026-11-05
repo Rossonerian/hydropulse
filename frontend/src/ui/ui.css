@@ -446,9 +446,12 @@
   align-items: center;
   gap: var(--space-2);
   cursor: pointer;
+  width: auto;
+  height: auto;
 }
 
 .switch__input {
+  flex-shrink: 0;
   width: 44px;
   height: 24px;
   appearance: none;
@@ -459,6 +462,7 @@
   transition: background-color var(--dur-fast) var(--ease),
     border-color var(--dur-fast) var(--ease);
   position: relative;
+  margin: 0;
 }
 
 .switch__input:checked {
@@ -1115,7 +1119,14 @@
   }
 }
 
+[data-theme] {
+  background: var(--ground);
+  color: var(--ink);
+}
+
 .preview__theme {
+  background: var(--ground);
+  color: var(--ink);
   padding: var(--space-4);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);

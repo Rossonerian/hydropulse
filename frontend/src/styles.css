@@ -614,32 +614,6 @@ button:disabled {
   color: #74839b;
   margin: 4px 0 0;
 }
-.switch {
-  width: 31px;
-  height: 18px;
-  padding: 2px;
-  border: 1px solid #42506a;
-  border-radius: 12px;
-  background: #26344b;
-  display: flex;
-  align-items: center;
-  transition: 180ms ease-out;
-}
-.switch span {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: #a9b6c8;
-  transition: 180ms ease-out;
-}
-.switch.on {
-  justify-content: flex-end;
-  background: #3a2527;
-  border-color: #8d4145;
-}
-.switch.on span {
-  background: #ef6b70;
-}
 .reveal-button {
   margin-top: 7px;
   padding: 6px;

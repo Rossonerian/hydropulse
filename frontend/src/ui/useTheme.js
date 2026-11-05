@@ -20,6 +20,18 @@ try {
   // Silently fail if localStorage is unavailable
 }
 
+const subscribers = new Set();
+
+function broadcastTheme(newTheme) {
+  subscribers.forEach((cb) => {
+    try {
+      cb(newTheme);
+    } catch (e) {
+      // Ignore callback errors
+    }
+  });
+}
+
 // Apply theme to document immediately
 if (typeof document !== 'undefined') {
   document.documentElement.setAttribute('data-theme', currentTheme);
@@ -44,10 +56,16 @@ export function getTokenValue(name) {
 export function useTheme() {
   const [theme, setThemeState] = useState(currentTheme);
 
+  useEffect(() => {
+    subscribers.add(setThemeState);
+    return () => {
+      subscribers.delete(setThemeState);
+    };
+  }, []);
+
   const setTheme = useCallback((newTheme) => {
     if (newTheme !== 'night' && newTheme !== 'day') return;
     currentTheme = newTheme;
-    setThemeState(newTheme);
     if (typeof document !== 'undefined') {
       document.documentElement.setAttribute('data-theme', newTheme);
     }
@@ -56,6 +74,7 @@ export function useTheme() {
     } catch (e) {
       // Silently fail if localStorage is unavailable
     }
+    broadcastTheme(newTheme);
   }, []);
 
   const toggleTheme = useCallback(() => {
@@ -71,6 +90,7 @@ export function useTheme() {
  * @returns {string} Token value
  */
 export function useThemeToken(name) {
+  const { theme } = useTheme();
   const [value, setValue] = useState(() => getTokenValue(name));
 
   useEffect(() => {

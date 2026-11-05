@@ -1,0 +1,326 @@
+/**
+ * HydroPulse Map Styles
+ * Map canvas, markers, tooltips, legend, and control stack.
+ * Uses design tokens exclusively — no raw hex values.
+ */
+
+/* =============================================================================
+   Map Canvas Container
+   ============================================================================= */
+
+.map-canvas {
+  grid-column: 2;
+  grid-row: 1;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  box-shadow: var(--shadow-overlay);
+  isolation: isolate;
+}
+
+.map-canvas .leaflet-container {
+  height: 100%;
+  width: 100%;
+  background: var(--surface-sunken);
+  z-index: 1;
+}
+
+.map-canvas .leaflet-control-attribution {
+  background: var(--surface) !important;
+  color: var(--ink-faint) !important;
+  font-size: 12px !important;
+}
+
+.map-canvas .leaflet-control-attribution a {
+  color: var(--ink-muted) !important;
+}
+
+/* =============================================================================
+   Map Toolbar (legacy fallback — replaced by MapControlStack)
+   ============================================================================= */
+
+.map-toolbar {
+  display: none;
+}
+
+/* =============================================================================
+   Map Legend
+   ============================================================================= */
+
+.map-canvas .map-legend {
+  position: absolute;
+  z-index: var(--z-mapctl);
+  bottom: var(--space-4);
+  left: var(--space-4);
+  right: auto;
+  min-width: 0;
+  max-width: min(420px, calc(100% - 2 * var(--space-4)));
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-overlay);
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+
+.map-canvas .map-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+
+.map-canvas .map-legend__swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.map-canvas .map-legend__swatch--pipe {
+  background-color: var(--water);
+}
+
+.map-canvas .map-legend__swatch--sensor {
+  background-color: var(--sensor);
+  border-radius: 50%;
+}
+
+.map-canvas .map-legend__swatch--heat {
+  background-color: var(--heat-4);
+}
+
+.map-canvas .map-legend__swatch--leak {
+  background-color: var(--leak);
+  border-radius: 50%;
+}
+
+.map-canvas .map-legend__swatch--valve {
+  background-color: var(--valve);
+  border-radius: 2px;
+}
+
+.map-canvas .map-legend__swatch--isolated {
+  background-color: var(--ink-faint);
+  border: 1px dashed var(--line);
+}
+
+.map-canvas .map-legend__swatch--node {
+  background-color: var(--ink-faint);
+  border-radius: 50%;
+}
+
+/* =============================================================================
+   Map Control Stack (overrides for map-specific positioning)
+   ============================================================================= */
+
+.map-canvas .map-control-stack {
+  top: var(--space-4);
+  right: var(--space-4);
+  z-index: var(--z-mapctl);
+}
+
+.map-canvas .map-control-stack .icon-btn {
+  height: 36px;
+  width: 36px;
+}
+
+@media (max-width: 1024px) {
+  .map-canvas .map-control-stack .icon-btn {
+    height: 44px;
+    width: 44px;
+  }
+}
+
+/* =============================================================================
+   Basemap Toggle (legacy .map-toggle class preserved for compatibility)
+   ============================================================================= */
+
+.map-toggle {
+  display: none;
+}
+
+/* =============================================================================
+   Map Status / Coordinate overlays (legacy — hidden in redesign)
+   ============================================================================= */
+
+.map-status,
+.map-coordinate,
+.map-fallback,
+.map-scale,
+.map-grid,
+.scan-overlay,
+.scan-beam,
+.scan-caption,
+.scan-spinner {
+  display: none;
+}
+
+/* =============================================================================
+   Reservoir / Tank Markers
+   ============================================================================= */
+
+.reservoir-marker {
+  background: transparent;
+  border: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.reservoir-marker svg {
+  display: block;
+  width: 24px;
+  height: 24px;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.3));
+}
+
+/* =============================================================================
+   Valve Markers (amber squares at pipe midpoints)
+   ============================================================================= */
+
+.valve-marker {
+  background: transparent;
+  border: 0;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.valve-marker::before {
+  content: '';
+  width: 12px;
+  height: 12px;
+  background: var(--valve);
+  border: 1px solid var(--surface);
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px var(--valve), 0 0 8px var(--valve);
+}
+
+/* =============================================================================
+   Leak Ring Marker (top candidate)
+   ============================================================================= */
+
+.leak-ring-marker {
+  background: transparent;
+  border: 0;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.leak-ring-marker::before {
+  content: '';
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--leak);
+  border-radius: 50%;
+  box-shadow: 0 0 12px var(--leak);
+}
+
+/* =============================================================================
+   Sensor Pulse Marker (hidden — sensor labels are now tooltips)
+   ============================================================================= */
+
+.sensor-pulse-marker {
+  display: none;
+}
+
+/* =============================================================================
+   Tooltips
+   ============================================================================= */
+
+.sensor-chip {
+  background: var(--surface) !important;
+  border: 1px solid var(--line) !important;
+  color: var(--ink) !important;
+  border-radius: var(--radius-sm) !important;
+  padding: 3px 6px !important;
+  font-size: 12px !important;
+  font-family: var(--font-mono) !important;
+  box-shadow: var(--shadow-overlay) !important;
+}
+
+.sensor-chip:before {
+  border-right-color: var(--line) !important;
+}
+
+.leak-chip {
+  background: var(--surface) !important;
+  border: 1px solid var(--leak) !important;
+  border-radius: var(--radius-sm) !important;
+  color: var(--leak) !important;
+  padding: 4px 8px !important;
+  font-size: 12px !important;
+  font-family: var(--font-mono) !important;
+  box-shadow: var(--shadow-overlay) !important;
+}
+
+.leak-chip:before {
+  border-top-color: var(--leak) !important;
+}
+
+.rank-chip {
+  background: var(--surface) !important;
+  border: 1px solid var(--valve) !important;
+  color: var(--valve) !important;
+  border-radius: 50% !important;
+  width: 20px;
+  height: 20px;
+  padding: 0 !important;
+  line-height: 18px !important;
+  text-align: center;
+  font-size: 12px !important;
+  font-family: var(--font-mono) !important;
+  box-shadow: var(--shadow-overlay) !important;
+}
+
+.truth-chip {
+  background: var(--surface) !important;
+  color: var(--ink) !important;
+  font-size: 12px !important;
+  font-family: var(--font-mono) !important;
+  border: 1px dashed var(--line) !important;
+  border-radius: var(--radius-sm) !important;
+  padding: 3px 6px !important;
+}
+
+/* =============================================================================
+   Leaflet Tooltip Defaults
+   ============================================================================= */
+
+.leaflet-tooltip {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-overlay);
+}
+
+.leaflet-tooltip-top:before {
+  border-top-color: var(--line);
+}
+
+.leaflet-tooltip-bottom:before {
+  border-bottom-color: var(--line);
+}
+
+.leaflet-tooltip-left:before {
+  border-left-color: var(--line);
+}
+
+.leaflet-tooltip-right:before {
+  border-right-color: var(--line);
+}
+

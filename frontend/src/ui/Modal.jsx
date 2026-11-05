@@ -10,6 +10,8 @@ import { IconButton } from './IconButton.jsx';
 export function Modal({ open, onClose, title, children, footer, initialFocusRef }) {
   const modalRef = useRef(null);
   const openerRef = useRef(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!open) return;
@@ -19,18 +21,20 @@ export function Modal({ open, onClose, title, children, footer, initialFocusRef 
 
     const handleEscape = (e) => {
       if (e.key === 'Escape') {
-        onClose?.();
+        onCloseRef.current?.();
       }
     };
 
     document.addEventListener('keydown', handleEscape);
     document.body.style.overflow = 'hidden';
 
-    // Focus management
-    if (initialFocusRef?.current) {
-      initialFocusRef.current.focus();
-    } else if (modalRef.current) {
-      modalRef.current.focus();
+    // Focus management on open only when activeElement is outside
+    if (!modalRef.current?.contains(document.activeElement)) {
+      if (initialFocusRef?.current) {
+        initialFocusRef.current.focus();
+      } else if (modalRef.current) {
+        modalRef.current.focus();
+      }
     }
 
     return () => {
@@ -39,7 +43,7 @@ export function Modal({ open, onClose, title, children, footer, initialFocusRef 
       // Restore focus to opener
       openerRef.current?.focus();
     };
-  }, [open, onClose, initialFocusRef]);
+  }, [open]);
   if (!open) return null;
 
   return (
