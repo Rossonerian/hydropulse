@@ -1,0 +1,534 @@
+[
+  {
+    "viewport": "1920x1080",
+    "state": "ops-idle",
+    "ok": true,
+    "scrollWidth": 1920,
+    "clientWidth": 1920,
+    "overflowX": false,
+    "file": "ops-idle-1920x1080.png"
+  },
+  {
+    "viewport": "1920x1080",
+    "state": "ops-located",
+    "ok": true,
+    "scrollWidth": 1920,
+    "clientWidth": 1920,
+    "overflowX": false,
+    "file": "ops-located-1920x1080.png"
+  },
+  {
+    "viewport": "1920x1080",
+    "state": "ops-isolated",
+    "ok": true,
+    "scrollWidth": 1920,
+    "clientWidth": 1920,
+    "overflowX": false,
+    "file": "ops-isolated-1920x1080.png"
+  },
+  {
+    "viewport": "1920x1080",
+    "state": "studio-schematic",
+    "ok": true,
+    "scrollWidth": 1920,
+    "clientWidth": 1920,
+    "overflowX": false,
+    "file": "studio-schematic-1920x1080.png"
+  },
+  {
+    "viewport": "1920x1080",
+    "state": "studio-map",
+    "ok": true,
+    "scrollWidth": 1920,
+    "clientWidth": 1920,
+    "overflowX": false,
+    "file": "studio-map-1920x1080.png"
+  },
+  {
+    "viewport": "1920x1080",
+    "state": "studio-terrain",
+    "ok": true,
+    "scrollWidth": 1920,
+    "clientWidth": 1920,
+    "overflowX": false,
+    "file": "studio-terrain-1920x1080.png"
+  },
+  {
+    "viewport": "1920x1080",
+    "state": "studio-catalog",
+    "ok": true,
+    "scrollWidth": 1920,
+    "clientWidth": 1920,
+    "overflowX": false,
+    "file": "studio-catalog-1920x1080.png"
+  },
+  {
+    "viewport": "1920x1080",
+    "state": "studio-import",
+    "ok": true,
+    "scrollWidth": 1920,
+    "clientWidth": 1920,
+    "overflowX": false,
+    "file": "studio-import-1920x1080.png"
+  },
+  {
+    "viewport": "1920x1080",
+    "consoleErrors": []
+  },
+  {
+    "viewport": "1440x900",
+    "state": "ops-idle",
+    "ok": true,
+    "scrollWidth": 1440,
+    "clientWidth": 1440,
+    "overflowX": false,
+    "file": "ops-idle-1440x900.png"
+  },
+  {
+    "viewport": "1440x900",
+    "state": "ops-located",
+    "ok": true,
+    "scrollWidth": 1440,
+    "clientWidth": 1440,
+    "overflowX": false,
+    "file": "ops-located-1440x900.png"
+  },
+  {
+    "viewport": "1440x900",
+    "state": "ops-isolated",
+    "ok": true,
+    "scrollWidth": 1440,
+    "clientWidth": 1440,
+    "overflowX": false,
+    "file": "ops-isolated-1440x900.png"
+  },
+  {
+    "viewport": "1440x900",
+    "state": "studio-schematic",
+    "ok": true,
+    "scrollWidth": 1440,
+    "clientWidth": 1440,
+    "overflowX": false,
+    "file": "studio-schematic-1440x900.png"
+  },
+  {
+    "viewport": "1440x900",
+    "state": "studio-map",
+    "ok": true,
+    "scrollWidth": 1440,
+    "clientWidth": 1440,
+    "overflowX": false,
+    "file": "studio-map-1440x900.png"
+  },
+  {
+    "viewport": "1440x900",
+    "state": "studio-terrain",
+    "ok": true,
+    "scrollWidth": 1440,
+    "clientWidth": 1440,
+    "overflowX": false,
+    "file": "studio-terrain-1440x900.png"
+  },
+  {
+    "viewport": "1440x900",
+    "state": "studio-catalog",
+    "ok": true,
+    "scrollWidth": 1440,
+    "clientWidth": 1440,
+    "overflowX": false,
+    "file": "studio-catalog-1440x900.png"
+  },
+  {
+    "viewport": "1440x900",
+    "state": "studio-import",
+    "ok": true,
+    "scrollWidth": 1440,
+    "clientWidth": 1440,
+    "overflowX": false,
+    "file": "studio-import-1440x900.png"
+  },
+  {
+    "viewport": "1440x900",
+    "consoleErrors": []
+  },
+  {
+    "viewport": "1366x768",
+    "state": "ops-idle",
+    "ok": true,
+    "scrollWidth": 1366,
+    "clientWidth": 1366,
+    "overflowX": false,
+    "file": "ops-idle-1366x768.png"
+  },
+  {
+    "viewport": "1366x768",
+    "state": "ops-located",
+    "ok": true,
+    "scrollWidth": 1366,
+    "clientWidth": 1366,
+    "overflowX": false,
+    "file": "ops-located-1366x768.png"
+  },
+  {
+    "viewport": "1366x768",
+    "state": "ops-isolated",
+    "ok": true,
+    "scrollWidth": 1366,
+    "clientWidth": 1366,
+    "overflowX": false,
+    "file": "ops-isolated-1366x768.png"
+  },
+  {
+    "viewport": "1366x768",
+    "state": "studio-schematic",
+    "ok": true,
+    "scrollWidth": 1366,
+    "clientWidth": 1366,
+    "overflowX": false,
+    "file": "studio-schematic-1366x768.png"
+  },
+  {
+    "viewport": "1366x768",
+    "state": "studio-map",
+    "ok": true,
+    "scrollWidth": 1366,
+    "clientWidth": 1366,
+    "overflowX": false,
+    "file": "studio-map-1366x768.png"
+  },
+  {
+    "viewport": "1366x768",
+    "state": "studio-terrain",
+    "ok": true,
+    "scrollWidth": 1366,
+    "clientWidth": 1366,
+    "overflowX": false,
+    "file": "studio-terrain-1366x768.png"
+  },
+  {
+    "viewport": "1366x768",
+    "state": "studio-catalog",
+    "ok": true,
+    "scrollWidth": 1366,
+    "clientWidth": 1366,
+    "overflowX": false,
+    "file": "studio-catalog-1366x768.png"
+  },
+  {
+    "viewport": "1366x768",
+    "state": "studio-import",
+    "ok": true,
+    "scrollWidth": 1366,
+    "clientWidth": 1366,
+    "overflowX": false,
+    "file": "studio-import-1366x768.png"
+  },
+  {
+    "viewport": "1366x768",
+    "consoleErrors": []
+  },
+  {
+    "viewport": "1024x768",
+    "state": "ops-idle",
+    "ok": true,
+    "scrollWidth": 1024,
+    "clientWidth": 1024,
+    "overflowX": false,
+    "file": "ops-idle-1024x768.png"
+  },
+  {
+    "viewport": "1024x768",
+    "state": "ops-located",
+    "ok": true,
+    "scrollWidth": 1024,
+    "clientWidth": 1024,
+    "overflowX": false,
+    "file": "ops-located-1024x768.png"
+  },
+  {
+    "viewport": "1024x768",
+    "state": "ops-isolated",
+    "ok": true,
+    "scrollWidth": 1024,
+    "clientWidth": 1024,
+    "overflowX": false,
+    "file": "ops-isolated-1024x768.png"
+  },
+  {
+    "viewport": "1024x768",
+    "state": "studio-schematic",
+    "ok": true,
+    "scrollWidth": 1024,
+    "clientWidth": 1024,
+    "overflowX": false,
+    "file": "studio-schematic-1024x768.png"
+  },
+  {
+    "viewport": "1024x768",
+    "state": "studio-map",
+    "ok": true,
+    "scrollWidth": 1024,
+    "clientWidth": 1024,
+    "overflowX": false,
+    "file": "studio-map-1024x768.png"
+  },
+  {
+    "viewport": "1024x768",
+    "state": "studio-terrain",
+    "ok": true,
+    "scrollWidth": 1024,
+    "clientWidth": 1024,
+    "overflowX": false,
+    "file": "studio-terrain-1024x768.png"
+  },
+  {
+    "viewport": "1024x768",
+    "state": "studio-catalog",
+    "ok": true,
+    "scrollWidth": 1024,
+    "clientWidth": 1024,
+    "overflowX": false,
+    "file": "studio-catalog-1024x768.png"
+  },
+  {
+    "viewport": "1024x768",
+    "state": "studio-import",
+    "ok": true,
+    "scrollWidth": 1024,
+    "clientWidth": 1024,
+    "overflowX": false,
+    "file": "studio-import-1024x768.png"
+  },
+  {
+    "viewport": "1024x768",
+    "consoleErrors": []
+  },
+  {
+    "viewport": "768x1024",
+    "state": "ops-idle",
+    "ok": true,
+    "scrollWidth": 900,
+    "clientWidth": 768,
+    "overflowX": true,
+    "file": "ops-idle-768x1024.png"
+  },
+  {
+    "viewport": "768x1024",
+    "state": "ops-located",
+    "ok": true,
+    "scrollWidth": 900,
+    "clientWidth": 768,
+    "overflowX": true,
+    "file": "ops-located-768x1024.png"
+  },
+  {
+    "viewport": "768x1024",
+    "state": "ops-isolated",
+    "ok": true,
+    "scrollWidth": 900,
+    "clientWidth": 768,
+    "overflowX": true,
+    "file": "ops-isolated-768x1024.png"
+  },
+  {
+    "viewport": "768x1024",
+    "state": "studio-schematic",
+    "ok": true,
+    "scrollWidth": 900,
+    "clientWidth": 768,
+    "overflowX": true,
+    "file": "studio-schematic-768x1024.png"
+  },
+  {
+    "viewport": "768x1024",
+    "state": "studio-map",
+    "ok": true,
+    "scrollWidth": 900,
+    "clientWidth": 768,
+    "overflowX": true,
+    "file": "studio-map-768x1024.png"
+  },
+  {
+    "viewport": "768x1024",
+    "state": "studio-terrain",
+    "ok": true,
+    "scrollWidth": 900,
+    "clientWidth": 768,
+    "overflowX": true,
+    "file": "studio-terrain-768x1024.png"
+  },
+  {
+    "viewport": "768x1024",
+    "state": "studio-catalog",
+    "ok": true,
+    "scrollWidth": 900,
+    "clientWidth": 768,
+    "overflowX": true,
+    "file": "studio-catalog-768x1024.png"
+  },
+  {
+    "viewport": "768x1024",
+    "state": "studio-import",
+    "ok": true,
+    "scrollWidth": 900,
+    "clientWidth": 768,
+    "overflowX": true,
+    "file": "studio-import-768x1024.png"
+  },
+  {
+    "viewport": "768x1024",
+    "consoleErrors": []
+  },
+  {
+    "viewport": "390x844",
+    "state": "ops-idle",
+    "ok": true,
+    "scrollWidth": 900,
+    "clientWidth": 390,
+    "overflowX": true,
+    "file": "ops-idle-390x844.png"
+  },
+  {
+    "viewport": "390x844",
+    "state": "ops-located",
+    "ok": true,
+    "scrollWidth": 900,
+    "clientWidth": 390,
+    "overflowX": true,
+    "file": "ops-located-390x844.png"
+  },
+  {
+    "viewport": "390x844",
+    "state": "ops-isolated",
+    "ok": true,
+    "scrollWidth": 900,
+    "clientWidth": 390,
+    "overflowX": true,
+    "file": "ops-isolated-390x844.png"
+  },
+  {
+    "viewport": "390x844",
+    "state": "studio-schematic",
+    "ok": true,
+    "scrollWidth": 900,
+    "clientWidth": 390,
+    "overflowX": true,
+    "file": "studio-schematic-390x844.png"
+  },
+  {
+    "viewport": "390x844",
+    "state": "studio-map",
+    "ok": true,
+    "scrollWidth": 900,
+    "clientWidth": 390,
+    "overflowX": true,
+    "file": "studio-map-390x844.png"
+  },
+  {
+    "viewport": "390x844",
+    "state": "studio-terrain",
+    "ok": true,
+    "scrollWidth": 900,
+    "clientWidth": 390,
+    "overflowX": true,
+    "file": "studio-terrain-390x844.png"
+  },
+  {
+    "viewport": "390x844",
+    "state": "studio-catalog",
+    "ok": true,
+    "scrollWidth": 900,
+    "clientWidth": 390,
+    "overflowX": true,
+    "file": "studio-catalog-390x844.png"
+  },
+  {
+    "viewport": "390x844",
+    "state": "studio-import",
+    "ok": true,
+    "scrollWidth": 900,
+    "clientWidth": 390,
+    "overflowX": true,
+    "file": "studio-import-390x844.png"
+  },
+  {
+    "viewport": "390x844",
+    "consoleErrors": []
+  },
+  {
+    "viewport": "360x800",
+    "state": "ops-idle",
+    "ok": true,
+    "scrollWidth": 900,
+    "clientWidth": 360,
+    "overflowX": true,
+    "file": "ops-idle-360x800.png"
+  },
+  {
+    "viewport": "360x800",
+    "state": "ops-located",
+    "ok": true,
+    "scrollWidth": 900,
+    "clientWidth": 360,
+    "overflowX": true,
+    "file": "ops-located-360x800.png"
+  },
+  {
+    "viewport": "360x800",
+    "state": "ops-isolated",
+    "ok": true,
+    "scrollWidth": 900,
+    "clientWidth": 360,
+    "overflowX": true,
+    "file": "ops-isolated-360x800.png"
+  },
+  {
+    "viewport": "360x800",
+    "state": "studio-schematic",
+    "ok": true,
+    "scrollWidth": 900,
+    "clientWidth": 360,
+    "overflowX": true,
+    "file": "studio-schematic-360x800.png"
+  },
+  {
+    "viewport": "360x800",
+    "state": "studio-map",
+    "ok": true,
+    "scrollWidth": 900,
+    "clientWidth": 360,
+    "overflowX": true,
+    "file": "studio-map-360x800.png"
+  },
+  {
+    "viewport": "360x800",
+    "state": "studio-terrain",
+    "ok": true,
+    "scrollWidth": 900,
+    "clientWidth": 360,
+    "overflowX": true,
+    "file": "studio-terrain-360x800.png"
+  },
+  {
+    "viewport": "360x800",
+    "state": "studio-catalog",
+    "ok": true,
+    "scrollWidth": 900,
+    "clientWidth": 360,
+    "overflowX": true,
+    "file": "studio-catalog-360x800.png"
+  },
+  {
+    "viewport": "360x800",
+    "state": "studio-import",
+    "ok": true,
+    "scrollWidth": 900,
+    "clientWidth": 360,
+    "overflowX": true,
+    "file": "studio-import-360x800.png"
+  },
+  {
+    "viewport": "360x800",
+    "consoleErrors": []
+  }
+]

@@ -1,0 +1,51 @@
+/**
+ * HydroPulse Base Styles
+ * Reset and base element styles.
+ */
+
+/* Box-sizing reset */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* Margin and padding reset */
+* {
+  margin: 0;
+  padding: 0;
+}
+
+/* HTML base */
+html {
+  font-size: 15px;
+}
+
+/* Body base */
+body {
+  font-family: var(--font-sans);
+  background: var(--ground);
+  color: var(--ink);
+  line-height: 1.5;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  margin: 0;
+}
+
+/* Focus ring for keyboard navigation */
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Respect reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

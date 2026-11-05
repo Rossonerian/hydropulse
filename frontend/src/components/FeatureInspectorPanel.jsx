@@ -1,30 +1,34 @@
-import {
-  AlertTriangle,
-  Calendar,
-  Compass,
-  Database,
-  Droplet,
-  ExternalLink,
-  Layers,
-  MapPin,
-  Ruler,
-  TrendingDown,
-  TrendingUp,
-  Wind,
-  X,
-} from 'lucide-react';
+import { AlertTriangle, X } from 'lucide-react';
 import {
   Area,
   AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
+  Legend,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
+import { IconButton } from '../ui/index.js';
 import { TIME_SERIES_DATA } from '../lib/realWorldData.js';
+import '../styles/studio/dialogs.css';
+
+const AXIS_TICK = { fontSize: 12, fill: 'var(--ink-muted)' };
+const AXIS_LINE = { stroke: 'var(--line)' };
+const TOOLTIP_STYLE = {
+  background: 'var(--surface)',
+  border: '1px solid var(--line)',
+  color: 'var(--ink)',
+  fontSize: 12,
+};
+const TOOLTIP_LABEL_STYLE = { color: 'var(--ink)' };
+
+const sentence = (text) => {
+  const t = String(text || '').replace(/_/g, ' ').toLowerCase();
+  return t.charAt(0).toUpperCase() + t.slice(1);
+};
 
 export default function FeatureInspectorPanel({ feature, onClose }) {
   if (!feature) return null;
@@ -32,207 +36,153 @@ export default function FeatureInspectorPanel({ feature, onClose }) {
   const { id, assetType, name, properties = {}, provenance = {} } = feature;
   const timeSeries = TIME_SERIES_DATA[id] || null;
 
+  const attrs = [
+    properties.diameter_mm != null && ['Diameter', `${properties.diameter_mm} mm`],
+    properties.nominal_diameter_mm != null && ['Nominal bore', `${properties.nominal_diameter_mm} mm`],
+    properties.length_m != null && ['Length', `${properties.length_m} m`],
+    properties.material && ['Material', properties.material],
+    properties.valve_type && ['Valve type', properties.valve_type],
+    properties.operational_status && ['Operational status', properties.operational_status],
+    properties.installation_year && ['Installation', properties.installation_year],
+    properties.installed_capacity_mld != null && ['Capacity', `${properties.installed_capacity_mld} MLD`],
+    properties.water_level_mbgl != null && ['Water table', `${properties.water_level_mbgl} m bgl`],
+    properties.yield_lpm != null && ['Yield', `${properties.yield_lpm} LPM`],
+    properties.effluent_bod_mg_l != null && ['Effluent BOD', `${properties.effluent_bod_mg_l} mg/L`],
+  ].filter(Boolean);
+
+  const licence =
+    provenance.licenseName || properties.licenseName || properties.license_name || 'Not stated';
+
   return (
-    <aside className='feature-inspector-pane clay-panel' aria-label='Feature Inspector'>
-      <div className='inspector-header'>
-        <div className='inspector-title-block'>
-          <span className='studio-eyebrow'>FEATURE INSPECTOR</span>
+    <aside className='stu-feat' aria-label='Feature inspector'>
+      <div className='stu-feat__head'>
+        <div>
           <h3>{name || id}</h3>
-          <span className='inspector-asset-type'>
-            {assetType.replace(/_/g, ' ').toUpperCase()}
-          </span>
+          <span className='stu-feat__type'>{String(assetType || '').replace(/_/g, ' ')}</span>
         </div>
-        <button className='icon-btn' onClick={onClose} aria-label='Close Inspector'>
-          <X size={16} />
-        </button>
+        <IconButton label='Close inspector' icon={X} size='sm' onClick={onClose} />
       </div>
 
-      <div className='inspector-content'>
-        {/* Provenance Banner */}
-        <div className='inspector-provenance-box'>
-          <div className='provenance-row'>
-            <span>DATA STATUS</span>
-            <span className='provenance-pill' data-status={provenance.dataStatus || 'source_mapped'}>
-              {(provenance.dataStatus || 'source_mapped').replace('_', ' ').toUpperCase()}
-            </span>
-          </div>
-          <div className='provenance-row'>
-            <span>CONFIDENCE</span>
-            <span className={`confidence-pill conf-${provenance.confidenceLevel || 'medium'}`}>
-              {(provenance.confidenceLevel || 'medium').toUpperCase()}
-            </span>
-          </div>
-          <div className='provenance-row'>
-            <span>SOURCE DATASET</span>
-            <b title={provenance.datasetId}>{provenance.datasetId || 'BWSSB Public GIS'}</b>
-          </div>
-          {provenance.sourceFeatureId && (
-            <div className='provenance-row'>
-              <span>SOURCE ASSET ID</span>
-              <code>{provenance.sourceFeatureId}</code>
-            </div>
+      <dl className='stu-feat__facts'>
+        <dt>Source</dt>
+        <dd title={provenance.datasetId}>{provenance.datasetId || 'BWSSB Public GIS'}</dd>
+        <dt>Licence</dt>
+        <dd>{licence}</dd>
+        <dt>Data status</dt>
+        <dd>{sentence(provenance.dataStatus || 'source_mapped')}</dd>
+        <dt>Confidence</dt>
+        <dd>{sentence(provenance.confidenceLevel || 'medium')}</dd>
+        {provenance.sourceFeatureId && (
+          <>
+            <dt>Source asset ID</dt>
+            <dd className='stu-mono'>{provenance.sourceFeatureId}</dd>
+          </>
+        )}
+      </dl>
+
+      {attrs.length > 0 && (
+        <div>
+          <h4 className='stu-feat__heading'>Engineering attributes</h4>
+          <dl className='stu-feat__facts stu-feat__facts--attrs'>
+            {attrs.map(([label, value]) => (
+              <div key={label} style={{ display: 'contents' }}>
+                <dt>{label}</dt>
+                <dd>{value}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      )}
+
+      <div className='stu-feat__note' role='note'>
+        <AlertTriangle size={16} aria-hidden='true' />
+        <div>
+          <b>Underground depth</b>
+          <p>
+            {properties.depth_label ||
+              'Pipe invert depth not provided by utility GIS. Mapped illustratively at -2.5m nominal depth.'}
+          </p>
+        </div>
+      </div>
+
+      {timeSeries && (
+        <div>
+          <h4 className='stu-feat__heading'>Measured observations and telemetry</h4>
+
+          {assetType === 'groundwater_monitor' && (
+            <>
+              <div className='stu-feat__chart-label'>
+                <span>Depth to water table (m below ground level)</span>
+                <b>GW-KA-BNG-KENGERI-01</b>
+              </div>
+              <ResponsiveContainer width='100%' height={160}>
+                <AreaChart data={timeSeries}>
+                  <CartesianGrid strokeDasharray='3 3' stroke='var(--line)' />
+                  <XAxis dataKey='timestamp' tick={AXIS_TICK} axisLine={AXIS_LINE} tickLine={AXIS_LINE} />
+                  <YAxis
+                    tick={AXIS_TICK}
+                    axisLine={AXIS_LINE}
+                    tickLine={AXIS_LINE}
+                    domain={[40, 48]}
+                    reversed
+                  />
+                  <Tooltip
+                    contentStyle={TOOLTIP_STYLE}
+                    labelStyle={TOOLTIP_LABEL_STYLE}
+                    formatter={(val) => [`${val} m bgl`, 'Depth']}
+                  />
+                  <Area
+                    type='monotone'
+                    dataKey='value'
+                    stroke='var(--water)'
+                    fill='var(--water)'
+                    fillOpacity={0.2}
+                    strokeWidth={2}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </>
+          )}
+
+          {assetType === 'water_quality_monitor' && (
+            <>
+              <div className='stu-feat__chart-label'>
+                <span>Dissolved oxygen (DO) vs BOD (mg/L)</span>
+                <b>Dubasipalya Lake</b>
+              </div>
+              <ResponsiveContainer width='100%' height={180}>
+                <BarChart data={timeSeries}>
+                  <CartesianGrid strokeDasharray='3 3' stroke='var(--line)' />
+                  <XAxis dataKey='timestamp' tick={AXIS_TICK} axisLine={AXIS_LINE} tickLine={AXIS_LINE} />
+                  <YAxis tick={AXIS_TICK} axisLine={AXIS_LINE} tickLine={AXIS_LINE} />
+                  <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={TOOLTIP_LABEL_STYLE} />
+                  <Legend wrapperStyle={{ fontSize: 12, color: 'var(--ink-muted)' }} />
+                  <Bar dataKey='do' name='DO (mg/L)' fill='var(--sensor)' />
+                  <Bar dataKey='bod' name='BOD (mg/L)' fill='var(--leak)' />
+                </BarChart>
+              </ResponsiveContainer>
+            </>
+          )}
+
+          {assetType === 'rain_gauge' && (
+            <>
+              <div className='stu-feat__chart-label'>
+                <span>Monthly precipitation (mm)</span>
+                <b>KSNDMC Kengeri</b>
+              </div>
+              <ResponsiveContainer width='100%' height={160}>
+                <BarChart data={timeSeries}>
+                  <CartesianGrid strokeDasharray='3 3' stroke='var(--line)' />
+                  <XAxis dataKey='month' tick={AXIS_TICK} axisLine={AXIS_LINE} tickLine={AXIS_LINE} />
+                  <YAxis tick={AXIS_TICK} axisLine={AXIS_LINE} tickLine={AXIS_LINE} />
+                  <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={TOOLTIP_LABEL_STYLE} />
+                  <Bar dataKey='rainfall_mm' name='Rainfall (mm)' fill='var(--water)' />
+                </BarChart>
+              </ResponsiveContainer>
+            </>
           )}
         </div>
-
-        {/* Engineering Properties */}
-        <div className='inspector-section'>
-          <span className='studio-group-title'>ENGINEERING ATTRIBUTES</span>
-          <div className='inspector-attr-grid'>
-            {properties.diameter_mm != null && (
-              <div className='attr-item'>
-                <span>DIAMETER</span>
-                <b>{properties.diameter_mm} mm</b>
-              </div>
-            )}
-            {properties.nominal_diameter_mm != null && (
-              <div className='attr-item'>
-                <span>NOMINAL BORE</span>
-                <b>{properties.nominal_diameter_mm} mm</b>
-              </div>
-            )}
-            {properties.length_m != null && (
-              <div className='attr-item'>
-                <span>LENGTH</span>
-                <b>{properties.length_m} m</b>
-              </div>
-            )}
-            {properties.material && (
-              <div className='attr-item'>
-                <span>MATERIAL</span>
-                <b>{properties.material}</b>
-              </div>
-            )}
-            {properties.valve_type && (
-              <div className='attr-item'>
-                <span>VALVE TYPE</span>
-                <b>{properties.valve_type}</b>
-              </div>
-            )}
-            {properties.operational_status && (
-              <div className='attr-item'>
-                <span>OPERATIONAL STATUS</span>
-                <b>{properties.operational_status}</b>
-              </div>
-            )}
-            {properties.installation_year && (
-              <div className='attr-item'>
-                <span>INSTALLATION</span>
-                <b>{properties.installation_year}</b>
-              </div>
-            )}
-            {properties.installed_capacity_mld != null && (
-              <div className='attr-item'>
-                <span>CAPACITY</span>
-                <b>{properties.installed_capacity_mld} MLD</b>
-              </div>
-            )}
-            {properties.water_level_mbgl != null && (
-              <div className='attr-item'>
-                <span>WATER TABLE</span>
-                <b>{properties.water_level_mbgl} m bgl</b>
-              </div>
-            )}
-            {properties.yield_lpm != null && (
-              <div className='attr-item'>
-                <span>YIELD</span>
-                <b>{properties.yield_lpm} LPM</b>
-              </div>
-            )}
-            {properties.effluent_bod_mg_l != null && (
-              <div className='attr-item'>
-                <span>EFFLUENT BOD</span>
-                <b>{properties.effluent_bod_mg_l} mg/L</b>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Depth / Elevation Caveat */}
-        <div className='depth-caveat-box'>
-          <AlertTriangle size={14} />
-          <div>
-            <b>Underground Depth:</b>
-            <p>
-              {properties.depth_label ||
-                'Pipe invert depth not provided by utility GIS. Mapped illustratively at -2.5m nominal depth.'}
-            </p>
-          </div>
-        </div>
-
-        {/* Time-Series Charts (for Monitors) */}
-        {timeSeries && (
-          <div className='inspector-section'>
-            <span className='studio-group-title'>
-              MEASURED OBSERVATIONS & TELEMETRY
-            </span>
-            <div className='inspector-chart-wrap'>
-              {assetType === 'groundwater_monitor' && (
-                <>
-                  <div className='chart-label-row'>
-                    <span>Depth to Water Table (m below ground level)</span>
-                    <b>GW-KA-BNG-KENGERI-01</b>
-                  </div>
-                  <ResponsiveContainer width='100%' height={160}>
-                    <AreaChart data={timeSeries}>
-                      <CartesianGrid strokeDasharray='3 3' stroke='#20324c' />
-                      <XAxis dataKey='timestamp' stroke='#64748B' fontSize={10} />
-                      <YAxis stroke='#64748B' fontSize={10} domain={[40, 48]} reversed />
-                      <Tooltip
-                        contentStyle={{ background: '#0D1424', borderColor: '#1E2A44', color: '#E2E8F0' }}
-                        formatter={(val) => [`${val} m bgl`, 'Depth']}
-                      />
-                      <Area
-                        type='monotone'
-                        dataKey='value'
-                        stroke='#22D3EE'
-                        fill='#22D3EE22'
-                        strokeWidth={2}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </>
-              )}
-
-              {assetType === 'water_quality_monitor' && (
-                <>
-                  <div className='chart-label-row'>
-                    <span>Dissolved Oxygen (DO) vs BOD (mg/L)</span>
-                    <b>Dubasipalya Lake</b>
-                  </div>
-                  <ResponsiveContainer width='100%' height={160}>
-                    <BarChart data={timeSeries}>
-                      <CartesianGrid strokeDasharray='3 3' stroke='#20324c' />
-                      <XAxis dataKey='timestamp' stroke='#64748B' fontSize={10} />
-                      <YAxis stroke='#64748B' fontSize={10} />
-                      <Tooltip contentStyle={{ background: '#0D1424', borderColor: '#1E2A44', color: '#E2E8F0' }} />
-                      <Bar dataKey='do' name='DO (mg/L)' fill='#10B981' />
-                      <Bar dataKey='bod' name='BOD (mg/L)' fill='#EF4444' />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </>
-              )}
-
-              {assetType === 'rain_gauge' && (
-                <>
-                  <div className='chart-label-row'>
-                    <span>Monthly Precipitation (mm)</span>
-                    <b>KSNDMC Kengeri</b>
-                  </div>
-                  <ResponsiveContainer width='100%' height={160}>
-                    <BarChart data={timeSeries}>
-                      <CartesianGrid strokeDasharray='3 3' stroke='#20324c' />
-                      <XAxis dataKey='month' stroke='#64748B' fontSize={10} />
-                      <YAxis stroke='#64748B' fontSize={10} />
-                      <Tooltip contentStyle={{ background: '#0D1424', borderColor: '#1E2A44', color: '#E2E8F0' }} />
-                      <Bar dataKey='rainfall_mm' name='Rainfall (mm)' fill='#3B82F6' />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
+      )}
     </aside>
   );
 }

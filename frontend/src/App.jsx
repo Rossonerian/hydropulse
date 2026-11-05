@@ -1,18 +1,22 @@
-import { useCallback, useEffect, useState } from 'react';
-import {
-  AlertTriangle,
-  X,
-} from 'lucide-react';
-import Header from './components/Header.jsx';
+import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
+import { ReactFlowProvider } from '@xyflow/react';
+import './styles/tokens.css';
+import './styles/base.css';
+import './styles/ops/shell.css';
+
+import AppShell from './components/AppShell.jsx';
 import ControlPanel from './components/ControlPanel.jsx';
 import MapCanvas from './components/MapCanvas.jsx';
 import Terrain3DViewer from './components/Terrain3DViewer.jsx';
 import IncidentPanel from './components/IncidentPanel.jsx';
-import PressureCharts from './components/PressureCharts.jsx';
-import RoiPanel from './components/RoiPanel.jsx';
-import StatusBanner from './components/StatusBanner.jsx';
-import NetworkStudio from './pages/NetworkStudio.jsx';
 import { useHydroPulse } from './hooks/useHydroPulse.js';
+
+// Lazy load NetworkStudio and PressureCharts with React.Suspense
+const NetworkStudio = lazy(() => import('./pages/NetworkStudio.jsx'));
+const PressureCharts = lazy(() => import('./components/PressureCharts.jsx'));
+
+// Dev-only UI primitive showcase
+const Preview = lazy(() => import('./ui/Preview.jsx'));
 
 export default function App() {
   const pulse = useHydroPulse();
@@ -35,284 +39,390 @@ export default function App() {
     reset,
     clearCache,
   } = pulse;
-  const [selected, setSelected] = useState('J15'),
-    [area, setArea] = useState(25),
-    [noise, setNoise] = useState(1.5),
-    [judge, setJudge] = useState(false),
-    [revealed, setRevealed] = useState(false),
-    [chartsOpen, setChartsOpen] = useState(true),
-    [help, setHelp] = useState(false),
-    [roi, setRoi] = useState(false),
-    [focusNode, setFocusNode] = useState(null),
-    [toast, setToast] = useState('');
-  const [studioOpen, setStudioOpen] = useState(false);
-  const [viewMode, setViewMode] = useState('2d');
+
+  const [view, setView] = useState('operations'); // 'operations' | 'studio'
+  const [viewMode, setViewMode] = useState('2d'); // '2d' | '3d'
   const [activeDraft, setActiveDraft] = useState(null);
-
   const activeNetwork = activeDraft || network;
+  const [activeTab, setActiveTab] = useState('simulate'); // 'simulate' | 'incident' | 'sensors'
+  const [statusAnnouncement, setStatusAnnouncement] = useState('');
+  const [selected, setSelected] = useState('J15');
+  const [area, setArea] = useState(25);
+  const [noise, setNoise] = useState(1.5);
+  const [judge, setJudge] = useState(false);
+  const [revealed, setRevealed] = useState(false);
+  const [chartsOpen, setChartsOpen] = useState(true);
+  const [help, setHelp] = useState(false);
+  const [roi, setRoi] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
 
-  const run = useCallback(
-    async (body, preset) => {
-      const r = await simulate(body, preset);
-      if (r) {
-        setRevealed(false);
-        setFocusNode(
-          activeNetwork?.nodes?.find(
-            (n) => n.id === r.predicted_top_candidates?.[0]?.node_id,
-          ) || null,
-        );
-      }
-    },
-    [simulate, activeNetwork],
-  );
+  // Auto-select Incident tab on simulation completion with polite live announcement
   useEffect(() => {
-    if (lastResult?.actual_loss_lpm)
-      setArea(lastResult.injected_leak_area_cm2 || 25);
+    if (lastResult) {
+      setActiveTab('incident');
+      setStatusAnnouncement('Simulation completed. Incident panel selected.');
+    }
   }, [lastResult]);
+
+  // Display error messages from useHydroPulse as banner toasts
   useEffect(() => {
     if (error) {
-      setToast(error);
-      const id = setTimeout(() => setToast(''), 6000);
-      return () => clearTimeout(id);
+      setToastMessage(error);
     }
   }, [error]);
+
+  // Node selection: sets target junction only when not in judge mode
+  const handleSelectNode = useCallback(
+    (nodeId) => {
+      if (!judge) {
+        setSelected(nodeId);
+      }
+    },
+    [judge],
+  );
+
+  const run = useCallback(
+    (params, preset) => {
+      const presetId = typeof preset === 'string' ? preset : preset?.id || null;
+      const targetId = params?.target_node_id || params?.target_junction_id || selected;
+      const leakArea = params?.leak_area_cm2 ?? params?.area_cm2 ?? area;
+      const noisePct = params?.noise_pct ?? noise;
+
+      if (!judge) {
+        setSelected(targetId);
+      }
+      setRevealed(false);
+      simulate(
+        {
+          target_node_id: targetId,
+          leak_area_cm2: Number(leakArea) || 25,
+          noise_pct: Number(noisePct) || 1.5,
+          seed: null,
+        },
+        presetId,
+      );
+    },
+    [judge, selected, area, noise, simulate],
+  );
+
+  // Keyboard shortcuts
   useEffect(() => {
-    if (studioOpen) return undefined;
-    // Ignore global shortcuts while the operator is typing or editing a control.
-    const fn = (e) => {
-      const target = e.target;
-      if (
-        ['INPUT', 'TEXTAREA', 'SELECT'].includes(target?.tagName) ||
-        target?.isContentEditable
-      )
+    const onKeyDown = (e) => {
+      // Ignore shortcuts when focus is inside input/select/textarea
+      const activeEl = document.activeElement;
+      const tag = activeEl?.tagName?.toLowerCase();
+      const isInput =
+        tag === 'input' ||
+        tag === 'select' ||
+        tag === 'textarea' ||
+        activeEl?.isContentEditable;
+      if (isInput) return;
+
+      // When Network Studio is open, all shortcuts are disabled except 'n'/'N' to exit
+      if (view === 'studio') {
+        if (e.key === 'n' || e.key === 'N') {
+          e.preventDefault();
+          setView('operations');
+        }
         return;
-      const k = e.key.toLowerCase();
-      if (k === '?' || k === '/') {
+      }
+
+      // 'n' / 'N': Toggle view to/from Network Studio
+      if (e.key === 'n' || e.key === 'N') {
         e.preventDefault();
-        setHelp((x) => !x);
-      } else if (k === '1' || k === '2' || k === '3') {
-        const p = presets[Number(k) - 1];
-        if (p)
-          run(
-            {
-              target_node_id: p.target_node_id,
-              leak_area_cm2: p.leak_area_cm2,
-              noise_pct: p.noise_pct,
-              seed: null,
-            },
-            p.id,
-          );
-      } else if (k === ' ') {
+        setView('studio');
+        return;
+      }
+
+      // '?' / '/': Help modal
+      if (e.key === '?' || e.key === '/') {
         e.preventDefault();
-        run(
-          {
-            target_node_id: selected || 'J15',
-            leak_area_cm2: Number(area),
-            noise_pct: Number(noise),
-            seed: null,
-          },
-          null,
+        setHelp((v) => !v);
+        return;
+      }
+
+      // 'Escape': Close modals
+      if (e.key === 'Escape') {
+        setHelp(false);
+        setRoi(false);
+        return;
+      }
+
+      // '1', '2', '3': Scenario presets
+      if (e.key === '1') {
+        e.preventDefault();
+        const p = presets?.[0];
+        if (p) run(p, p);
+        return;
+      }
+      if (e.key === '2') {
+        e.preventDefault();
+        const p = presets?.[1];
+        if (p) run(p, p);
+        return;
+      }
+      if (e.key === '3') {
+        e.preventDefault();
+        const p = presets?.[2];
+        if (p) run(p, p);
+        return;
+      }
+
+      // 'Space': Simulate custom burst
+      if (e.code === 'Space' || e.key === ' ') {
+        e.preventDefault();
+        run({ area_cm2: area, noise_pct: noise }, null);
+        return;
+      }
+
+      // 'i' / 'I': Isolate valves
+      if (e.key === 'i' || e.key === 'I') {
+        e.preventDefault();
+        isolate();
+        return;
+      }
+
+      // 'r' / 'R': Reset incident
+      if (e.key === 'r' || e.key === 'R') {
+        e.preventDefault();
+        reset();
+        return;
+      }
+
+      // 'j' / 'J': Toggle judge mode
+      if (e.key === 'j' || e.key === 'J') {
+        e.preventDefault();
+        setJudge((v) => !v);
+        setRevealed(false);
+        return;
+      }
+
+      // 'v' / 'V': Reveal/hide truth
+      if (e.key === 'v' || e.key === 'V') {
+        e.preventDefault();
+        setRevealed((v) => !v);
+        return;
+      }
+
+      // 'm' / 'M': Toggle 2D Map / 3D Terrain view
+      if (e.key === 'm' || e.key === 'M') {
+        e.preventDefault();
+        setViewMode((v) => (v === '2d' ? '3d' : '2d'));
+        return;
+      }
+
+      // 'b' / 'B': Toggle basemap
+      if (e.key === 'b' || e.key === 'B') {
+        e.preventDefault();
+        const basemapBtn = document.querySelector(
+          '[aria-label="Hide basemap"], [aria-label="Show basemap"]',
         );
-      } else if (k === 'i' && lastResult) isolate();
-      else if (k === 'r') reset();
-      else if (k === 'j') setJudge((v) => !v);
-      else if (k === 'v' && judge) setRevealed((v) => !v);
-      else if (k === 'n') setStudioOpen(true);
-      else if (k === 'm') setViewMode((prev) => (prev === '2d' ? '3d' : '2d'));
-      else if (k === 'b') document.querySelector('.map-toggle')?.click();
-      else if (k === 'f') {
-        if (!document.fullscreenElement)
-          document.documentElement.requestFullscreen?.();
-        else document.exitFullscreen?.();
+        if (basemapBtn) {
+          basemapBtn.click();
+        }
+        return;
+      }
+
+      // 'f' / 'F': Toggle fullscreen
+      if (e.key === 'f' || e.key === 'F') {
+        e.preventDefault();
+        const fsBtn = document.querySelector(
+          '[aria-label="Enter fullscreen"], [aria-label="Exit fullscreen"]',
+        );
+        if (fsBtn) {
+          fsBtn.click();
+        } else if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen?.().catch(() => {});
+        } else {
+          document.exitFullscreen?.().catch(() => {});
+        }
+        return;
       }
     };
-    window.addEventListener('keydown', fn);
-    return () => window.removeEventListener('keydown', fn);
-  }, [presets, run, selected, area, noise, lastResult, isolate, reset, judge, studioOpen]);
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [view, presets, area, noise, run, isolate, reset]);
+
+  // Derived truth and candidate for distance/localization error calculation
   const truth = lastResult?.injected_node_id;
   const candidate = lastResult?.predicted_top_candidates?.[0]?.node_id;
-  // Older backend responses may omit localization_error_m, so derive distance from node coordinates.
   const distance =
-    activeNetwork?.nodes && truth && candidate
+    network?.nodes && truth && candidate
       ? (() => {
-          const a = activeNetwork.nodes.find((n) => n.id === truth),
-            b = activeNetwork.nodes.find((n) => n.id === candidate);
-          return a && b
-            ? Math.hypot((a.lat - b.lat) * 111000, (a.lng - b.lng) * 95000)
-            : 0;
+          const tNode = network.nodes.find((n) => n.id === truth);
+          const cNode = network.nodes.find((n) => n.id === candidate);
+          if (!tNode || !cNode) return 0;
+          const dx = tNode.x - cNode.x;
+          const dy = tNode.y - cNode.y;
+          return Math.sqrt(dx * dx + dy * dy);
         })()
       : 0;
   const showTruth = !judge || revealed;
   const errorMeters = lastResult?.localization_error_m ?? distance;
+
+  // Dev-only UI primitives preview
+  const isUiPreview =
+    import.meta.env.DEV && new URLSearchParams(window.location.search).get('ui') === '1';
+
+  if (isUiPreview) {
+    return (
+      <Suspense fallback={<div>Loading preview…</div>}>
+        <Preview />
+      </Suspense>
+    );
+  }
+
   return (
-    studioOpen ? (
-      <NetworkStudio
-        initialNetwork={activeNetwork}
-        networkSource={networkSource}
-        onExit={() => setStudioOpen(false)}
-      />
-    ) : (
-    <main className='app-shell'>
-      <Header
-        mode={mode}
-        health={health}
-        viewMode={viewMode}
-        onViewModeChange={setViewMode}
-        onHelp={() => setHelp(true)}
-        onRoi={() => setRoi(true)}
-        onStudio={() => setStudioOpen(true)}
-      />
-      <StatusBanner
-        mode={mode}
-        networkSource={networkSource}
-        lastUpdated={lastUpdated}
-        isRefreshing={isRefreshing}
-        isCached={isCached}
-        onRetry={load}
-        onClearCache={clearCache}
-      />
-      <div className='workspace'>
+    <AppShell
+      view={view}
+      onViewChange={setView}
+      mode={mode}
+      networkSource={networkSource}
+      health={health}
+      network={activeNetwork}
+      phase={phase}
+      lastResult={lastResult}
+      activeTab={activeTab}
+      onTabChange={setActiveTab}
+      statusAnnouncement={statusAnnouncement}
+      onSimulateBurst={() => run({ area_cm2: area, noise_pct: noise }, null)}
+      onHelp={() => setHelp(true)}
+      onRoi={() => setRoi(true)}
+      helpOpen={help}
+      onHelpClose={() => setHelp(false)}
+      roiOpen={roi}
+      onRoiClose={() => setRoi(false)}
+      statusMessage={toastMessage}
+      onDismissStatus={() => setToastMessage('')}
+      onRetryConnection={() => pulse.load()}
+      lastUpdated={lastUpdated}
+      isRefreshing={isRefreshing}
+      isCached={isCached}
+      onClearCache={clearCache}
+      controlPanel={
         <ControlPanel
-          network={activeNetwork}
           presets={presets}
           selected={selected}
-          setSelected={setSelected}
           area={area}
-          setArea={setArea}
           noise={noise}
-          setNoise={setNoise}
-          onSimulate={run}
+          judge={judge}
+          phase={phase}
+          onSelectedChange={handleSelectNode}
+          setSelected={handleSelectNode}
+          onAreaChange={setArea}
+          onNoiseChange={setNoise}
+          onSimulate={(body, preset) => run(body, preset)}
+          onReset={reset}
           onIsolate={isolate}
-          onReset={() => {
-            reset();
-            setFocusNode(null);
+          onJudgeToggle={() => {
+            setJudge((v) => !v);
             setRevealed(false);
           }}
-          phase={phase}
-          judge={judge}
-          setJudge={setJudge}
-          onReveal={setRevealed}
+          onReveal={() => setRevealed(true)}
           revealed={revealed}
+          showTruth={showTruth}
+          network={activeNetwork}
           mode={mode}
           simulateCooldown={simulateCooldown}
         />
-        {viewMode === '2d' ? (
+      }
+      mapCanvas={
+        viewMode === '2d' ? (
           <MapCanvas
             network={activeNetwork}
-            networkSource={networkSource}
-            phase={phase}
-            result={lastResult}
             selected={selected}
-            setSelected={setSelected}
+            phase={phase}
+            lastResult={lastResult}
+            result={lastResult}
+            isolatedValves={lastResult?.recommended_valves_to_close || []}
             judge={judge}
+            showTruth={showTruth}
             revealed={revealed}
-            mode={mode}
-            onPick={(n) => {
-              if (!judge) setSelected(n.id);
-            }}
-            focusNode={focusNode}
+            onPick={handleSelectNode}
+            setSelected={handleSelectNode}
+            onSelect={handleSelectNode}
           />
         ) : (
-          <div className='map-canvas terrain-workspace-view'>
+          <div className="map-canvas terrain-workspace-view" style={{ width: '100%', height: '100%', position: 'relative' }}>
             <Terrain3DViewer
               network={activeNetwork}
               result={lastResult}
               phase={phase}
               selected={selected}
-              setSelected={setSelected}
+              setSelected={handleSelectNode}
               judge={judge}
               revealed={revealed}
               mode={mode}
               onUpdateDraft={(updated) => setActiveDraft(updated)}
             />
           </div>
-        )}
+        )
+      }
+      incidentPanel={
         <IncidentPanel
           network={activeNetwork}
-          result={lastResult}
-          phase={phase}
-          showTruth={showTruth}
           mode={mode}
-          onFocus={(n) => setFocusNode(n)}
-        />
-        <PressureCharts
+          onSimulate={simulate}
+          phase={phase}
           result={lastResult}
-          open={chartsOpen}
-          onToggle={() => setChartsOpen((v) => !v)}
-          sensorIds={activeNetwork?.sensor_ids || []}
+          lastResult={lastResult}
+          judge={judge}
+          showTruth={showTruth}
+          errorMeters={errorMeters}
+          error={error}
+          onIsolate={isolate}
+          onReset={reset}
+          onJudgeToggle={() => {
+            setJudge((v) => !v);
+            setRevealed(false);
+          }}
+          onReveal={() => setRevealed(true)}
+          onFocus={handleSelectNode}
+          onSelectNode={handleSelectNode}
         />
-      </div>
-      {revealed && lastResult && (
-        <div className='reveal-banner'>
-          <span className='truth-dot' />
-          <b>TRUTH REVEALED</b>
-          <span>
-            Injected at <strong>{truth}</strong>
-          </span>
-          <i>
-            Localization error{' '}
-            <strong>{Number(errorMeters).toFixed(1)} m</strong>
-          </i>
-          <button onClick={() => setRevealed(false)} aria-label='Hide truth'>
-            <X size={14} />
-          </button>
-        </div>
-      )}
-      {toast && (
-        <div className='toast'>
-          <AlertTriangle size={15} />
-          {toast}
-          <button onClick={() => setToast('')}>
-            <X size={14} />
-          </button>
-        </div>
-      )}
-      <RoiPanel
-        open={roi}
-        onClose={() => setRoi(false)}
-        lastResult={lastResult}
-      />
-      {help && (
-        <div className='modal-backdrop' onClick={() => setHelp(false)}>
-          <section className='help-modal' onClick={(e) => e.stopPropagation()}>
-            <div className='modal-heading'>
-              <div>
-                <div className='eyebrow'>STAGE CONTROL</div>
-                <h2>Keyboard shortcuts</h2>
-              </div>
-              <button
-                className='icon-btn'
-                onClick={() => setHelp(false)}
-                aria-label='Close shortcuts'
-              >
-                <X size={17} />
-              </button>
+      }
+      pressureCharts={
+        <Suspense
+          fallback={
+            <div className="charts-loading" style={{ padding: 'var(--space-4)', color: 'var(--ink-muted)' }}>
+              Loading charts…
             </div>
-            <div className='shortcut-grid'>
-              {[
-                ['1 / 2 / 3', 'Run scenario'],
-                ['Space', 'Simulate burst'],
-                ['I', 'Isolate valves'],
-                ['R', 'Reset incident'],
-                ['J', 'Toggle judge mode'],
-                ['V', 'Reveal truth'],
-                ['M', 'Toggle 2D / 3D view'],
-                ['N', 'Network Studio'],
-                ['B', 'Toggle basemap'],
-                ['F', 'Fullscreen'],
-                ['?', 'Show shortcuts'],
-              ].map(([key, label]) => (
-                <div key={key}>
-                  <kbd>{key}</kbd>
-                  <span>{label}</span>
-                </div>
-              ))}
+          }
+        >
+          <PressureCharts
+            result={lastResult}
+            lastResult={lastResult}
+            open={chartsOpen || activeTab === 'sensors'}
+            onToggle={() => setChartsOpen((v) => !v)}
+          />
+        </Suspense>
+      }
+      studioShell={
+        <Suspense
+          fallback={
+            <div
+              className="studio-loading"
+              role="status"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: 'calc(100vh - 52px)',
+                color: 'var(--ink-muted)',
+                fontFamily: 'var(--font-sans)',
+              }}
+            >
+              Loading Network Studio…
             </div>
-            <p>Shortcuts pause while a text field is focused.</p>
-          </section>
-        </div>
-      )}
-    </main>
-    )
+          }
+        >
+          <NetworkStudio
+            initialNetwork={activeNetwork}
+            networkSource={networkSource}
+          />
+        </Suspense>
+      }
+    />
   );
 }

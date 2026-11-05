@@ -1,0 +1,141 @@
+/* Network Studio map views: geographic (Leaflet) and terrain (canvas) canvases.
+   Tokens only; rendered feature colours live in the JSX and are marked "data colour". */
+
+/* ---------- Geographic ---------- */
+
+.stu-geo {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--surface-sunken);
+}
+
+.stu-geo__map {
+  width: 100%;
+  height: 100%;
+  background: var(--surface-sunken);
+  font-family: inherit;
+}
+
+.stu-geo__map .leaflet-tooltip {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  box-shadow: none;
+  font-size: 12px;
+}
+
+.stu-geo__controls {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  z-index: var(--z-mapctl);
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.stu-geo__caveat {
+  position: absolute;
+  left: var(--space-4);
+  bottom: var(--space-4);
+  z-index: var(--z-mapctl);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  max-width: calc(100% - 2 * var(--space-4));
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  color: var(--ink-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.stu-geo__caveat svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--valve);
+}
+
+/* ---------- Terrain ---------- */
+
+.stu-terr {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--ground);
+}
+
+.stu-terr__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  touch-action: none;
+}
+
+.stu-terr__canvas:active {
+  cursor: grabbing;
+}
+
+.stu-terr__hud {
+  position: absolute;
+  top: var(--space-4);
+  left: var(--space-4);
+  z-index: var(--z-mapctl);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: calc(100% - 80px);
+}
+
+.stu-terr__compass,
+.stu-terr__depth {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.stu-terr__compass svg {
+  color: var(--water);
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.stu-terr__legend {
+  position: absolute;
+  left: var(--space-4);
+  bottom: var(--space-4);
+  z-index: var(--z-mapctl);
+  max-width: calc(100% - 2 * var(--space-4));
+}
+
+/* Legend swatches without a semantic token: same data colours as the canvas. */
+.stu-terr__legend .map-legend__swatch--sewer {
+  background-color: #a855f7; /* data colour */
+}
+
+.stu-terr__legend .map-legend__swatch--pump {
+  background-color: #3b82f6; /* data colour */
+}

@@ -62,14 +62,17 @@ class OpenRouterClient:
         self,
         suggestions: List[AiSuggestion],
         network_revision: str,
+        api_key: Optional[str] = None,
         transport: Optional[httpx.BaseTransport] = None,
     ) -> List[AiSuggestion]:
         """Optionally enrich suggestion rationales via OpenRouter, falling back cleanly on any error.
 
         Never mutates deterministic IDs, categories, target IDs, parameters, or numeric metrics.
         Only refines `rationale` if OpenRouter returns a valid concise engineering summary.
+        Supports per-request caller-supplied `api_key` or server-configured default.
         """
-        if not self.is_active or not suggestions:
+        effective_key = (api_key or self._config.openrouter_api_key or "").strip()
+        if not self._config.openrouter_enabled or not effective_key or not suggestions:
             return suggestions
 
         # Build a compact, deterministic prompt containing only structured metrics (no secrets)
@@ -96,6 +99,7 @@ class OpenRouterClient:
         response_map = self._call_chat_completion_json(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
+            api_key=effective_key,
             transport=transport,
         )
         if not response_map:
@@ -117,15 +121,17 @@ class OpenRouterClient:
         self,
         system_prompt: str,
         user_prompt: str,
+        api_key: Optional[str] = None,
         transport: Optional[httpx.BaseTransport] = None,
     ) -> Optional[Dict[str, Any]]:
         """Execute bounded HTTP POST to OpenRouter with strict timeout and safe error handling."""
-        if not self.is_active or not self._config.openrouter_api_key:
+        effective_key = (api_key or self._config.openrouter_api_key or "").strip()
+        if not self._config.openrouter_enabled or not effective_key:
             return None
 
         url = f"{self._config.openrouter_base_url}/chat/completions"
         headers = {
-            "Authorization": f"Bearer {self._config.openrouter_api_key}",
+            "Authorization": f"Bearer {effective_key}",
             "Content-Type": "application/json",
             "HTTP-Referer": "https://github.com/Rossonerian/hydropulse",
             "X-Title": "HydroPulse Hydraulic Digital Twin",

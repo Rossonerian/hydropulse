@@ -46,6 +46,8 @@ export default function Terrain3DViewer({
   showIllustrativeDepth: propDepth,
   onToggleDepth: propToggleDepth,
   visibleLayers = {},
+  selectedFeature,
+  onSelectFeature,
 }) {
   const canvasRef = useRef(null);
   const [internalDepth, setInternalDepth] = useState(true);

@@ -369,9 +369,6 @@ export function useHydroPulse() {
             (await client.mockSimulate(body, presetId)) ||
             makeMockResult(network, body);
         }
-        await new Promise((resolve) =>
-          setTimeout(resolve, Math.max(0, 900 - (performance.now() - start))),
-        );
         setLastResult(result);
         setPhase('located');
         return result;

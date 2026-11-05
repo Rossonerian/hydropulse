@@ -1,0 +1,311 @@
+/**
+ * HydroPulse Charts & ROI Styles
+ * Uses design tokens exclusively. No raw hex codes.
+ * Minimum font size: 12px.
+ */
+
+/* Charts Drawer */
+.charts-drawer {
+  grid-column: 1 / 4;
+  grid-row: 2;
+  min-height: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-overlay);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.charts-drawer.collapsed {
+  height: 39px;
+}
+
+.drawer-handle {
+  height: 33px;
+  min-height: 33px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 13px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.handle-grip {
+  width: 3px;
+  height: 13px;
+  border-radius: 3px;
+  background: var(--water);
+}
+
+.drawer-handle > b {
+  font-size: 12px;
+  letter-spacing: 0.85px;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.drawer-caption {
+  font-size: 12px;
+  color: var(--ink-faint);
+  letter-spacing: 0.5px;
+}
+
+.drawer-result {
+  margin-left: auto;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.4px;
+}
+
+.drawer-chevron {
+  color: var(--ink-muted);
+  font-size: 15px;
+  margin-left: 3px;
+}
+
+/* Charts Body */
+.charts-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-4) var(--space-3);
+}
+
+.chart-block,
+.signature-block {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--line);
+  padding-right: 12px;
+}
+
+.chart-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 5px;
+}
+
+.chart-heading span {
+  color: var(--ink);
+  font-size: 12px;
+  letter-spacing: 0.75px;
+  font-weight: 700;
+}
+
+.chart-heading small {
+  color: var(--ink-faint);
+  font-size: 12px;
+  letter-spacing: 0.45px;
+}
+
+.chart-heading small i {
+  font-style: normal;
+  color: var(--water);
+}
+
+.chart-block > .recharts-responsive-container,
+.signature-block > .recharts-responsive-container {
+  flex: 1;
+  min-height: 0;
+}
+
+/* Empty State */
+.charts-empty {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+}
+
+/* ROI Modal */
+.roi-mark {
+  height: 38px;
+  width: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line-strong);
+  background: var(--surface-raised);
+  color: var(--water);
+}
+
+.roi-intro {
+  color: var(--ink-muted);
+  font-size: 12px;
+  margin: 14px 0 17px;
+}
+
+.roi-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 11px;
+}
+
+.roi-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.roi-fields label small {
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
+.roi-fields input {
+  height: 35px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  outline: 0;
+}
+
+.roi-fields input:focus {
+  border-color: var(--focus);
+}
+
+.roi-results {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.roi-result {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+}
+
+.roi-result > span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--ink-muted);
+  font-size: 12px;
+  letter-spacing: 0.55px;
+}
+
+.roi-result > span svg {
+  color: var(--water);
+}
+
+.roi-result > b {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.roi-result > b small {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+
+.roi-result > small {
+  color: var(--ink-faint);
+  font-size: 12px;
+}
+
+.roi-result.emphasis {
+  border-color: var(--valve);
+  background: var(--surface-sunken);
+}
+
+.roi-result.emphasis > span svg {
+  color: var(--valve);
+}
+
+.roi-result.emphasis > b {
+  color: var(--valve);
+  font-size: 14px;
+}
+
+.roi-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 17px;
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+
+/* Help Modal */
+.help-shortcuts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.help-shortcut-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.help-shortcut-row:last-child {
+  border-bottom: 0;
+}
+
+.help-shortcut-keys {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.help-shortcut-action {
+  color: var(--ink);
+  font-size: 12px;
+}
+
+/* Ensure modal content uses tokens */
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-overlay);
+}
+
+.modal__header {
+  border-bottom: 1px solid var(--line);
+}
+
+.modal__title {
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.modal__body {
+  color: var(--ink);
+}
+
+.modal__footer {
+  border-top: 1px solid var(--line);
+}

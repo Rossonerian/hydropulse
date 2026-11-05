@@ -418,23 +418,83 @@ def test_openrouter_client_offline_and_failure_resilience() -> None:
     )
     assert res_ok[0].suggestion_id == "sug-loop-J10-J20"
     assert res_ok[0].rationale == enriched_text
-    assert res_ok[0].suggestion_id == "sug-loop-J10-J20"
     assert res_ok[0].simulated_after_metrics == sample_sugs[0].simulated_after_metrics
+
+    # 7. Caller-supplied API key on server without configured key (site input)
+    cfg_no_server_key = load_config(
+        {
+            "HYDROPULSE_ENV": "dev",
+            "HYDROPULSE_OPENROUTER_ENABLED": "true",
+            "OPENROUTER_API_KEY": "",
+            "HYDROPULSE_OPENROUTER_MAX_RETRIES": "0",
+        }
+    )
+    client_no_key = OpenRouterClient(config=cfg_no_server_key)
+    assert client_no_key.is_active is False
+    assert (
+        client_no_key.enrich_suggestions(sample_sugs, network_revision="rev-1")[0].rationale
+        == sample_sugs[0].rationale
+    )
+    res_caller_key = client_no_key.enrich_suggestions(
+        sample_sugs,
+        network_revision="rev-1",
+        api_key="sk-or-v1-caller-provided-site-key",
+        transport=httpx.MockTransport(_ok_handler),
+    )
+    assert res_caller_key[0].rationale == enriched_text
 
 def test_ai_advisor_works_when_openrouter_fails(client: TestClient) -> None:
     """GET /api/ai/suggestions succeeds with deterministic physics even if OpenRouter raises an error."""
     ai_advisor._advisor_service._suggestions_cache.clear()
-    with patch("backend.ai_advisor.get_openrouter_client") as mock_get_or:
-        fake_or = MagicMock()
-        fake_or.is_active = True
-        fake_or.enrich_suggestions.side_effect = RuntimeError("Simulated OpenRouter outage")
-        mock_get_or.return_value = fake_or
+    try:
+        with patch("backend.ai_advisor.get_openrouter_client") as mock_get_or:
+            fake_or = MagicMock()
+            fake_or.is_active = True
+            fake_or.enrich_suggestions.side_effect = RuntimeError("Simulated OpenRouter outage")
+            mock_get_or.return_value = fake_or
 
-        r = client.get("/api/ai/suggestions")
-        assert r.status_code == 200
-        body = r.json()
-        assert len(body["suggestions"]) >= 3
-        assert body["sensor_benchmark"] is not None
+            r = client.get("/api/ai/suggestions")
+            assert r.status_code == 200
+            body = r.json()
+            assert len(body["suggestions"]) >= 3
+            assert body["sensor_benchmark"] is not None
+    finally:
+        ai_advisor._advisor_service._suggestions_cache.clear()
+
+
+def test_ai_suggestions_with_caller_provided_openrouter_key(client: TestClient) -> None:
+    """GET /api/ai/suggestions forwards caller-supplied X-OpenRouter-Key to OpenRouter enrichment."""
+    ai_advisor._advisor_service._suggestions_cache.clear()
+    try:
+        with patch("backend.ai_advisor.get_openrouter_client") as mock_get_or:
+            fake_or = MagicMock()
+            fake_or.config.openrouter_enabled = True
+            fake_or.is_active = False  # Server has no key
+            fake_or.enrich_suggestions.return_value = [
+                AiSuggestion(
+                    suggestion_id="sug-caller-enriched",
+                    category="loop_completion",
+                    title="Caller Enriched Suggestion",
+                    rationale="Enriched via caller header key.",
+                    source_network_revision="rev-1-00c49b29",
+                    status="proposed",
+                    affected_node_ids=["J10"],
+                    affected_pipe_ids=["P1"],
+                    proposed_parameters={"pipe_id": "P_LOOP_J10"},
+                    baseline_metrics={},
+                    simulated_after_metrics={},
+                    uncertainty_note="",
+                )
+            ]
+            mock_get_or.return_value = fake_or
+
+            r = client.get("/api/ai/suggestions", headers={"X-OpenRouter-Key": "sk-or-test-caller-key"})
+            assert r.status_code == 200
+            fake_or.enrich_suggestions.assert_called_once()
+            _, kwargs = fake_or.enrich_suggestions.call_args
+            assert kwargs.get("api_key") == "sk-or-test-caller-key"
+    finally:
+        ai_advisor._advisor_service._suggestions_cache.clear()
 
 
 # =============================================================================

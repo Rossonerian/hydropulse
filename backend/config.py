@@ -207,6 +207,10 @@ def load_config(environ: dict[str, str] | None = None) -> BackendConfig:
         "http://127.0.0.1:4173",
     )
     raw_origins = env_map.get("HYDROPULSE_CORS_ORIGINS", "")
+    if is_prod and not raw_origins.strip():
+        raise ValueError(
+            "HYDROPULSE_CORS_ORIGINS must specify the exact production frontend origin(s)."
+        )
     if raw_origins.strip():
         cors_origins = tuple(
             o.strip().rstrip("/") if o.strip() != "*" else "*"
@@ -228,7 +232,7 @@ def load_config(environ: dict[str, str] | None = None) -> BackendConfig:
     admin_token = admin_token_raw if admin_token_raw else None
     require_admin_auth = _parse_bool(
         env_map.get("HYDROPULSE_REQUIRE_ADMIN_AUTH"),
-        default=bool(is_prod and admin_token),
+        default=is_prod,
     )
 
     max_body = _parse_int(
@@ -248,8 +252,8 @@ def load_config(environ: dict[str, str] | None = None) -> BackendConfig:
     ).strip()
     openrouter_api_key = openrouter_key_raw if openrouter_key_raw else None
     openrouter_model = (
-        (env_map.get("HYDROPULSE_OPENROUTER_MODEL") or env_map.get("OPENROUTER_MODEL") or "meta-llama/llama-3.3-70b-instruct:free").strip()
-        or "meta-llama/llama-3.3-70b-instruct:free"
+        (env_map.get("HYDROPULSE_OPENROUTER_MODEL") or env_map.get("OPENROUTER_MODEL") or "nvidia/nemotron-3.5-lightning:free").strip()
+        or "nvidia/nemotron-3.5-lightning:free"
     )
     raw_fallbacks = env_map.get("HYDROPULSE_OPENROUTER_FALLBACK_MODELS") or env_map.get("OPENROUTER_FALLBACK_MODELS") or ""
     if raw_fallbacks.strip():
