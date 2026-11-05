@@ -1,0 +1,317 @@
+/**
+ * HydroPulse Incident Panel Styles
+ * All styles use design tokens from src/styles/tokens.css
+ * NO raw hex codes allowed.
+ */
+
+/* Panel container */
+.incident-panel {
+  width: 360px;
+  height: 100%;
+  background: var(--surface);
+  border-left: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Header */
+.incident-header {
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--line);
+}
+
+.incident-header--leak {
+  background: var(--leak-wash);
+}
+
+.incident-header--error {
+  background: var(--leak-wash);
+}
+
+.incident-header h2 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0 0 var(--space-1) 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.incident-header--leak h2 strong {
+  color: var(--leak);
+}
+
+.incident-description {
+  font-size: 14px;
+  color: var(--ink-muted);
+  margin: 0;
+}
+
+.incident-id {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--ink-faint);
+  margin: 0;
+}
+
+/* Simulating progress */
+.simulating-progress {
+  margin-top: var(--space-3);
+  height: 4px;
+  background: var(--surface-sunken);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.simulating-progress-bar {
+  height: 100%;
+  background: var(--water);
+  animation: progress-slide 1.5s ease-in-out infinite;
+}
+
+@keyframes progress-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Content area */
+.incident-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-4);
+}
+
+/* Network summary */
+.network-summary h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0 0 var(--space-3) 0;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.summary-label {
+  font-size: 12px;
+  color: var(--ink-muted);
+  letter-spacing: 0.5px;
+}
+
+.summary-value {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+/* Metrics */
+.incident-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.metric-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.metric-label {
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+
+.metric-value {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.metric-value small {
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
+/* Sections */
+.incident-section {
+  margin-bottom: var(--space-4);
+}
+
+.incident-section h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0 0 var(--space-3) 0;
+}
+
+/* Valve list */
+.valve-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.valve-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.valve-indicator {
+  width: 12px;
+  height: 12px;
+  background: var(--valve);
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
+/* Supply bar */
+.supply-info {
+  padding: var(--space-3);
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.supply-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-2);
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+
+.supply-value {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--sensor);
+}
+
+.supply-bar {
+  height: 8px;
+  background: var(--surface-sunken);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  margin-bottom: var(--space-2);
+}
+
+.supply-bar-fill {
+  height: 100%;
+  background: var(--sensor);
+  transition: width var(--dur-base) var(--ease);
+}
+
+.supply-caption {
+  font-size: 12px;
+  color: var(--ink-faint);
+  margin: 0;
+}
+
+/* Truth data */
+.incident-truth {
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+
+.truth-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 13px;
+  color: var(--ink-muted);
+  margin-bottom: var(--space-2);
+}
+
+.truth-item svg {
+  color: var(--ink-faint);
+  flex-shrink: 0;
+}
+
+/* Compute time */
+.compute-time {
+  font-size: 12px;
+  color: var(--ink-faint);
+  text-align: center;
+  margin-top: var(--space-4);
+}
+
+/* Simulating status */
+.simulating-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6);
+  text-align: center;
+}
+
+.simulating-icon {
+  color: var(--water);
+  margin-bottom: var(--space-3);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.simulating-status p {
+  font-size: 14px;
+  color: var(--ink-muted);
+}
+
+/* Error state */
+.incident-header--error h2 {
+  color: var(--leak);
+}
+
+.incident-header--error .btn {
+  margin-top: var(--space-3);
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .incident-panel {
+    width: 320px;
+  }
+}
+
+/* Animations */
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}

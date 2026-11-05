@@ -281,10 +281,6 @@ export function useHydroPulse() {
             (await client.mockSimulate(body, presetId)) ||
             makeMockResult(network, body);
         }
-        // Keep the scan animation visible briefly even when a local fixture resolves instantly.
-        await new Promise((resolve) =>
-          setTimeout(resolve, Math.max(0, 900 - (performance.now() - start))),
-        );
         setLastResult(result);
         setPhase('located');
         return result;
