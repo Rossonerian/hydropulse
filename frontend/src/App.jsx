@@ -455,6 +455,7 @@ export default function App() {
             selected={selected}
             phase={phase}
             lastResult={lastResult}
+            basemapProxy={!!health?.basemap_proxy}
             result={lastResult}
             isolatedValves={lastResult?.recommended_valves_to_close || []}
             judge={judge}

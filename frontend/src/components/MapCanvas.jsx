@@ -11,6 +11,7 @@ import {
 import L from 'leaflet';
 import { Layers2, Crosshair, Maximize2, Minimize2 } from 'lucide-react';
 import SkeletonLoader from './SkeletonLoader.jsx';
+import { basemapProxyUrl } from '../api/client.js';
 import { MapControlStack, MapLegend, IconButton } from '../ui/index.js';
 import { useTheme, getTokenValue } from '../ui/useTheme.js';
 
@@ -132,6 +133,7 @@ function MapCanvas({
   mode,
   onPick,
   focusNode,
+  basemapProxy = false,
 }) {
   const { theme } = useTheme();
   const [basemap, setBasemap] = useState(true);
@@ -183,7 +185,12 @@ function MapCanvas({
   }), [theme]);
 
   // Basemap URL based on theme
-  const basemapUrl = theme === 'night' ? CARTO_DARK_URL : CARTO_LIGHT_URL;
+  const night = theme === 'night';
+  const basemapUrl = basemapProxy
+    ? basemapProxyUrl(night ? 'dark' : 'light')
+    : night
+      ? CARTO_DARK_URL
+      : CARTO_LIGHT_URL;
 
   // Create reservoir/tank icon with theme-aware color
   const reservoirIcon = useMemo(() => {
