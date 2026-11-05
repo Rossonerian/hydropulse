@@ -14,8 +14,10 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from starlette.requests import Request
 
+from backend import basemap as basemap_mod
 from backend import ai_advisor, iot_manager, network_builder, scenario_engine
 from backend.config import BackendConfig, load_config
 from backend.hydraulic_engine import HydraulicEngine
@@ -156,7 +158,36 @@ def _require_junction(eng: HydraulicEngine, node_id: str) -> None:
 
 @app.get("/api/health", response_model=HealthResponse)
 def health() -> dict:
-    return _engine().health()
+    return {**_engine().health(), "basemap_proxy": get_config().basemap_proxy_enabled}
+
+
+_basemap_service: basemap_mod.BasemapService | None = None
+_basemap_cfg_id: int | None = None
+
+
+def _basemap() -> basemap_mod.BasemapService:
+    """Lazily build the tile proxy for the current config (rebuilt after a config reload)."""
+    global _basemap_service, _basemap_cfg_id
+    cfg = get_config()
+    if _basemap_service is None or _basemap_cfg_id != id(cfg):
+        _basemap_service = basemap_mod.BasemapService(cfg)
+        _basemap_cfg_id = id(cfg)
+    return _basemap_service
+
+
+@app.get(
+    "/api/basemap/{style}/{z}/{x}/{y}",
+    response_class=Response,
+    responses={200: {"content": {"image/png": {}}}},
+)
+async def basemap_tile(style: str, z: int, x: int, y: int) -> Response:
+    """Public read-only CARTO basemap tile proxy; the API key stays server-side."""
+    try:
+        data, ctype = await _basemap().get_tile(style, z, x, y)
+    except basemap_mod.BasemapError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
+    ttl = get_config().basemap_cache_ttl_s
+    return Response(content=data, media_type=ctype, headers={"Cache-Control": f"public, max-age={ttl}"})
 
 
 @app.get("/api/ready")
