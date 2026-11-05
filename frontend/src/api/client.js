@@ -16,7 +16,13 @@ async function request(path, options = {}) {
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      const e = new Error(data.detail || `Request failed (${response.status})`);
+      let detailMsg = `Request failed (${response.status})`;
+      if (Array.isArray(data.detail)) {
+        detailMsg = data.detail.map((d) => (d.loc ? d.loc.join('.') + ': ' : '') + d.msg).join('; ');
+      } else if (typeof data.detail === 'string') {
+        detailMsg = data.detail;
+      }
+      const e = new Error(detailMsg);
       e.status = response.status;
       throw e;
     }

@@ -1,34 +1,25 @@
-import { useState } from 'react';
-import {
-  AlertTriangle,
-  ArrowRight,
-  Check,
-  CheckCircle2,
-  FileCheck,
-  FileSpreadsheet,
-  FileText,
-  FileUp,
-  Layers,
-  ShieldAlert,
-  Upload,
-  X,
-} from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { AlertTriangle, ArrowRight, Check, CheckCircle2, ShieldAlert, Upload } from 'lucide-react';
+import { Button, Field, Modal, StagedBadge } from '../ui/index.js';
 import { validateImportedFile } from '../lib/realWorldData.js';
+import '../styles/studio/dialogs.css';
 
 const ASSET_TYPES = [
-  { id: 'potable_water_pipe', label: 'Potable Water Pipeline (Mains / Feeder)' },
-  { id: 'sewer_pipe', label: 'Sewerage Gravity Line (Non-Potable)' },
-  { id: 'valve', label: 'Valves (Isolation / Air / Sluice)' },
-  { id: 'pumping_station', label: 'Pumping / Booster Station' },
-  { id: 'borewell', label: 'Groundwater Borewell' },
-  { id: 'groundwater_monitor', label: 'Groundwater Telemetry Station' },
-  { id: 'water_quality_monitor', label: 'Water Quality Observation Point' },
-  { id: 'rain_gauge', label: 'Rain Gauge / Hydrological Monitor' },
-  { id: 'water_body', label: 'Surface Waterbody / Lake / Stream' },
-  { id: 'road', label: 'Urban Road / Street Centerline' },
+  { id: 'potable_water_pipe', label: 'Potable water pipeline (mains / feeder)' },
+  { id: 'sewer_pipe', label: 'Sewerage gravity line (non-potable)' },
+  { id: 'valve', label: 'Valves (isolation / air / sluice)' },
+  { id: 'pumping_station', label: 'Pumping / booster station' },
+  { id: 'borewell', label: 'Groundwater borewell' },
+  { id: 'groundwater_monitor', label: 'Groundwater telemetry station' },
+  { id: 'water_quality_monitor', label: 'Water quality observation point' },
+  { id: 'rain_gauge', label: 'Rain gauge / hydrological monitor' },
+  { id: 'water_body', label: 'Surface waterbody / lake / stream' },
+  { id: 'road', label: 'Urban road / street centreline' },
 ];
 
-export default function ImportWizardModal({ isOpen, onClose, onImportStaged }) {
+const STEPS = ['Choose file', 'Map fields', 'Review', 'Stage'];
+
+export default function ImportWizardModal({ open, onClose, onImportStaged }) {
   const [step, setStep] = useState(1);
   const [file, setFile] = useState(null);
   const [fileContent, setFileContent] = useState('');
@@ -37,7 +28,18 @@ export default function ImportWizardModal({ isOpen, onClose, onImportStaged }) {
   const [importName, setImportName] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
-  if (!isOpen) return null;
+  // The Modal primitive unmounts its content when closed, but this component
+  // stays mounted, so wizard state is reset explicitly on close.
+  useEffect(() => {
+    if (open) return;
+    setStep(1);
+    setFile(null);
+    setFileContent('');
+    setAssetType('potable_water_pipe');
+    setValidation(null);
+    setImportName('');
+    setIsProcessing(false);
+  }, [open]);
 
   const handleFileChange = async (e) => {
     const selected = e.target.files?.[0];
@@ -88,225 +90,211 @@ export default function ImportWizardModal({ isOpen, onClose, onImportStaged }) {
     onClose();
   };
 
-  const reset = () => {
-    setStep(1);
-    setFile(null);
-    setFileContent('');
-    setValidation(null);
-  };
+  let footer = null;
+  if (step === 2) {
+    footer = (
+      <div className='stu-wiz__actions'>
+        <Button variant='secondary' onClick={() => setStep(1)}>
+          Back
+        </Button>
+        <Button variant='primary' onClick={() => setStep(3)}>
+          Review geometry <ArrowRight size={16} aria-hidden='true' />
+        </Button>
+      </div>
+    );
+  } else if (step === 3) {
+    footer = (
+      <div className='stu-wiz__actions'>
+        <Button variant='secondary' onClick={() => setStep(2)}>
+          Back
+        </Button>
+        <Button variant='primary' disabled={!validation?.valid} onClick={() => setStep(4)}>
+          Continue to staging <ArrowRight size={16} aria-hidden='true' />
+        </Button>
+      </div>
+    );
+  } else if (step === 4) {
+    footer = (
+      <div className='stu-wiz__actions'>
+        <Button variant='secondary' onClick={() => setStep(3)}>
+          Back
+        </Button>
+        <Button variant='primary' icon={Check} onClick={handleConfirm}>
+          Stage layer
+        </Button>
+      </div>
+    );
+  }
 
   return (
-    <div
-      className='studio-modal-backdrop'
-      role='dialog'
-      aria-modal='true'
-      aria-labelledby='import-wizard-title'
-      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
-    >
-      <section className='import-wizard-modal clay-panel'>
-        {/* Wizard Header */}
-        <div className='catalog-header'>
-          <div className='catalog-header-title'>
-            <div className='catalog-icon-badge'>
-              <FileUp size={20} />
-            </div>
-            <div>
-              <span className='studio-eyebrow'>STAGING PIPELINE</span>
-              <h2 id='import-wizard-title'>Import Real-World Layer</h2>
-            </div>
-          </div>
-          <button className='icon-btn' onClick={onClose} aria-label='Close Import Wizard'>
-            <X size={18} />
-          </button>
-        </div>
+    <Modal open={open} onClose={onClose} title='Import layer' footer={footer}>
+      <div className='stu-wiz'>
+        <ol className='stu-wiz__steps' aria-label='Import progress'>
+          {STEPS.map((label, i) => {
+            const n = i + 1;
+            return (
+              <li
+                key={label}
+                className={`stu-wiz__step ${step > n ? 'stu-wiz__step--done' : ''}`}
+                aria-current={step === n ? 'step' : undefined}
+              >
+                <span className='stu-wiz__step-num'>{n}</span>
+                {label}
+              </li>
+            );
+          })}
+        </ol>
 
-        {/* Step Indicator */}
-        <div className='wizard-steps'>
-          <div className={`wizard-step ${step >= 1 ? 'is-active' : ''} ${step > 1 ? 'is-done' : ''}`}>
-            <span>1</span> File Upload
-          </div>
-          <div className={`wizard-step ${step >= 2 ? 'is-active' : ''} ${step > 2 ? 'is-done' : ''}`}>
-            <span>2</span> Asset Classification
-          </div>
-          <div className={`wizard-step ${step >= 3 ? 'is-active' : ''} ${step > 3 ? 'is-done' : ''}`}>
-            <span>3</span> Validation & Diagnostics
-          </div>
-          <div className={`wizard-step ${step >= 4 ? 'is-active' : ''}`}>
-            <span>4</span> Staging Confirmation
-          </div>
-        </div>
-
-        {/* Wizard Steps Content */}
-        <div className='wizard-content'>
-          {/* STEP 1: Upload */}
-          {step === 1 && (
-            <div className='wizard-step-pane'>
-              <div className='upload-dropzone'>
-                <Upload size={36} />
-                <h3>Choose a geospatial file to import</h3>
-                <p>Supported: GeoJSON (.geojson, .json), KML (.kml), CSV with lat/lon, EPANET (.inp)</p>
-                <label className='studio-text-button primary upload-btn'>
-                  <FileUp size={15} /> Browse File
-                  <input
-                    type='file'
-                    accept='.geojson,.json,.kml,.csv,.inp'
-                    hidden
-                    onChange={handleFileChange}
-                  />
-                </label>
-              </div>
-              <div className='wizard-note'>
-                <ShieldAlert size={15} />
-                <p>
-                  Security boundary: Files are processed client-side into local draft staging.
-                  Imported files will <b>never</b> overwrite the committed EPANET benchmark model.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 2: Classification */}
-          {step === 2 && (
-            <div className='wizard-step-pane'>
-              <div className='wizard-field'>
-                <label>Layer Display Name</label>
+        {step === 1 && (
+          <div className='stu-wiz__pane'>
+            <div className='stu-wiz__drop'>
+              <Upload size={32} aria-hidden='true' />
+              <h3>Choose a geospatial file to import</h3>
+              <p>
+                Supported: GeoJSON (.geojson, .json), KML (.kml), CSV with lat/lon, EPANET (.inp)
+              </p>
+              <label className='stu-wiz__file-label'>
+                {isProcessing ? 'Reading file…' : 'Browse file'}
                 <input
-                  type='text'
-                  value={importName}
-                  onChange={(e) => setImportName(e.target.value)}
-                  placeholder='e.g., BWSSB Ward 159 Surveyed Mains'
+                  className='stu-wiz__file'
+                  type='file'
+                  accept='.geojson,.json,.kml,.csv,.inp'
+                  onChange={handleFileChange}
                 />
+              </label>
+            </div>
+            {validation && !validation.valid && validation.errors?.length > 0 && (
+              <div className='stu-wiz__note stu-wiz__note--bad' role='alert'>
+                <AlertTriangle size={16} aria-hidden='true' />
+                <span>{validation.errors[0]}</span>
               </div>
+            )}
+            <div className='stu-wiz__note'>
+              <ShieldAlert size={16} aria-hidden='true' />
+              <p>
+                Security boundary: files are processed client-side into local draft staging.
+                Imported files will <b>never</b> overwrite the committed EPANET benchmark model.
+              </p>
+            </div>
+          </div>
+        )}
 
-              <div className='wizard-field'>
-                <label>Select Asset Classification</label>
-                <div className='asset-type-grid'>
-                  {ASSET_TYPES.map((t) => (
+        {step === 2 && (
+          <div className='stu-wiz__pane'>
+            <Field label='Layer display name' htmlFor='stu-wiz-name'>
+              <input
+                id='stu-wiz-name'
+                type='text'
+                className='stu-wiz__input'
+                value={importName}
+                onChange={(e) => setImportName(e.target.value)}
+                placeholder='e.g., BWSSB Ward 159 surveyed mains'
+              />
+            </Field>
+
+            <div>
+              <h3 className='stu-wiz__heading' id='stu-wiz-type'>
+                Asset classification
+              </h3>
+              <ul className='stu-wiz__types' aria-labelledby='stu-wiz-type'>
+                {ASSET_TYPES.map((t) => (
+                  <li key={t.id}>
                     <button
-                      key={t.id}
-                      className={`asset-type-chip ${assetType === t.id ? 'is-selected' : ''}`}
+                      type='button'
+                      className='stu-wiz__type'
+                      aria-pressed={assetType === t.id}
                       onClick={() => handleAssetTypeChange(t.id)}
                     >
-                      <span>{t.label}</span>
+                      {t.label}
                     </button>
-                  ))}
-                </div>
-              </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
 
-              {assetType === 'sewer_pipe' && (
-                <div className='wizard-warning-box'>
-                  <AlertTriangle size={15} />
-                  <span>
-                    Sewerage assets are strictly quarantined from the potable-water hydraulic network.
-                  </span>
+            {assetType === 'sewer_pipe' && (
+              <div className='stu-wiz__note'>
+                <AlertTriangle size={16} aria-hidden='true' />
+                <span>
+                  Sewerage assets are strictly quarantined from the potable-water hydraulic network.
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {step === 3 && (
+          <div className='stu-wiz__pane'>
+            <div className='stu-wiz__report'>
+              <h4>
+                {validation?.valid ? (
+                  <>
+                    <CheckCircle2 size={16} aria-hidden='true' /> Format and topology validated
+                  </>
+                ) : (
+                  'Validation issues detected'
+                )}
+              </h4>
+              <p className='stu-mono'>
+                {validation?.fileName} · {validation?.detectedFormat} · {validation?.detectedCrs}
+              </p>
+
+              <dl className='stu-wiz__stats'>
+                <div>
+                  <dt>Detected features</dt>
+                  <dd>{validation?.featureCount || 0}</dd>
+                </div>
+                <div>
+                  <dt>Hydraulic status</dt>
+                  <dd className={validation?.modelReady ? 'is-good' : 'is-warn'}>
+                    {validation?.modelReady ? 'Model ready' : 'Geographic only'}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Errors</dt>
+                  <dd className={validation?.errors.length ? 'is-bad' : 'is-good'}>
+                    {validation?.errors.length || 0}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Warnings</dt>
+                  <dd>{validation?.warnings.length || 0}</dd>
+                </div>
+              </dl>
+
+              {validation?.blockingReasons?.length > 0 && (
+                <div>
+                  <h4 className='stu-wiz__heading'>Hydraulic simulation readiness gate</h4>
+                  <ul className='stu-wiz__reasons'>
+                    {validation.blockingReasons.map((r, i) => (
+                      <li key={i}>{r}</li>
+                    ))}
+                  </ul>
                 </div>
               )}
-
-              <div className='wizard-actions'>
-                <button className='studio-text-button secondary' onClick={() => setStep(1)}>
-                  Back
-                </button>
-                <button className='studio-text-button primary' onClick={() => setStep(3)}>
-                  Next: Validate Geometry <ArrowRight size={14} />
-                </button>
-              </div>
             </div>
-          )}
+          </div>
+        )}
 
-          {/* STEP 3: Validation */}
-          {step === 3 && (
-            <div className='wizard-step-pane'>
-              <div className='validation-report clay-panel'>
-                <div className='validation-top'>
-                  <div className='valid-icon'>
-                    {validation?.valid ? <CheckCircle2 size={24} className='green' /> : <AlertTriangle size={24} className='amber' />}
-                  </div>
-                  <div>
-                    <h4>{validation?.valid ? 'Format & Topology Validated' : 'Validation Issues Detected'}</h4>
-                    <p>{validation?.fileName} · {validation?.detectedFormat} · {validation?.detectedCrs}</p>
-                  </div>
-                </div>
-
-                <div className='validation-stats-grid'>
-                  <div>
-                    <span>DETECTED FEATURES</span>
-                    <b>{validation?.featureCount || 0}</b>
-                  </div>
-                  <div>
-                    <span>HYDRAULIC STATUS</span>
-                    <b className={validation?.modelReady ? 'green' : 'amber'}>
-                      {validation?.modelReady ? 'MODEL READY' : 'GEOGRAPHIC ONLY'}
-                    </b>
-                  </div>
-                  <div>
-                    <span>ERRORS</span>
-                    <b className={validation?.errors.length ? 'red' : 'green'}>{validation?.errors.length || 0}</b>
-                  </div>
-                  <div>
-                    <span>WARNINGS</span>
-                    <b>{validation?.warnings.length || 0}</b>
-                  </div>
-                </div>
-
-                {validation?.blockingReasons?.length > 0 && (
-                  <div className='blocking-reasons'>
-                    <span className='studio-group-title'>HYDRAULIC SIMULATION READINESS GATE</span>
-                    <ul>
-                      {validation.blockingReasons.map((r, i) => (
-                        <li key={i}>
-                          <AlertTriangle size={13} />
-                          <span>{r}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+        {step === 4 && (
+          <div className='stu-wiz__pane'>
+            <div className='stu-wiz__confirm'>
+              <h3>Ready to stage layer</h3>
+              <p>
+                <b>{importName}</b> will be added to your draft workspace with{' '}
+                <b>{validation?.featureCount}</b> features.
+              </p>
+              <div>
+                <StagedBadge />
               </div>
-
-              <div className='wizard-actions'>
-                <button className='studio-text-button secondary' onClick={() => setStep(2)}>
-                  Back
-                </button>
-                <button
-                  className='studio-text-button primary'
-                  disabled={!validation?.valid}
-                  onClick={() => setStep(4)}
-                >
-                  Proceed to Staging <ArrowRight size={14} />
-                </button>
-              </div>
+              <ul>
+                <li>Staged as a reference overlay in the Map and Terrain views.</li>
+                <li>The WNTR hydraulic model remains untouched.</li>
+              </ul>
             </div>
-          )}
-
-          {/* STEP 4: Confirm */}
-          {step === 4 && (
-            <div className='wizard-step-pane'>
-              <div className='staging-confirm-box'>
-                <FileCheck size={40} className='green' />
-                <h3>Ready to Stage Real-World Layer</h3>
-                <p>
-                  <b>{importName}</b> will be committed to your draft workspace with{' '}
-                  <b>{validation?.featureCount}</b> features.
-                </p>
-                <div className='staging-commit-notice'>
-                  <Check size={14} /> Staged as reference overlay in Geographic Map and 3D Terrain view.
-                  <br />
-                  <Check size={14} /> WNTR hydraulic model remains untouched and 100% frozen.
-                </div>
-              </div>
-
-              <div className='wizard-actions'>
-                <button className='studio-text-button secondary' onClick={() => setStep(3)}>
-                  Back
-                </button>
-                <button className='studio-text-button primary' onClick={handleConfirm}>
-                  <Check size={14} /> Commit to Staging
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </section>
-    </div>
+          </div>
+        )}
+      </div>
+    </Modal>
   );
 }
