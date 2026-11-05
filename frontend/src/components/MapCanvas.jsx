@@ -22,6 +22,7 @@ import {
   GitBranch,
   Circle,
 } from 'lucide-react';
+import SkeletonLoader from './SkeletonLoader.jsx';
 
 const reservoirIcon = L.divIcon({
   className: 'reservoir-marker',
@@ -443,12 +444,17 @@ function MapCanvas({
       <div className='map-grid' />
       <ScanOverlay active={phase === 'simulating'} />
 
+      {/* Skeletons: show map shell immediately; veil while geometry synchronizes */}
+      {(!network?.nodes || network.nodes.length === 0) && (
+        <SkeletonLoader variant='map-veil' />
+      )}
+
       {/* Map Control Toolbar */}
       <div className='map-toolbar' role='toolbar' aria-label='Map navigation controls'>
         <button
           className='map-toggle'
           onClick={handleZoomIn}
-          title='Zoom In (+)'
+          title='Zoom in map (+)'
           type='button'
           aria-label='Zoom in'
         >
@@ -457,7 +463,7 @@ function MapCanvas({
         <button
           className='map-toggle'
           onClick={handleZoomOut}
-          title='Zoom Out (-)'
+          title='Zoom out map (-)'
           type='button'
           aria-label='Zoom out'
         >
@@ -466,7 +472,7 @@ function MapCanvas({
         <button
           className='map-toggle'
           onClick={() => setFitTrigger((c) => c + 1)}
-          title='Fit Network to Screen'
+          title='Fit network bounds to screen (F)'
           type='button'
           aria-label='Fit network'
         >
@@ -476,7 +482,7 @@ function MapCanvas({
         <button
           className='map-toggle'
           onClick={() => setResetTrigger((c) => c + 1)}
-          title='Reset to Kengeri DMA Overview'
+          title='Reset overview to Kengeri center (R)'
           type='button'
           aria-label='Reset overview'
         >
@@ -489,8 +495,9 @@ function MapCanvas({
             setTilesFailed(false);
             setTileMode((current) => (current === 'osm' ? 'carto' : current === 'carto' ? 'grid' : 'osm'));
           }}
-          title='Toggle Basemap (OSM / CARTO / Grid)'
+          title='Cycle basemap: OSM / CARTO / Grid (B)'
           type='button'
+          aria-label='Cycle basemap'
         >
           <Layers2 size={14} />
           <b>{tilesFailed ? 'Offline' : tileMode.toUpperCase()}</b>

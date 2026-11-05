@@ -25,10 +25,15 @@ export default function App() {
     phase,
     lastResult,
     error,
+    lastUpdated,
+    isRefreshing,
+    isCached,
+    simulateCooldown,
     load,
     simulate,
     isolate,
     reset,
+    clearCache,
   } = pulse;
   const [selected, setSelected] = useState('J15'),
     [area, setArea] = useState(25),
@@ -157,7 +162,15 @@ export default function App() {
         onRoi={() => setRoi(true)}
         onStudio={() => setStudioOpen(true)}
       />
-      <StatusBanner mode={mode} networkSource={networkSource} onRetry={load} />
+      <StatusBanner
+        mode={mode}
+        networkSource={networkSource}
+        lastUpdated={lastUpdated}
+        isRefreshing={isRefreshing}
+        isCached={isCached}
+        onRetry={load}
+        onClearCache={clearCache}
+      />
       <div className='workspace'>
         <ControlPanel
           network={activeNetwork}
@@ -181,6 +194,7 @@ export default function App() {
           onReveal={setRevealed}
           revealed={revealed}
           mode={mode}
+          simulateCooldown={simulateCooldown}
         />
         {viewMode === '2d' ? (
           <MapCanvas

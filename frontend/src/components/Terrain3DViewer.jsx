@@ -22,6 +22,8 @@ import {
   CheckCircle2,
   Circle,
 } from 'lucide-react';
+import HoldToConfirmButton from './HoldToConfirmButton.jsx';
+import SkeletonLoader from './SkeletonLoader.jsx';
 import {
   KENGERI_AOI,
   REAL_WORLD_FEATURES,
@@ -367,6 +369,18 @@ export default function Terrain3DViewer({
     });
   };
 
+  const handleNudgeJunction = () => {
+    if (!selectedNode) return;
+    commitMutation((next) => {
+      const n = next.nodes.find((item) => item.id === selectedNode.id);
+      if (n) {
+        n.lat += 0.0001;
+        n.lng += 0.0001;
+      }
+      return next;
+    });
+  };
+
   // Topology Validation
   const handleValidate = () => {
     if (!draftNetwork) return;
@@ -403,6 +417,25 @@ export default function Terrain3DViewer({
       setSaveStatus('Error writing draft to local storage.');
     }
   };
+
+  // Discard Local Draft (Hold-to-confirm safe action §21.2 & §21.5)
+  const handleDiscardEdits = useCallback(() => {
+    setDraftNetwork(network);
+    setHistoryPast([]);
+    setHistoryFuture([]);
+    setDirty(false);
+    setValidationMsg({
+      success: true,
+      text: 'Local draft discarded. Reset to baseline network geometry.',
+    });
+    setSaveStatus('Draft reset to baseline');
+    try {
+      localStorage.removeItem('hydropulse_active_draft');
+    } catch {
+      // Storage unavailable
+    }
+    onUpdateDraft?.(null);
+  }, [network, onUpdateDraft]);
 
   // Canvas Render Loop
   useEffect(() => {
@@ -808,6 +841,14 @@ export default function Terrain3DViewer({
     setZoom((z) => Math.max(0.4, Math.min(4.5, z * factor)));
   };
 
+  if (!draftNetwork) {
+    return (
+      <div className='terrain-3d-container' role='status' aria-busy='true'>
+        <SkeletonLoader variant='map-veil' />
+      </div>
+    );
+  }
+
   return (
     <div className='terrain-3d-container' onWheel={handleWheel}>
       <canvas
@@ -829,6 +870,7 @@ export default function Terrain3DViewer({
             onClick={() => setInteractionMode('navigate')}
             title='Navigate Mode: Orbit, Pan, and Zoom camera'
             type='button'
+            aria-label='Navigate mode'
           >
             <Compass size={15} />
           </button>
@@ -837,13 +879,14 @@ export default function Terrain3DViewer({
             onClick={() => setInteractionMode('edit')}
             title='Edit Network Mode: Select and reshape pipes and junctions'
             type='button'
+            aria-label='Edit mode'
           >
             <MousePointer2 size={15} />
           </button>
         </div>
 
         {/* Camera Azimuth Compass */}
-        <div className='hud-compass'>
+        <div className='hud-compass' aria-label={`Azimuth ${Math.round(rotation.azimuth)} degrees, Elevation ${Math.round(rotation.elevation)} degrees`}>
           <Compass size={14} style={{ transform: `rotate(${-rotation.azimuth}deg)` }} />
           <span>{Math.round(rotation.azimuth)}° Az · {Math.round(rotation.elevation)}° El</span>
         </div>
@@ -853,40 +896,45 @@ export default function Terrain3DViewer({
           <button
             className='studio-icon-button'
             onClick={() => setZoom((z) => Math.min(4.5, z * 1.2))}
-            title='Zoom In (+)'
+            title='Zoom in camera (+)'
             type='button'
+            aria-label='Zoom in'
           >
             <ZoomIn size={15} />
           </button>
           <button
             className='studio-icon-button'
             onClick={() => setZoom((z) => Math.max(0.4, z / 1.2))}
-            title='Zoom Out (-)'
+            title='Zoom out camera (-)'
             type='button'
+            aria-label='Zoom out'
           >
             <ZoomOut size={15} />
           </button>
           <button
             className='studio-icon-button'
             onClick={fitNetwork}
-            title='Fit Network to Screen'
+            title='Fit network bounds to screen (F)'
             type='button'
+            aria-label='Fit network bounds'
           >
             <Maximize2 size={15} />
           </button>
           <button
             className='studio-icon-button'
             onClick={resetCamera}
-            title='Reset Perspective Overview'
+            title='Reset perspective overview (R)'
             type='button'
+            aria-label='Reset perspective overview'
           >
             <RotateCcw size={15} />
           </button>
           <button
             className='studio-icon-button'
             onClick={topDownCamera}
-            title='2D Top-Down Planimetric View'
+            title='Switch to 2D top-down planimetric view'
             type='button'
+            aria-label='Top-down view'
           >
             <Minimize2 size={15} />
           </button>
@@ -894,8 +942,9 @@ export default function Terrain3DViewer({
             <button
               className='studio-icon-button'
               onClick={focusSelected}
-              title={`Focus on Selected ${selected}`}
+              title={`Focus camera on selected ${selected}`}
               type='button'
+              aria-label={`Focus on ${selected}`}
             >
               <Crosshair size={15} />
             </button>
@@ -1013,6 +1062,21 @@ export default function Terrain3DViewer({
                   <b>{selectedNode.households || 0}</b>
                 </div>
                 {interactionMode === 'edit' && (
+                  <div className='hud-actions-box'>
+                    <span className='hud-action-title'>JUNCTION SPATIAL TRANSFORM</span>
+                    <div className='hud-btn-row'>
+                      <button
+                        className='hud-action-btn'
+                        onClick={handleNudgeJunction}
+                        type='button'
+                        title='Nudge junction position to adjust topological alignment'
+                      >
+                        <Plus size={13} /> Shift Position
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {interactionMode === 'edit' && (
                   <p className='hud-note'>
                     Drag this junction handle across the terrain to move it. Connected pipe endpoints propagate automatically.
                   </p>
@@ -1064,6 +1128,27 @@ export default function Terrain3DViewer({
             )}
 
             {saveStatus && <div className='hud-save-status'>{saveStatus}</div>}
+
+            {/* Danger Zone: Separated Destructive Actions (§21.2 & §21.5) */}
+            {dirty && (
+              <div className='danger-zone-box' role='region' aria-label='Danger Zone'>
+                <div className='danger-zone-header'>
+                  <AlertTriangle size={13} />
+                  <span>DANGER ZONE</span>
+                </div>
+                <p className='danger-zone-desc'>
+                  Discarding replaces all unsaved route modifications and resets to baseline geometry ({network?.pipes?.length || 0} pipes).
+                </p>
+                <HoldToConfirmButton
+                  onConfirm={handleDiscardEdits}
+                  holdDurationMs={1200}
+                  label='Hold to discard edits'
+                  actionName='Discarding changes…'
+                  completedLabel='Draft reset'
+                  variant='danger'
+                />
+              </div>
+            )}
           </div>
         </div>
       )}

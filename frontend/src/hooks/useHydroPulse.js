@@ -1,5 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { client } from '../api/client.js';
+
+const CACHE_KEY_PREFIX = 'hydropulse.cache.v1';
+const TOPOLOGY_STALE_MS = 5 * 60 * 1000; // 5 minutes freshness window for network topology
 
 function createDemoNetwork() {
   // Deterministic UI fallback only; these generated values are not measured network data.
@@ -92,7 +95,7 @@ const demoPresets = [
 ];
 
 function makeMockResult(network, body) {
-  // Keep the demo response stable and internally consistent without a backend or recorded fixture.
+  // Stable and internally consistent response without backend
   const target = network?.nodes.find((node) => node.id === body.target_node_id);
   if (!target) {
     const error = new Error(`Unknown junction id: ${body.target_node_id}`);
@@ -161,7 +164,6 @@ function makeMockResult(network, body) {
 }
 
 async function loadMockData() {
-  // Prefer committed fixtures field by field and synthesize only the pieces that are missing.
   const [networkResult, presetsResult, healthResult] = await Promise.all([
     client.hasMockFile('network.json')
       ? client
@@ -194,6 +196,27 @@ async function loadMockData() {
   };
 }
 
+// Caching helper
+function readStorageCache(key) {
+  try {
+    const raw = sessionStorage.getItem(`${CACHE_KEY_PREFIX}.${key}`);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStorageCache(key, data) {
+  try {
+    sessionStorage.setItem(
+      `${CACHE_KEY_PREFIX}.${key}`,
+      JSON.stringify({ ...data, cachedAt: new Date().toISOString() }),
+    );
+  } catch {
+    // SessionStorage quota exceeded or unavailable
+  }
+}
+
 export function useHydroPulse() {
   const [network, setNetwork] = useState(null);
   const [networkSource, setNetworkSource] = useState('synthetic');
@@ -205,8 +228,48 @@ export function useHydroPulse() {
   const [lastRequest, setLastRequest] = useState(null);
   const [error, setError] = useState('');
 
+  // Caching & Freshness State (Section 18)
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isCached, setIsCached] = useState(false);
+
+  // Cooldown Protection (Section 21.6)
+  const [simulateCooldown, setSimulateCooldown] = useState(0); // seconds remaining
+  const cooldownTimerRef = useRef(null);
+
+  const startCooldown = (seconds = 2) => {
+    setSimulateCooldown(seconds);
+    if (cooldownTimerRef.current) clearInterval(cooldownTimerRef.current);
+    cooldownTimerRef.current = setInterval(() => {
+      setSimulateCooldown((prev) => {
+        if (prev <= 1) {
+          clearInterval(cooldownTimerRef.current);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
   const load = useCallback(async () => {
     setError('');
+
+    // Check if we have valid cached data in sessionStorage first (Section 18.2 Fast First Paint)
+    const cacheKey = client.forcedMock ? 'mock' : 'live';
+    const cached = readStorageCache(cacheKey);
+
+    if (cached?.network) {
+      setNetwork(cached.network);
+      setNetworkSource(cached.networkSource);
+      setPresets(cached.presets || []);
+      setHealth(cached.health || null);
+      setLastUpdated(cached.cachedAt);
+      setIsCached(true);
+      if (mode === 'loading') setMode(client.forcedMock ? 'mock' : 'live');
+    }
+
+    setIsRefreshing(true);
+
     if (client.forcedMock) {
       const data = await loadMockData();
       setNetwork(data.network);
@@ -214,10 +277,16 @@ export function useHydroPulse() {
       setPresets(data.presets);
       setHealth(data.health);
       setMode('mock');
+      setIsRefreshing(false);
+      setIsCached(false);
+      const now = new Date().toISOString();
+      setLastUpdated(now);
+      writeStorageCache('mock', data);
       return;
     }
+
     try {
-      // Load live health, topology, and presets together as one coherent network snapshot.
+      // Background revalidation
       const [liveHealth, liveNetwork, livePresets] = await Promise.all([
         client.getHealth(),
         client.getNetwork(),
@@ -228,38 +297,59 @@ export function useHydroPulse() {
       setNetworkSource('live');
       setPresets(livePresets.presets || []);
       setMode('live');
+      setIsRefreshing(false);
+      setIsCached(false);
+      const now = new Date().toISOString();
+      setLastUpdated(now);
+      writeStorageCache('live', {
+        health: liveHealth,
+        network: liveNetwork,
+        networkSource: 'live',
+        presets: livePresets.presets || [],
+      });
     } catch (loadError) {
-      const data = await loadMockData();
-      setNetwork(data.network);
-      setNetworkSource(data.networkSource);
-      setPresets(data.presets);
-      setHealth(data.health);
-      setMode('offline');
-      setError(loadError.message);
+      // Revalidation failed: preserve cached data if valid, otherwise fallback to mock
+      if (!cached?.network) {
+        const data = await loadMockData();
+        setNetwork(data.network);
+        setNetworkSource(data.networkSource);
+        setPresets(data.presets);
+        setHealth(data.health);
+        setMode('offline');
+        const now = new Date().toISOString();
+        setLastUpdated(now);
+        writeStorageCache('mock', data);
+      } else {
+        setMode('offline');
+      }
+      setIsRefreshing(false);
+      setError(`Backend offline: ${loadError.message}`);
     }
-  }, []);
+  }, [mode]);
 
   useEffect(() => {
     load();
   }, [load]);
+
   useEffect(() => {
     if (mode !== 'live') return undefined;
-    // Detect backend outages that happen after the initial load succeeded.
     const timer = setInterval(() => {
       client.getHealth().catch(() => {
         setMode('offline');
-        setError('Backend offline: running on recorded data');
+        setError('Backend heartbeat lost: running on cached data');
       });
-    }, 12000);
+    }, 15000);
     return () => clearInterval(timer);
   }, [mode]);
 
   const simulate = useCallback(
     async (body, presetId) => {
-      if (!network) return null;
+      if (!network || simulateCooldown > 0) return null;
       setPhase('simulating');
       setError('');
       setLastRequest(body);
+      startCooldown(2); // 2-second cooldown to guard duplicate submissions (§21.6)
+
       const start = performance.now();
       try {
         let result;
@@ -267,9 +357,7 @@ export function useHydroPulse() {
           try {
             result = await client.simulateLeak(body);
           } catch (requestError) {
-            // Preserve actionable contract errors; use local fallback only for transport failures.
-            if (requestError.status === 404 || requestError.status === 422)
-              throw requestError;
+            if (requestError.status === 404 || requestError.status === 422) throw requestError;
             setMode('offline');
             setError('Backend offline: running on recorded data');
             result =
@@ -281,7 +369,6 @@ export function useHydroPulse() {
             (await client.mockSimulate(body, presetId)) ||
             makeMockResult(network, body);
         }
-        // Keep the scan animation visible briefly even when a local fixture resolves instantly.
         await new Promise((resolve) =>
           setTimeout(resolve, Math.max(0, 900 - (performance.now() - start))),
         );
@@ -294,14 +381,13 @@ export function useHydroPulse() {
         return null;
       }
     },
-    [mode, network, lastResult],
+    [mode, network, lastResult, simulateCooldown],
   );
 
   const isolate = useCallback(async () => {
-    if (!lastResult) return;
+    if (!lastResult || phase === 'isolated') return;
     if (mode === 'live') {
       try {
-        // Send the selected valves and incident context the operator is about to isolate.
         await client.isolate({
           valve_ids: lastResult.recommended_valves_to_close,
           target_node_id: lastResult.injected_node_id,
@@ -312,13 +398,24 @@ export function useHydroPulse() {
       }
     }
     setPhase('isolated');
-  }, [lastResult, mode]);
+  }, [lastResult, mode, phase]);
 
   const reset = () => {
     setLastResult(null);
     setLastRequest(null);
     setPhase('idle');
     setError('');
+  };
+
+  const clearCache = () => {
+    try {
+      sessionStorage.removeItem(`${CACHE_KEY_PREFIX}.live`);
+      sessionStorage.removeItem(`${CACHE_KEY_PREFIX}.mock`);
+      setIsCached(false);
+      load();
+    } catch {
+      // Storage unavailable
+    }
   };
 
   return {
@@ -331,9 +428,14 @@ export function useHydroPulse() {
     lastResult,
     lastRequest,
     error,
+    lastUpdated,
+    isRefreshing,
+    isCached,
+    simulateCooldown,
     load,
     simulate,
     isolate,
     reset,
+    clearCache,
   };
 }

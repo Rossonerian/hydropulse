@@ -2629,3 +2629,270 @@ kbd {
   margin: 4px 0 0;
 }
 
+/* ==========================================================================
+   Sections 17-21: Skeletons, Cache Freshness, Hold to Confirm & Danger Zone
+   ========================================================================== */
+
+/* Shimmer Keyframes */
+@keyframes hp-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes hp-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spin-icon {
+  animation: hp-spin 1s linear infinite;
+}
+
+/* Skeleton Loaders (§17) */
+.skeleton-block {
+  background: linear-gradient(90deg, #1C2541 25%, #3A506B 50%, #1C2541 75%);
+  background-size: 200% 100%;
+  animation: hp-shimmer 1.8s infinite linear;
+  border-radius: 4px;
+}
+
+.skeleton-map-veil {
+  position: absolute;
+  inset: 0;
+  background: rgba(11, 19, 43, 0.88);
+  backdrop-filter: blur(4px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  z-index: 1000;
+  color: var(--hp-cyan);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+}
+
+.map-veil-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid rgba(91, 192, 222, 0.2);
+  border-top-color: var(--hp-cyan);
+  border-radius: 50%;
+  animation: hp-spin 0.9s linear infinite;
+}
+
+.skeleton-inspector-pane {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.skeleton-summary-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.skeleton-summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(28, 37, 65, 0.4);
+  border: 1px solid rgba(58, 80, 107, 0.3);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+/* Status Banner Actions & Refreshing / Cached States (§18.5, §21.3) */
+.status-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.status-banner-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.1);
+  color: #FFF;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.status-banner-actions button:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.status-banner-actions button.secondary {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #CBD5E1;
+}
+
+.status-banner-actions button.secondary:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #FFF;
+}
+
+.refreshing-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  background: rgba(91, 192, 222, 0.1);
+  border-bottom: 1px solid rgba(91, 192, 222, 0.25);
+  color: var(--hp-cyan);
+  font-size: 11px;
+  font-family: var(--mono);
+}
+
+.cached-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 16px;
+  background: rgba(58, 80, 107, 0.2);
+  border-bottom: 1px solid rgba(58, 80, 107, 0.35);
+  color: #94A3B8;
+  font-size: 10.5px;
+  font-family: var(--mono);
+}
+
+/* Danger Zone (§21.5) */
+.danger-zone-box {
+  background: rgba(239, 68, 68, 0.06);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-top: 10px;
+}
+
+.danger-zone-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #EF4444;
+}
+
+.danger-zone-desc {
+  font-size: 10px;
+  color: #94A3B8;
+  line-height: 1.4;
+  margin: 4px 0 8px;
+}
+
+/* Hold to Confirm Button (§21.2) */
+.hold-confirm-btn {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid var(--hp-slate);
+  background: var(--hp-navy);
+  color: var(--hp-sand);
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.hold-confirm-btn:hover {
+  background: var(--hp-slate);
+}
+
+.hold-confirm-btn.variant-danger {
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #F87171;
+  background: rgba(28, 37, 65, 0.8);
+}
+
+.hold-confirm-btn.variant-danger:hover {
+  border-color: #EF4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.hold-confirm-btn.is-holding {
+  border-color: #EF4444;
+}
+
+.hold-confirm-btn.is-triggered {
+  background: #EF4444 !important;
+  color: #0B132B !important;
+  border-color: #EF4444 !important;
+}
+
+.hold-progress-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  background: rgba(239, 68, 68, 0.35);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.hold-btn-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.pulse-icon {
+  animation: hp-icon-pulse 0.6s ease-in-out infinite alternate;
+}
+
+@keyframes hp-icon-pulse {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.15);
+  }
+}
+
+/* Reduced Motion Override (§22) */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-block {
+    animation: none;
+    background: #243354;
+  }
+
+  .map-veil-spinner,
+  .spin-icon,
+  .pulse-icon {
+    animation: none;
+  }
+
+  .hold-progress-fill {
+    transition: none;
+  }
+}
+
