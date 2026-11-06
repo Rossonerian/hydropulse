@@ -12,6 +12,7 @@ import {
   Activity,
   PencilRuler,
   Sparkles,
+  BarChart3,
 } from 'lucide-react';
 import { DataSourceBadge } from '../ui/DataSourceBadge.jsx';
 import { useTheme } from '../ui/useTheme.js';
@@ -53,6 +54,7 @@ export default function TopBar({
   onResetCustom,
   onReplayTour,
   onAiAdvisor,
+  onOpenBenchmark,
 }) {
   const { theme, toggleTheme } = useTheme();
   const [open, setOpen] = useState(false);
@@ -237,14 +239,19 @@ export default function TopBar({
               <div className="topbar-menu__sep topbar-menu__mobile-only" role="separator" />
 
               <div className="topbar-menu__group" role="presentation">
-                Data
+                Data & Analytics
               </div>
               <Item icon={Database} onClick={act(onDataSource)}>
                 Use the demo
               </Item>
               <Item icon={Upload} onClick={act(onResetCustom)}>
-                Use my data
+                Import network data (EPANET / GeoJSON)
               </Item>
+              {onOpenBenchmark && (
+                <Item icon={BarChart3} onClick={act(onOpenBenchmark)}>
+                  Accuracy & Benchmark report
+                </Item>
+              )}
               {customData && (
                 <Item
                   icon={Database}

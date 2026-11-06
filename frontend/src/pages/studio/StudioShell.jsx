@@ -15,6 +15,7 @@ import StudioAiAuditDrawer from './StudioAiAuditDrawer.jsx';
 import { client } from '../../api/client.js';
 import DataCatalogModal from '../../components/DataCatalogModal.jsx';
 import ImportWizardModal from '../../components/ImportWizardModal.jsx';
+import BenchmarkAnalyticsModal from '../../components/BenchmarkAnalyticsModal.jsx';
 import FeatureInspectorPanel from '../../components/FeatureInspectorPanel.jsx';
 import '../../styles/studio/shell.css';
 
@@ -89,6 +90,8 @@ function StudioWorkspace({ initialNetwork, networkSource }) {
   const [viewMode, setViewMode] = useState('schematic'); // 'schematic' | 'geographic' | 'terrain3d'
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [benchmarkOpen, setBenchmarkOpen] = useState(false);
+  const [benchmarkData, setBenchmarkData] = useState(null);
   const [inspectedFeature, setInspectedFeature] = useState(null);
   const [activeLayerIds, setActiveLayerIds] = useState([
     'bwssb_water_lines_detailed_part_1',
@@ -422,6 +425,16 @@ function StudioWorkspace({ initialNetwork, networkSource }) {
         open={importOpen}
         onClose={() => setImportOpen(false)}
         onImportStaged={handleImportStaged}
+        onOpenBenchmark={(b) => {
+          setBenchmarkData(b);
+          setBenchmarkOpen(true);
+        }}
+      />
+
+      <BenchmarkAnalyticsModal
+        open={benchmarkOpen}
+        onClose={() => setBenchmarkOpen(false)}
+        initialData={benchmarkData}
       />
 
       <StudioAiAuditDrawer

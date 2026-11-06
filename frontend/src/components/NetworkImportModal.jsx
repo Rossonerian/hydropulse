@@ -137,7 +137,11 @@ export default function NetworkImportModal({
     setFileName(file.name);
     const format = detectFormat(file.name);
     if (!format) {
-      setError('Unsupported file type. Choose a .inp, .geojson or .json file.');
+      if (file.name.toLowerCase().endsWith('.csv')) {
+        setError('CSV files contain table data or point coordinates, not EPANET network topology. To import an operational water network, select an EPANET .inp file or GeoJSON pipes/junctions. To view benchmark metrics, see the Accuracy & Benchmark report.');
+      } else {
+        setError('Unsupported file type. Choose a .inp, .geojson or .json file.');
+      }
       return;
     }
     if (file.size > MAX_BYTES) {
@@ -194,8 +198,10 @@ export default function NetworkImportModal({
   };
 
   const meta = preview?.proposed_meta;
-  const canActivate = live && preview?.valid && token.trim() && !busy && !checking;
-  const needsToken = live && (preview?.valid || customActive || !preview);
+  const requiresAdmin = Boolean(health?.require_admin_auth);
+  const hasValidToken = !requiresAdmin || Boolean(token.trim());
+  const canActivate = live && preview?.valid && hasValidToken && !busy && !checking;
+  const needsToken = live && requiresAdmin;
 
   // 1 Upload, 2 Validate, 3 Activate. 4 means everything is complete.
   // Shown beside the disabled button so it is always clear why it cannot be pressed.
@@ -204,7 +210,7 @@ export default function NetworkImportModal({
   else if (checking || busy) activateReason = 'Please wait a moment.';
   else if (!preview) activateReason = 'Choose a file first.';
   else if (!preview.valid) activateReason = 'The file has errors. Fix them and choose it again.';
-  else if (!token.trim()) activateReason = 'Enter the admin token below first.';
+  else if (requiresAdmin && !token.trim()) activateReason = 'Enter the admin token below first.';
 
   const stepNow = done ? 4 : preview?.valid ? 3 : preview || checking ? 2 : 1;
 
@@ -350,24 +356,26 @@ export default function NetworkImportModal({
           Activating replaces the shared workspace for all visitors until reset.
         </p>
 
-        {needsToken && (
-          <>
-            <Field
-              label="Admin token"
-              htmlFor="import-admin-token"
-              hint="Needed to activate or reset. Kept only in this dialog and cleared when it closes."
-            >
-              <input
-                id="import-admin-token"
-                className="import__text"
-                type="password"
-                autoComplete="off"
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-                disabled={!!busy}
-              />
-            </Field>
-          </>
+        {needsToken ? (
+          <Field
+            label="Admin token"
+            htmlFor="import-admin-token"
+            hint="Needed to activate or reset. Kept only in this dialog and cleared when it closes."
+          >
+            <input
+              id="import-admin-token"
+              className="import__text"
+              type="password"
+              autoComplete="off"
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+              disabled={!!busy}
+            />
+          </Field>
+        ) : (
+          <p className="import__msg import__msg--info">
+            Local/Demo mode — Admin authentication is not required to activate or reset networks.
+          </p>
         )}
 
         {error && (
@@ -384,11 +392,11 @@ export default function NetworkImportModal({
             size="sm"
             onClick={resetToDemo}
             busy={busy === 'reset'}
-            disabled={!live || !token.trim() || !!busy}
+            disabled={!live || (requiresAdmin && !token.trim()) || !!busy}
           >
             Reset to demo network
           </Button>
-          {live && !token.trim() && <span className="import__reset-hint"> Enter the admin token above to enable.</span>}
+          {live && requiresAdmin && !token.trim() && <span className="import__reset-hint"> Enter the admin token above to enable.</span>}
         </div>
           </>
         )}

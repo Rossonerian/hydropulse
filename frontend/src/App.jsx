@@ -18,6 +18,7 @@ import { useHydroPulse } from './hooks/useHydroPulse.js';
 import { Stepper, NextActionButton } from './components/NextAction.jsx';
 import AssistantPanel from './components/assistant/AssistantPanel.jsx';
 import ExportReportModal from './components/ExportReportModal.jsx';
+import BenchmarkAnalyticsModal from './components/BenchmarkAnalyticsModal.jsx';
 import OperationsChatbot from './components/assistant/OperationsChatbot.jsx';
 import { useAssistant } from './hooks/useAssistant.js';
 import { reportText, copyText } from './lib/opsFlow.js';
@@ -101,6 +102,8 @@ export default function App() {
   const [help, setHelp] = useState(false);
   const [roi, setRoi] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [benchmarkOpen, setBenchmarkOpen] = useState(false);
+  const [benchmarkData, setBenchmarkData] = useState(null);
   const [aiAdvisorOpen, setAiAdvisorOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [entry, setEntry] = useState(readEntry);
@@ -481,6 +484,7 @@ export default function App() {
       onDataSource={openDataSource}
       onResetCustom={() => setImportOpen(true)}
       onAiAdvisor={() => setAiAdvisorOpen((v) => !v)}
+      onOpenBenchmark={() => setBenchmarkOpen(true)}
       assistantPanel={
         <AssistantPanel
           assistant={assistant}
@@ -508,6 +512,11 @@ export default function App() {
             phase={phase}
             judge={judge}
             revealed={revealed}
+          />
+          <BenchmarkAnalyticsModal
+            open={benchmarkOpen}
+            onClose={() => setBenchmarkOpen(false)}
+            initialData={benchmarkData}
           />
           <OperationsChatbot
             open={aiAdvisorOpen}
