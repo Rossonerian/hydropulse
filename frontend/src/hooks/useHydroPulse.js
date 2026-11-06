@@ -212,8 +212,8 @@ function writeStorageCache(key, data) {
       `${CACHE_KEY_PREFIX}.${key}`,
       JSON.stringify({ ...data, cachedAt: new Date().toISOString() }),
     );
-  } catch {
-    // SessionStorage quota exceeded or unavailable
+  } catch (err) {
+    console.debug('SessionStorage quota exceeded or unavailable:', err);
   }
 }
 
@@ -410,8 +410,8 @@ export function useHydroPulse() {
       sessionStorage.removeItem(`${CACHE_KEY_PREFIX}.mock`);
       setIsCached(false);
       load();
-    } catch {
-      // Storage unavailable
+    } catch (err) {
+      console.debug('Storage unavailable for clearCache:', err);
     }
   };
 

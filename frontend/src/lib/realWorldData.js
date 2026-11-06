@@ -1024,6 +1024,86 @@ export const TIME_SERIES_DATA = {
   ],
 };
 
+export const DEFAULT_BENCHMARK_ROWS = [
+  { strategy: 'betweenness_separated', sensors: 'J72, J29, J64, J95, J47', noise_pct: 0.0, top1_pct: 86.2, top3_pct: 100.0, mean_err_m: 13.6, median_err_m: 0.0, p90_err_m: 70.3, p50_latency_ms: 297, p95_latency_ms: 517 },
+  { strategy: 'betweenness_separated', sensors: 'J72, J29, J64, J95, J47', noise_pct: 1.5, top1_pct: 51.2, top3_pct: 85.0, mean_err_m: 79.7, median_err_m: 0.0, p90_err_m: 226.5, p50_latency_ms: 297, p95_latency_ms: 493 },
+  { strategy: 'betweenness_separated', sensors: 'J72, J29, J64, J95, J47', noise_pct: 3.0, top1_pct: 37.5, top3_pct: 67.5, mean_err_m: 123.7, median_err_m: 105.6, p90_err_m: 293.0, p50_latency_ms: 291, p95_latency_ms: 517 },
+  { strategy: 'betweenness_separated', sensors: 'J72, J29, J64, J95, J47', noise_pct: 5.0, top1_pct: 27.5, top3_pct: 48.8, mean_err_m: 156.3, median_err_m: 127.2, p90_err_m: 378.0, p50_latency_ms: 279, p95_latency_ms: 488 },
+  { strategy: 'betweenness_top', sensors: 'J72, J71, J83, J62, J73', noise_pct: 0.0, top1_pct: 66.2, top3_pct: 87.5, mean_err_m: 50.6, median_err_m: 0.0, p90_err_m: 146.4, p50_latency_ms: 134, p95_latency_ms: 348 },
+  { strategy: 'betweenness_top', sensors: 'J72, J71, J83, J62, J73', noise_pct: 1.5, top1_pct: 20.0, top3_pct: 42.5, mean_err_m: 223.2, median_err_m: 187.2, p90_err_m: 475.5, p50_latency_ms: 136, p95_latency_ms: 333 },
+  { strategy: 'betweenness_top', sensors: 'J72, J71, J83, J62, J73', noise_pct: 3.0, top1_pct: 16.2, top3_pct: 30.0, mean_err_m: 295.5, median_err_m: 248.5, p90_err_m: 580.8, p50_latency_ms: 129, p95_latency_ms: 332 },
+  { strategy: 'betweenness_top', sensors: 'J72, J71, J83, J62, J73', noise_pct: 5.0, top1_pct: 15.0, top3_pct: 25.0, mean_err_m: 391.2, median_err_m: 320.2, p90_err_m: 783.3, p50_latency_ms: 127, p95_latency_ms: 359 },
+];
+
+/**
+ * Parse benchmark metrics CSV or Markdown table into structured rows.
+ */
+export function parseBenchmarkCsv(content) {
+  if (!content || typeof content !== 'string') return null;
+  const lines = content.trim().split('\n').map((l) => l.trim()).filter(Boolean);
+  if (lines.length < 2) return null;
+
+  const isPipe = lines[0].includes('|');
+  const splitLine = (str) => {
+    if (isPipe) {
+      return str.split('|').slice(1, -1).map((s) => s.trim());
+    }
+    // Simple CSV parser supporting quotes
+    const re = /(".*?"|[^",\s]+)(?=\s*,|\s*$)/g;
+    const matches = str.match(/(?:,|\n|^)("(?:(?:"")*[^"]*)*"|[^",\n]*|(?:\n|$))/g) || [];
+    return matches.map((m) => m.replace(/^,/, '').replace(/^"(.*)"$/, '$1').trim());
+  };
+
+  const headerRow = splitLine(lines[0]).map((h) => h.toLowerCase());
+  const rows = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const raw = lines[i];
+    if (isPipe && (raw.includes('---') || raw.includes(':---'))) continue;
+    const cols = splitLine(raw);
+    if (!cols.length || cols.every((c) => !c)) continue;
+
+    const rowObj = {};
+    headerRow.forEach((h, idx) => {
+      const val = cols[idx] !== undefined ? cols[idx] : '';
+      const num = parseFloat(val);
+      rowObj[h] = !isNaN(num) && /^-?\d+(\.\d+)?$/.test(val) ? num : val;
+    });
+
+    // Normalize keys
+    const strat = rowObj.sensor_strategy || rowObj['sensor strategy'] || rowObj.strategy || 'custom_strategy';
+    const sens = rowObj.sensors || '';
+    const noise = parseFloat(rowObj.noise_pct ?? rowObj['noise %'] ?? rowObj.noise ?? 0);
+    const top1 = parseFloat(rowObj.top1_pct ?? rowObj['top-1 %'] ?? rowObj.top1 ?? rowObj.accuracy ?? 0);
+    const top3 = parseFloat(rowObj.top3_pct ?? rowObj['top-3 %'] ?? rowObj.top3 ?? 0);
+    const meanErr = parseFloat(rowObj.mean_err_m ?? rowObj['mean err (m)'] ?? rowObj.err_mean ?? 0);
+    const medErr = parseFloat(rowObj.median_err_m ?? rowObj['median err (m)'] ?? rowObj.err_median ?? 0);
+    const p90Err = parseFloat(rowObj.p90_err_m ?? rowObj['p90 err (m)'] ?? rowObj.err_p90 ?? 0);
+    const p50 = parseFloat(rowObj.p50_latency_ms ?? rowObj['p50 latency (ms)'] ?? rowObj.ms_p50 ?? rowObj.compute_time_ms ?? 0);
+    const p95 = parseFloat(rowObj.p95_latency_ms ?? rowObj['p95 latency (ms)'] ?? rowObj.ms_p95 ?? 0);
+
+    rows.push({
+      strategy: String(strat),
+      sensors: String(sens),
+      noise_pct: isNaN(noise) ? 0 : noise,
+      top1_pct: isNaN(top1) ? 0 : top1,
+      top3_pct: isNaN(top3) ? 0 : top3,
+      mean_err_m: isNaN(meanErr) ? 0 : meanErr,
+      median_err_m: isNaN(medErr) ? 0 : medErr,
+      p90_err_m: isNaN(p90Err) ? 0 : p90Err,
+      p50_latency_ms: isNaN(p50) ? 0 : p50,
+      p95_latency_ms: isNaN(p95) ? 0 : p95,
+      raw: rowObj,
+    });
+  }
+
+  return {
+    rawHeaders: headerRow,
+    rows: rows.length ? rows : DEFAULT_BENCHMARK_ROWS,
+    totalRows: rows.length,
+  };
+}
+
 /**
  * Filter catalog datasets by search text and category
  */
@@ -1102,12 +1182,33 @@ export function validateImportedFile(fileName, content, assetType = 'potable_wat
     const lines = content.trim().split('\n');
     if (lines.length > 1) {
       const header = lines[0].toLowerCase();
-      const hasCoords = (header.includes('lat') && header.includes('lon')) || (header.includes('x') && header.includes('y'));
-      if (hasCoords) {
+      const hasCoords = (header.includes('lat') && (header.includes('lon') || header.includes('lng'))) || (header.includes('x') && header.includes('y'));
+
+      // Check if this CSV contains benchmark / performance metrics rather than GIS geometries
+      const benchmarkTokens = ['noise', 'accuracy', 'top1', 'top_1', 'top-1', 'top3', 'top_3', 'top-3', 'latency', 'compute_time', 'ms_p50', 'ms_p95', 'sensor_strategy', 'trials', 'err_mean', 'err_median', 'p90_err'];
+      const matchedTokens = benchmarkTokens.filter((t) => header.includes(t));
+      const isBenchmarkCsv = matchedTokens.length >= 2 || (header.includes('benchmark') && !hasCoords);
+
+      if (isBenchmarkCsv) {
+        result.isBenchmarkMetrics = true;
+        result.valid = false;
+        result.modelReady = false;
+        const parsed = parseBenchmarkCsv(content);
+        result.benchmarkData = {
+          ...parsed,
+          sourceName: fileName,
+          isCustom: true,
+        };
+        result.errors.push('This file contains model benchmark performance statistics (localization accuracy, sensor noise %, compute latency), not geospatial asset coordinates. It cannot be plotted as a geographical map layer.');
+        result.blockingReasons.push('Benchmark files contain algorithmic accuracy statistics without geographic latitude/longitude coordinates.');
+        result.warnings.push('To analyze this benchmark data, open it in the Accuracy & Benchmark Report viewer.');
+      } else if (hasCoords) {
         result.featureCount = lines.length - 1;
         result.valid = true;
       } else {
-        result.errors.push('CSV missing coordinate columns (requires lat/lng or x/y).');
+        result.valid = false;
+        result.errors.push('CSV missing coordinate columns (requires lat/lng or x/y in EPSG:4326).');
+        result.blockingReasons.push('No latitude and longitude columns detected in CSV header. Provide columns such as lat, lng (or x, y).');
       }
     } else {
       result.errors.push('CSV has insufficient rows.');

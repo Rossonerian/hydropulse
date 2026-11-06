@@ -392,35 +392,42 @@
 
 .valve-barrier-marker {
   position: relative;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
   pointer-events: auto;
+  cursor: pointer;
 }
 
 .valve-barrier-glow {
   position: absolute;
-  inset: -4px;
-  border-radius: 6px;
-  background: rgba(245, 158, 11, 0.2);
+  inset: -6px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(245, 158, 11, 0.45) 0%, rgba(245, 158, 11, 0) 70%);
   animation: valveBarrierPulse 2s ease-in-out infinite;
 }
 
 .valve-barrier-badge {
   position: relative;
-  width: 22px;
-  height: 22px;
-  background: var(--surface);
+  width: 26px;
+  height: 26px;
+  background: var(--surface-raised);
   border: 1.5px solid var(--valve);
   color: var(--valve);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 0 12px rgba(245, 158, 11, 0.6);
+  box-shadow: 0 0 14px rgba(245, 158, 11, 0.65);
   z-index: 2;
+  transition: transform var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
+}
+
+.valve-barrier-badge:hover {
+  transform: scale(1.15);
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.9);
 }
 
 /* Pipe flow direction arrow */

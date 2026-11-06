@@ -9,7 +9,7 @@ import {
   useMap,
 } from 'react-leaflet';
 import L from 'leaflet';
-import { Layers2, Crosshair, Maximize2, Minimize2 } from 'lucide-react';
+import { Layers2, Crosshair, Navigation, Maximize2, Minimize2 } from 'lucide-react';
 import SkeletonLoader from './SkeletonLoader.jsx';
 import { basemapProxyUrl } from '../api/client.js';
 import { MapControlStack, MapLegend, IconButton } from '../ui/index.js';
@@ -206,17 +206,21 @@ function MapCanvas({
     });
   }, [colors.water]);
 
-  // Animated pulsing valve barrier marker icon
+  // Animated pulsing valve barrier marker icon (hydraulic bowtie valve symbol)
   const valveBarrierIcon = useMemo(() => L.divIcon({
     className: 'valve-barrier-marker',
     html: `<div class="valve-barrier-glow"></div>
-           <div class="valve-barrier-badge" title="Isolation Valve Closed">
-             <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" fill="none" stroke-width="2.5" stroke-linecap="round">
-               <path d="M4 6h16M12 6v12M4 18h16M7 10l5 4 5-4" />
+           <div class="valve-barrier-badge" title="Isolation Valve Closed (Click for cut-set details)">
+             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+               <polygon points="4,6 12,12 4,18" />
+               <polygon points="20,6 12,12 20,18" />
+               <line x1="12" y1="12" x2="12" y2="4" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+               <line x1="8" y1="4" x2="16" y2="4" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+               <line x1="12" y1="9" x2="12" y2="15" stroke="var(--surface-raised, #0f172a)" stroke-width="2" />
              </svg>
            </div>`,
-    iconSize: [26, 26],
-    iconAnchor: [13, 13],
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
   }), []);
 
   // Sentinel radar pulse icon
@@ -339,9 +343,9 @@ function MapCanvas({
               ]}
               pathOptions={{
                 color: isSelected ? colors.sensor : isolatedPipe ? colors.inkFaint : active ? colors.valve : colors.water,
-                weight: isSelected ? width + 2 : width,
-                opacity: isolatedPipe ? 0.4 : active ? 0.9 : 0.7,
-                dashArray: isolatedPipe ? '6 6' : active ? '8 8' : null,
+                weight: isSelected ? width + 2 : active ? 4.5 : width,
+                opacity: isolatedPipe ? 0.4 : active ? 1.0 : 0.7,
+                dashArray: isolatedPipe ? '6 6' : active ? '8 6' : null,
               }}
               eventHandlers={{
                 click: () => {
@@ -572,20 +576,26 @@ function MapCanvas({
           ))}
 
         {/* Valve markers at pipe midpoints (pulsing barrier badges) */}
-        {valveMarkers.map((vm) => (
-          <Marker
-            key={vm.id}
-            position={vm.position}
-            icon={valveBarrierIcon}
-          >
-            <Tooltip permanent direction='top' offset={[0, -12]}>
-              <div className='map-node-tooltip'>
-                <strong style={{ color: colors.valve }}>SHUT VALVE</strong> · {vm.pipeId}
-                <div style={{ fontSize: '11px', color: colors.ink }}>Isolation Cut-Set</div>
-              </div>
-            </Tooltip>
-          </Marker>
-        ))}
+        {valveMarkers.map((vm) => {
+          const pipeObj = (network?.pipes || []).find((p) => p.id === vm.pipeId);
+          return (
+            <Marker
+              key={vm.id}
+              position={vm.position}
+              icon={valveBarrierIcon}
+            >
+              <Tooltip direction='top' offset={[0, -14]}>
+                <div className='map-node-tooltip'>
+                  <strong style={{ color: colors.valve }}>SHUT ISOLATION VALVE</strong>
+                  <div>Pipe: <b>{vm.pipeId}</b> {pipeObj?.diameter_mm ? `(${pipeObj.diameter_mm}mm)` : ''}</div>
+                  <div style={{ fontSize: '11px', color: colors.inkMuted, marginTop: '2px' }}>
+                    Topological Cut-Set Boundary
+                  </div>
+                </div>
+              </Tooltip>
+            </Marker>
+          );
+        })}
 
         {/* Top candidate leak ring */}
         {result?.predicted_top_candidates?.[0] && byId[result.predicted_top_candidates[0].node_id] && (
@@ -625,7 +635,7 @@ function MapCanvas({
           />
           <IconButton
             label={showFlowArrows ? 'Hide flow arrows' : 'Show flow arrows'}
-            icon={Maximize2}
+            icon={Navigation}
             size='sm'
             pressed={showFlowArrows}
             onClick={() => setShowFlowArrows((v) => !v)}

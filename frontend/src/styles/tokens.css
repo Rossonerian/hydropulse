@@ -100,14 +100,15 @@
   --radius-lg: 10px;
 }
 
-/* Z-index layers */
+/* Z-index layers: Leaflet tile pane is 200, controls are 1000.
+   All application overlays, toolbars, HUDs, sheets, modals, and toasts sit strictly above Leaflet. */
 :root {
   --z-map: 0;
-  --z-dock: 10;
-  --z-mapctl: 20;
-  --z-sheet: 30;
-  --z-modal: 40;
-  --z-toast: 50;
+  --z-dock: 1000;
+  --z-mapctl: 1100;
+  --z-sheet: 1200;
+  --z-modal: 1300;
+  --z-toast: 1400;
 }
 
 /* Motion */

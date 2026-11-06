@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
@@ -28,6 +29,8 @@ from backend.security import (
     register_exception_handlers,
 )
 from data_utils.schemas import (
+    AiChatRequest,
+    AiChatResponse,
     AiSuggestionsResponse,
     ApplySuggestionRequest,
     ApplySuggestionResponse,
@@ -286,6 +289,31 @@ def get_ai_suggestions(
 def apply_ai_suggestion(req: ApplySuggestionRequest) -> ApplySuggestionResponse:
     """Apply a confirmed AI recommendation and promote a new network revision."""
     return ai_advisor.apply_suggestion(_engine(), req)
+
+
+@app.post("/api/ai/chat", response_model=AiChatResponse)
+def ai_chat(
+    req: AiChatRequest,
+    x_openrouter_key: str | None = Header(None, alias="X-OpenRouter-Key"),
+    openrouter_key: str | None = Query(None, alias="openrouter_key"),
+) -> AiChatResponse:
+    """Consult the AI Hydraulic Advisor using OpenRouter or deterministic hydraulic twin."""
+    t0 = time.perf_counter()
+    effective_key = x_openrouter_key or openrouter_key
+    reply, provider, model = ai_advisor.generate_chat_response(
+        message=req.message,
+        context=req.context,
+        history=req.history,
+        client_api_key=effective_key,
+        engine=_engine(),
+    )
+    dt_ms = round((time.perf_counter() - t0) * 1000.0, 1)
+    return AiChatResponse(
+        reply=reply,
+        provider=provider,
+        model=model,
+        compute_time_ms=dt_ms,
+    )
 
 @app.get("/api/network/presets", response_model=NetworkPresetsListResponse)
 def list_network_presets() -> NetworkPresetsListResponse:

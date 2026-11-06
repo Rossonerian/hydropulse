@@ -25,6 +25,33 @@
   outline-offset: 2px;
 }
 
+.import__dropzone {
+  border: 2px dashed var(--line-strong);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  text-align: center;
+  background: var(--surface-sunken);
+  transition: all var(--dur-fast) var(--ease);
+  cursor: pointer;
+}
+.import__dropzone:hover {
+  border-color: var(--water);
+  background: rgba(34, 211, 238, 0.06);
+}
+.import__dropzone-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  cursor: pointer;
+  color: var(--ink-muted);
+  font-size: 13px;
+}
+.import__dropzone-label strong {
+  color: var(--ink);
+  font-size: 14px;
+}
+
 .import__msg {
   margin: 0;
   padding: var(--space-3);

@@ -58,6 +58,51 @@ class OpenRouterClient:
             "max_retries": self._config.openrouter_max_retries,
         }
 
+    def generate_chat_completion(
+        self,
+        messages: List[Dict[str, str]],
+        api_key: Optional[str] = None,
+        transport: Optional[httpx.BaseTransport] = None,
+    ) -> Optional[str]:
+        """Execute chat completion via OpenRouter with caller-provided or configured key."""
+        effective_key = (api_key or self._config.openrouter_api_key or "").strip()
+        if not effective_key:
+            return None
+
+        url = f"{self._config.openrouter_base_url}/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {effective_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://github.com/Rossonerian/hydropulse",
+            "X-Title": "HydroPulse DHARA Hydraulic Copilot",
+        }
+        payload = {
+            "model": self._config.openrouter_model,
+            "messages": messages,
+            "temperature": 0.2,
+            "max_tokens": 600,
+        }
+
+        timeout = httpx.Timeout(
+            timeout=self._config.openrouter_timeout_s,
+            connect=min(self._config.openrouter_connect_timeout_s, self._config.openrouter_timeout_s),
+        )
+        try:
+            with httpx.Client(timeout=timeout, transport=transport) as client:
+                resp = client.post(url, headers=headers, json=payload)
+            if resp.status_code == 200:
+                body = resp.json()
+                choices = body.get("choices")
+                if isinstance(choices, list) and choices:
+                    content = choices[0].get("message", {}).get("content")
+                    if isinstance(content, str) and content.strip():
+                        return content.strip()
+            log.warning("OpenRouter chat returned HTTP %d: %s", resp.status_code, resp.text[:120])
+            return None
+        except Exception as exc:
+            log.warning("OpenRouter chat call failed (%s); using deterministic fallback.", type(exc).__name__)
+            return None
+
     def enrich_suggestions(
         self,
         suggestions: List[AiSuggestion],

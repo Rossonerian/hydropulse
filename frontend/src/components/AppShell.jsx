@@ -41,6 +41,7 @@ export default function AppShell({
   onResetCustom,
   onReplayTour,
   onAiAdvisor,
+  onOpenBenchmark,
   extra,
 }) {
   return (
@@ -58,6 +59,7 @@ export default function AppShell({
         onDataSource={onDataSource}
         onResetCustom={onResetCustom}
         onAiAdvisor={onAiAdvisor}
+        onOpenBenchmark={onOpenBenchmark}
       />
 
       {view === 'studio' ? (

@@ -1,0 +1,9 @@
+sensor_strategy,sensors,noise_pct,top1_pct,top3_pct,mean_err_m,median_err_m,p90_err_m,p50_latency_ms,p95_latency_ms
+betweenness_separated,"J72, J29, J64, J95, J47",0.0,86.2,100.0,13.6,0.0,70.3,297,517
+betweenness_separated,"J72, J29, J64, J95, J47",1.5,51.2,85.0,79.7,0.0,226.5,297,493
+betweenness_separated,"J72, J29, J64, J95, J47",3.0,37.5,67.5,123.7,105.6,293.0,291,517
+betweenness_separated,"J72, J29, J64, J95, J47",5.0,27.5,48.8,156.3,127.2,378.0,279,488
+betweenness_top,"J72, J71, J83, J62, J73",0.0,66.2,87.5,50.6,0.0,146.4,134,348
+betweenness_top,"J72, J71, J83, J62, J73",1.5,20.0,42.5,223.2,187.2,475.5,136,333
+betweenness_top,"J72, J71, J83, J62, J73",3.0,16.2,30.0,295.5,248.5,580.8,129,332
+betweenness_top,"J72, J71, J83, J62, J73",5.0,15.0,25.0,391.2,320.2,783.3,127,359

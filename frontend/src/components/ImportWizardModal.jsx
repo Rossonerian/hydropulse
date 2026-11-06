@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, ArrowRight, Check, CheckCircle2, ShieldAlert, Upload } from 'lucide-react';
+import { AlertTriangle, ArrowRight, BarChart3, Check, CheckCircle2, ShieldAlert, Upload } from 'lucide-react';
 import { Button, Field, Modal, StagedBadge } from '../ui/index.js';
 import { validateImportedFile } from '../lib/realWorldData.js';
 import '../styles/studio/dialogs.css';
@@ -19,7 +19,7 @@ const ASSET_TYPES = [
 
 const STEPS = ['Choose a file', 'Name and type', 'Check it', 'Add to map'];
 
-export default function ImportWizardModal({ open, onClose, onImportStaged }) {
+export default function ImportWizardModal({ open, onClose, onImportStaged, onOpenBenchmark }) {
   const [step, setStep] = useState(1);
   const [file, setFile] = useState(null);
   const [fileContent, setFileContent] = useState('');
@@ -53,13 +53,18 @@ export default function ImportWizardModal({ open, onClose, onImportStaged }) {
       setFileContent(text);
       const res = validateImportedFile(selected.name, text, assetType);
       setValidation(res);
-      setStep(2);
+      if (res.valid) {
+        setStep(2);
+      } else {
+        setStep(1);
+      }
     } catch (err) {
       setValidation({
         valid: false,
         errors: [`Failed to read file: ${err.message}`],
         warnings: [],
       });
+      setStep(1);
     } finally {
       setIsProcessing(false);
     }
@@ -168,11 +173,109 @@ export default function ImportWizardModal({ open, onClose, onImportStaged }) {
                 />
               </label>
             </div>
-            {validation && !validation.valid && validation.errors?.length > 0 && (
-              <div className='stu-wiz__note stu-wiz__note--bad' role='alert'>
-                <AlertTriangle size={16} aria-hidden='true' />
-                <span>{validation.errors[0]}</span>
+            {validation?.isBenchmarkMetrics ? (
+              <div
+                className='stu-wiz__benchmark-card'
+                role='region'
+                aria-label='Benchmark metrics detected'
+                style={{
+                  background: 'var(--surface-raised, #1e293b)',
+                  border: '1px solid var(--water, #00b4d8)',
+                  borderRadius: '8px',
+                  padding: '16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                  marginTop: '12px',
+                }}
+              >
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                  <BarChart3 size={24} style={{ color: 'var(--water, #00b4d8)', flexShrink: 0, marginTop: '2px' }} />
+                  <div>
+                    <h4 style={{ margin: '0 0 4px', fontSize: '14px', color: 'var(--text, #f8fafc)' }}>
+                      Benchmark Performance Metrics Detected
+                    </h4>
+                    <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-dim, #94a3b8)', lineHeight: 1.4 }}>
+                      <b>{file?.name}</b> contains hydraulic model benchmark statistics (localization accuracy percentages, sensor noise, compute latency), not geospatial asset coordinates. It cannot be plotted as a spatial map layer (pipelines or borewells).
+                    </p>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    gap: '8px',
+                    background: 'var(--surface, #0f172a)',
+                    padding: '10px',
+                    borderRadius: '6px',
+                    fontSize: '11px',
+                  }}
+                >
+                  <div>
+                    <span style={{ color: 'var(--text-dim, #94a3b8)', display: 'block' }}>Detected Rows:</span>
+                    <b style={{ color: 'var(--text, #f8fafc)' }}>{validation.benchmarkData?.rows?.length || 0} benchmark rows</b>
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--text-dim, #94a3b8)', display: 'block' }}>Noise Range:</span>
+                    <b style={{ color: 'var(--water, #00b4d8)' }}>0.0% – 5.0% noise</b>
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--text-dim, #94a3b8)', display: 'block' }}>Top-1 Accuracy:</span>
+                    <b style={{ color: 'var(--success, #10b981)' }}>Up to 86.2%</b>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '4px' }}>
+                  <Button
+                    variant='primary'
+                    size='sm'
+                    icon={BarChart3}
+                    onClick={() => {
+                      onOpenBenchmark?.(validation.benchmarkData);
+                      onClose();
+                    }}
+                  >
+                    Open in Accuracy & Benchmark Report
+                  </Button>
+                  <Button
+                    variant='ghost'
+                    size='sm'
+                    onClick={() => {
+                      setFile(null);
+                      setFileContent('');
+                      setValidation(null);
+                    }}
+                  >
+                    Choose another file
+                  </Button>
+                </div>
               </div>
+            ) : (
+              validation && !validation.valid && (
+                <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div className='stu-wiz__note stu-wiz__note--bad' role='alert'>
+                    <AlertTriangle size={16} aria-hidden='true' />
+                    <span>{validation.errors[0]}</span>
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '11px',
+                      color: 'var(--text-dim, #94a3b8)',
+                      background: 'var(--surface-raised, #1e293b)',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--line, #334155)',
+                    }}
+                  >
+                    <b>Expected coordinate format for CSV map layers:</b>
+                    <div style={{ fontFamily: 'var(--font-mono, monospace)', marginTop: '4px', color: 'var(--text, #f8fafc)' }}>
+                      id, name, lat, lng, type<br />
+                      BW1, Kengeri Borewell 1, 12.9081, 77.4852, borewell
+                    </div>
+                  </div>
+                </div>
+              )
             )}
             <div className='stu-wiz__note'>
               <ShieldAlert size={16} aria-hidden='true' />

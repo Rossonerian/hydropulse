@@ -137,7 +137,38 @@ export default function NetworkImportModal({
     setFileName(file.name);
     const format = detectFormat(file.name);
     if (!format) {
-      setError('Unsupported file type. Choose a .inp, .geojson or .json file.');
+      if (file.name.toLowerCase().endsWith('.csv')) {
+        setError('CSV files contain table data or point coordinates, not EPANET network topology. To import an operational water network, select an EPANET .inp file or GeoJSON pipes/junctions. To view benchmark metrics, see the Accuracy & Benchmark report.');
+      } else {
+        setError('Unsupported file type. Choose a .inp, .geojson or .json file.');
+      }
+      return;
+    }
+    if (file.size > MAX_BYTES) {
+      setError(`File is too large (${(file.size / 1e6).toFixed(1)} MB). The limit is 2 MB.`);
+      return;
+    }
+    const content = await file.text();
+    await runPreview({ name: file.name, format, content });
+  };
+
+  const handleDrop = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const file = e.dataTransfer?.files?.[0];
+    if (!file) return;
+    seq.current += 1;
+    setPreview(null);
+    setError('');
+    setIsSample(false);
+    setFileName(file.name);
+    const format = detectFormat(file.name);
+    if (!format) {
+      if (file.name.toLowerCase().endsWith('.csv')) {
+        setError('CSV files contain table data or point coordinates, not EPANET network topology. To import an operational water network, select an EPANET .inp file or GeoJSON pipes/junctions. To view benchmark metrics, see the Accuracy & Benchmark report.');
+      } else {
+        setError('Unsupported file type. Choose a .inp, .geojson or .json file.');
+      }
       return;
     }
     if (file.size > MAX_BYTES) {
@@ -154,8 +185,8 @@ export default function NetworkImportModal({
     setToken('');
     try {
       await onActivated?.();
-    } catch {
-      /* reload errors surface through the hook's own error state */
+    } catch (err) {
+      console.debug('[NetworkImportModal activation error]', err);
     }
     notify('water', message);
     setDone(message);
@@ -194,8 +225,10 @@ export default function NetworkImportModal({
   };
 
   const meta = preview?.proposed_meta;
-  const canActivate = live && preview?.valid && token.trim() && !busy && !checking;
-  const needsToken = live && (preview?.valid || customActive || !preview);
+  const requiresAdmin = Boolean(health?.require_admin_auth);
+  const hasValidToken = !requiresAdmin || Boolean(token.trim());
+  const canActivate = live && preview?.valid && hasValidToken && !busy && !checking;
+  const needsToken = live && requiresAdmin;
 
   // 1 Upload, 2 Validate, 3 Activate. 4 means everything is complete.
   // Shown beside the disabled button so it is always clear why it cannot be pressed.
@@ -204,7 +237,7 @@ export default function NetworkImportModal({
   else if (checking || busy) activateReason = 'Please wait a moment.';
   else if (!preview) activateReason = 'Choose a file first.';
   else if (!preview.valid) activateReason = 'The file has errors. Fix them and choose it again.';
-  else if (!token.trim()) activateReason = 'Enter the admin token below first.';
+  else if (requiresAdmin && !token.trim()) activateReason = 'Enter the admin token below first.';
 
   const stepNow = done ? 4 : preview?.valid ? 3 : preview || checking ? 2 : 1;
 
@@ -227,7 +260,7 @@ export default function NetworkImportModal({
   );
 
   return (
-    <Modal open={open} onClose={onClose} title="Use your own data" footer={footer} initialFocusRef={fileRef}>
+    <Modal open={open} onClose={onClose} title="Import Network (EPANET / GeoJSON)" footer={footer} initialFocusRef={fileRef}>
       <div className="import">
         <ol className="import__steps" aria-label="Import progress">
           {STEPS.map((label, i) => {
@@ -261,11 +294,20 @@ export default function NetworkImportModal({
           </p>
         )}
 
-        <Field
-          label="Network file"
-          htmlFor="import-file"
-          hint="EPANET .inp, or GeoJSON (.geojson / .json). Maximum 2 MB. The file is checked before anything changes."
+        <div
+          className="import__dropzone"
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          onDrop={handleDrop}
+          onClick={() => fileRef.current?.click()}
         >
+          <div className="import__dropzone-label">
+            <strong>Drop EPANET .inp or GeoJSON file here</strong>
+            <span>or click to browse your computer (Max 2 MB)</span>
+            {fileName && <span style={{ color: 'var(--water)', marginTop: '4px' }}>Selected: {fileName}</span>}
+          </div>
           <input
             ref={fileRef}
             id="import-file"
@@ -274,8 +316,9 @@ export default function NetworkImportModal({
             accept=".inp,.geojson,.json"
             onChange={handleFile}
             disabled={!live || checking || !!busy}
+            style={{ display: 'none' }}
           />
-        </Field>
+        </div>
 
         <div className="import__sample">
           <Button variant="secondary" size="sm" onClick={trySample} disabled={!live || checking || !!busy}>
@@ -350,24 +393,26 @@ export default function NetworkImportModal({
           Activating replaces the shared workspace for all visitors until reset.
         </p>
 
-        {needsToken && (
-          <>
-            <Field
-              label="Admin token"
-              htmlFor="import-admin-token"
-              hint="Needed to activate or reset. Kept only in this dialog and cleared when it closes."
-            >
-              <input
-                id="import-admin-token"
-                className="import__text"
-                type="password"
-                autoComplete="off"
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-                disabled={!!busy}
-              />
-            </Field>
-          </>
+        {needsToken ? (
+          <Field
+            label="Admin token"
+            htmlFor="import-admin-token"
+            hint="Needed to activate or reset. Kept only in this dialog and cleared when it closes."
+          >
+            <input
+              id="import-admin-token"
+              className="import__text"
+              type="password"
+              autoComplete="off"
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+              disabled={!!busy}
+            />
+          </Field>
+        ) : (
+          <p className="import__msg import__msg--info">
+            Local/Demo mode — Admin authentication is not required to activate or reset networks.
+          </p>
         )}
 
         {error && (
@@ -384,11 +429,11 @@ export default function NetworkImportModal({
             size="sm"
             onClick={resetToDemo}
             busy={busy === 'reset'}
-            disabled={!live || !token.trim() || !!busy}
+            disabled={!live || (requiresAdmin && !token.trim()) || !!busy}
           >
             Reset to demo network
           </Button>
-          {live && !token.trim() && <span className="import__reset-hint"> Enter the admin token above to enable.</span>}
+          {live && requiresAdmin && !token.trim() && <span className="import__reset-hint"> Enter the admin token above to enable.</span>}
         </div>
           </>
         )}

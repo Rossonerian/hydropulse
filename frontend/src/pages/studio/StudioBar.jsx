@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   ChevronDown,
-  Compass,
   GitBranch,
   Map,
   Pencil,
@@ -9,6 +8,7 @@ import {
   Redo2,
   Sparkles,
   Undo2,
+  ArrowRightCircle,
 } from 'lucide-react';
 import { Button, IconButton, SegmentedControl } from '../../ui/index.js';
 import '../../styles/studio/shell.css';
@@ -16,7 +16,6 @@ import '../../styles/studio/shell.css';
 const VIEW_OPTIONS = [
   { value: 'schematic', label: 'Schematic', icon: GitBranch },
   { value: 'geographic', label: 'Map', icon: Map },
-  { value: 'terrain3d', label: 'Terrain', icon: Compass },
 ];
 
 /** Compact icon button used by canvas controls. */
@@ -139,6 +138,8 @@ export default function StudioBar({
   onSimulateWhatIf,
   isSimulating = false,
   onOpenAiAudit,
+  onDeployToOperations,
+  isDeploying = false,
 }) {
   const fileItems = [
     { label: 'Load Kengeri sample', onSelect: loadDemo, disabled: readOnly },
@@ -220,6 +221,18 @@ export default function StudioBar({
           >
             AI Audit
           </Button>
+          {onDeployToOperations && (
+            <Button
+              size='sm'
+              variant='primary'
+              icon={ArrowRightCircle}
+              onClick={onDeployToOperations}
+              disabled={isDeploying || !canExport}
+              title='Export this network plan to EPANET format and activate it in live Operations SCADA'
+            >
+              {isDeploying ? 'Deploying…' : 'Deploy to Operations'}
+            </Button>
+          )}
         </div>
       )}
 

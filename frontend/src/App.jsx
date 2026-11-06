@@ -18,6 +18,7 @@ import { useHydroPulse } from './hooks/useHydroPulse.js';
 import { Stepper, NextActionButton } from './components/NextAction.jsx';
 import AssistantPanel from './components/assistant/AssistantPanel.jsx';
 import ExportReportModal from './components/ExportReportModal.jsx';
+import BenchmarkAnalyticsModal from './components/BenchmarkAnalyticsModal.jsx';
 import OperationsChatbot from './components/assistant/OperationsChatbot.jsx';
 import { useAssistant } from './hooks/useAssistant.js';
 import { reportText, copyText } from './lib/opsFlow.js';
@@ -42,8 +43,8 @@ function writeEntry(v) {
   try {
     if (v) localStorage.setItem(ENTRY_KEY, v);
     else localStorage.removeItem(ENTRY_KEY);
-  } catch {
-    /* storage unavailable: choice just isn't remembered */
+  } catch (err) {
+    console.debug('[HydroPulse entry storage unavailable]', err);
   }
 }
 
@@ -51,15 +52,16 @@ const TOUR_KEY = 'hp-tour';
 function tourDone() {
   try {
     return localStorage.getItem(TOUR_KEY) === 'done';
-  } catch {
+  } catch (err) {
+    console.debug('[HydroPulse tour storage read]', err);
     return false;
   }
 }
 function markTourDone() {
   try {
     localStorage.setItem(TOUR_KEY, 'done');
-  } catch {
-    /* storage unavailable: tour may show again */
+  } catch (err) {
+    console.debug('[HydroPulse tour storage write]', err);
   }
 }
 
@@ -101,6 +103,8 @@ export default function App() {
   const [help, setHelp] = useState(false);
   const [roi, setRoi] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [benchmarkOpen, setBenchmarkOpen] = useState(false);
+  const [benchmarkData, setBenchmarkData] = useState(null);
   const [aiAdvisorOpen, setAiAdvisorOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [entry, setEntry] = useState(readEntry);
@@ -134,16 +138,26 @@ export default function App() {
   }, [presets, activePresetId]);
 
   const handleSelectPreset = useCallback((p) => {
+    if (phase !== 'idle' || lastResult !== null) {
+      reset();
+      setRevealed(false);
+      setActiveTab('simulate');
+    }
     setActivePresetId(p.id);
     setSelected(p.target_node_id);
     setArea(p.leak_area_cm2);
     setNoise(p.noise_pct);
-  }, []);
+  }, [phase, lastResult, reset]);
 
   const handlePickSpot = useCallback((nodeId) => {
+    if (phase !== 'idle' || lastResult !== null) {
+      reset();
+      setRevealed(false);
+      setActiveTab('simulate');
+    }
     setSelected(nodeId);
     setActivePresetId(null);
-  }, []);
+  }, [phase, lastResult, reset]);
 
   const handleSizeChange = useCallback((newArea) => {
     setArea(newArea);
@@ -208,16 +222,22 @@ export default function App() {
   }, [error]);
 
   // Node selection: sets target junction cleanly as string ID and clears preset lock
+  // Auto-resets simulation state so operators can immediately retest a new junction
   const handleSelectNode = useCallback(
     (nodeOrId) => {
       const id = typeof nodeOrId === 'string' ? nodeOrId : nodeOrId?.id;
       if (!id) return;
       if (!judge) {
+        if (phase !== 'idle' || lastResult !== null) {
+          reset();
+          setRevealed(false);
+          setActiveTab('simulate');
+        }
         setSelected(id);
         setActivePresetId(null);
       }
     },
-    [judge],
+    [judge, phase, lastResult, reset],
   );
 
   const run = useCallback(
@@ -481,6 +501,7 @@ export default function App() {
       onDataSource={openDataSource}
       onResetCustom={() => setImportOpen(true)}
       onAiAdvisor={() => setAiAdvisorOpen((v) => !v)}
+      onOpenBenchmark={() => setBenchmarkOpen(true)}
       assistantPanel={
         <AssistantPanel
           assistant={assistant}
@@ -508,6 +529,11 @@ export default function App() {
             phase={phase}
             judge={judge}
             revealed={revealed}
+          />
+          <BenchmarkAnalyticsModal
+            open={benchmarkOpen}
+            onClose={() => setBenchmarkOpen(false)}
+            initialData={benchmarkData}
           />
           <OperationsChatbot
             open={aiAdvisorOpen}
@@ -681,6 +707,8 @@ export default function App() {
           <NetworkStudio
             initialNetwork={activeNetwork}
             networkSource={networkSource}
+            onNetworkActivated={handleNetworkChanged}
+            onSwitchToOperations={() => setView('operations')}
           />
         </Suspense>
       }

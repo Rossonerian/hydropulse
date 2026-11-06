@@ -256,3 +256,88 @@ export function validateDraft(draft) {
 
   return { errors, warnings };
 }
+
+/**
+ * Serialize draft nodes and pipes into a standard EPANET 2.0 .inp file.
+ * Handles both geographic and schematic coordinates with Bengaluru projection fallback.
+ */
+export function exportNetworkToInp(network, projectName = 'HydroPulse Plan') {
+  const nodes = network?.nodes || [];
+  const pipes = network?.pipes || [];
+
+  const junctions = nodes.filter(
+    (n) => n.type === 'junction' || !['reservoir', 'tank'].includes(n.type),
+  );
+  const reservoirs = nodes.filter((n) => n.type === 'reservoir');
+  const tanks = nodes.filter((n) => n.type === 'tank');
+
+  const lines = [
+    '[TITLE]',
+    ` ${projectName}`,
+    '',
+    '[JUNCTIONS]',
+    ';ID                      Elevation       Demand          Pattern',
+  ];
+
+  for (const j of junctions) {
+    const elev = Number.isFinite(Number(j.elevation_m)) ? Number(j.elevation_m) : 800.0;
+    const demand = Number.isFinite(Number(j.base_demand_lps)) ? Number(j.base_demand_lps) : 1.5;
+    lines.push(` ${j.id.padEnd(23)} ${elev.toFixed(2).padEnd(15)} ${demand.toFixed(2)}`);
+  }
+
+  lines.push('', '[RESERVOIRS]', ';ID                      Head            Pattern');
+  for (const r of reservoirs) {
+    const head = Number.isFinite(Number(r.head_m || r.elevation_m))
+      ? Number(r.head_m || r.elevation_m)
+      : 845.0;
+    lines.push(` ${r.id.padEnd(23)} ${head.toFixed(2)}`);
+  }
+  // Ensure at least one source exists for hydraulic solvability
+  if (!reservoirs.length && !tanks.length && junctions.length) {
+    const baseElev = junctions[0].elevation_m ? Number(junctions[0].elevation_m) : 800;
+    lines.push(` R1                      ${(baseElev + 40).toFixed(2)}`);
+  }
+
+  lines.push(
+    '',
+    '[TANKS]',
+    ';ID                      Elevation   InitLevel   MinLevel    MaxLevel    Diameter    MinVol      VolCurve',
+  );
+  for (const t of tanks) {
+    const elev = Number.isFinite(Number(t.elevation_m)) ? Number(t.elevation_m) : 820.0;
+    lines.push(` ${t.id.padEnd(23)} ${elev.toFixed(2).padEnd(11)} 5.0         1.0         10.0        15.0        0           ;`);
+  }
+
+  lines.push(
+    '',
+    '[PIPES]',
+    ';ID                   Node1                Node2                              Length             Diameter            Roughness           Minor Loss               Status',
+  );
+  for (const p of pipes) {
+    const len = Number.isFinite(Number(p.length_m)) && Number(p.length_m) > 0 ? Number(p.length_m) : 150.0;
+    const diam = Number.isFinite(Number(p.diameter_mm)) && Number(p.diameter_mm) > 0 ? Number(p.diameter_mm) : 150.0;
+    const status = (p.status || 'OPEN').toUpperCase() === 'CLOSED' ? 'Closed' : 'Open';
+    lines.push(
+      ` ${p.id.padEnd(20)} ${p.source.padEnd(20)} ${p.target.padEnd(34)} ${len.toFixed(2).padEnd(18)} ${diam.toFixed(2).padEnd(19)} 120                 0                   ${status}`,
+    );
+  }
+
+  lines.push('', '[OPTIONS]', 'Units    LPS', 'Headloss H-W', '', '[TIMES]', 'Duration 0', '');
+
+  lines.push('[COORDINATES]', ';Node                 X-Coord              Y-Coord');
+  for (const n of nodes) {
+    let lng = Number(n.lng);
+    let lat = Number(n.lat);
+    // If invalid or missing real coordinates, project schematic x/y into Kengeri, Bengaluru bounds
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < 12.0 || lng < 77.0) {
+      const sx = Number.isFinite(Number(n.x)) ? Number(n.x) : 100;
+      const sy = Number.isFinite(Number(n.y)) ? Number(n.y) : 100;
+      lng = 77.4800 + (sx % 1000) * 0.00008;
+      lat = 12.9050 + (sy % 1000) * 0.00008;
+    }
+    lines.push(` ${n.id.padEnd(20)} ${lng.toFixed(6).padEnd(20)} ${lat.toFixed(6)}`);
+  }
+
+  lines.push('', '[END]', '');
+  return lines.join('\n');
+}

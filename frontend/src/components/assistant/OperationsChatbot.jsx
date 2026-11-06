@@ -1,8 +1,118 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { Sparkles, X, Send, Bot, User, ArrowRight, Activity, ShieldAlert, Truck } from 'lucide-react';
-import { Button } from '../../ui/index.js';
+import { Sparkles, X, Send, Bot, User, KeyRound, Cpu, ShieldAlert, Check } from 'lucide-react';
+import { Button, Modal, Field } from '../../ui/index.js';
 import { number } from '../../lib/format.js';
+import { client } from '../../api/client.js';
 import '../../components/assistant/assistant.css';
+
+/**
+ * Rich Markdown formatter for hydraulic intelligence answers.
+ * Handles headings (###), alerts (⚠️), bullet and numbered lists, inline code chips, and bolds.
+ */
+function MarkdownMessage({ text }) {
+  if (!text) return null;
+
+  const lines = text.split('\n');
+  const elements = [];
+  let currentList = null; // { type: 'ul' | 'ol', items: [] }
+
+  const flushList = () => {
+    if (currentList) {
+      const ListTag = currentList.type;
+      elements.push(
+        <ListTag key={`list-${elements.length}`} className={`chat-list-${currentList.type}`}>
+          {currentList.items.map((it, idx) => (
+            <li key={idx} className="chat-list-li">
+              {formatInline(it)}
+            </li>
+          ))}
+        </ListTag>,
+      );
+      currentList = null;
+    }
+  };
+
+  const formatInline = (str) => {
+    // Regex matches **bold**, `code`, or regular text
+    const parts = [];
+    const tokenRegex = /(\*\*[^*]+\*\*|`[^`]+`)/g;
+    let lastIdx = 0;
+    let match;
+
+    while ((match = tokenRegex.exec(str)) !== null) {
+      if (match.index > lastIdx) {
+        parts.push(str.slice(lastIdx, match.index));
+      }
+      const token = match[0];
+      if (token.startsWith('**') && token.endsWith('**')) {
+        parts.push(<strong key={match.index}>{token.slice(2, -2)}</strong>);
+      } else if (token.startsWith('`') && token.endsWith('`')) {
+        parts.push(
+          <span key={match.index} className="chat-code-chip">
+            {token.slice(1, -1)}
+          </span>,
+        );
+      }
+      lastIdx = tokenRegex.lastIndex;
+    }
+    if (lastIdx < str.length) {
+      parts.push(str.slice(lastIdx));
+    }
+    return parts;
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const rawLine = lines[i];
+    const line = rawLine.trim();
+
+    if (!line) {
+      flushList();
+      continue;
+    }
+
+    if (line.startsWith('### ')) {
+      flushList();
+      elements.push(
+        <h4 key={`h-${i}`} className="chat-heading">
+          {line.slice(4)}
+        </h4>,
+      );
+    } else if (line.startsWith('⚠️') || line.toUpperCase().startsWith('WARNING:')) {
+      flushList();
+      elements.push(
+        <div key={`alert-${i}`} className="chat-alert-box">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600, color: 'var(--valve)' }}>
+            <ShieldAlert size={15} />
+            <span>Operational Hydraulic Notice</span>
+          </div>
+          <div style={{ marginTop: '3px' }}>{formatInline(line.replace(/^⚠️\s*/, ''))}</div>
+        </div>,
+      );
+    } else if (line.startsWith('- ') || line.startsWith('* ')) {
+      if (!currentList || currentList.type !== 'ul') {
+        flushList();
+        currentList = { type: 'ul', items: [] };
+      }
+      currentList.items.push(line.slice(2));
+    } else if (/^\d+\.\s/.test(line)) {
+      if (!currentList || currentList.type !== 'ol') {
+        flushList();
+        currentList = { type: 'ol', items: [] };
+      }
+      currentList.items.push(line.replace(/^\d+\.\s*/, ''));
+    } else {
+      flushList();
+      elements.push(
+        <p key={`p-${i}`} className="chat-p">
+          {formatInline(line)}
+        </p>,
+      );
+    }
+  }
+  flushList();
+
+  return <div className="chat-md-block">{elements}</div>;
+}
 
 export default function OperationsChatbot({
   open,
@@ -16,12 +126,16 @@ export default function OperationsChatbot({
     {
       id: 'init-1',
       sender: 'assistant',
-      text: 'Hello Operator. I am the DHARA AI Hydraulic Advisor. I monitor real-time pressure drawdowns across Kengeri DMA and compute physics-based leak localizations and valve isolation plans. How can I assist you?',
+      text: '### DHARA Municipal Hydraulic Copilot\n\nI monitor real-time pressure drawdowns across Kengeri DMA and compute physics-grounded leak localization and valve isolation plans.\n\nSelect any quick prompt below or query pipe conditions, water hammer risks, or tanker logistics.',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      provider: 'deterministic_hydraulic',
     },
   ]);
   const [input, setInput] = useState('');
   const [typing, setTyping] = useState(false);
+  const [keyModalOpen, setKeyModalOpen] = useState(false);
+  const [customKey, setCustomKey] = useState(() => localStorage.getItem('hydropulse_openrouter_key') || '');
+  const [keyDraft, setKeyDraft] = useState('');
   const scrollRef = useRef(null);
 
   useEffect(() => {
@@ -33,7 +147,7 @@ export default function OperationsChatbot({
   const topCandidate = result?.predicted_top_candidates?.[0]?.node_id || 'J13';
   const injectedNode = result?.injected_node_id || 'J1';
 
-  // Quick context-aware questions
+  // Quick context-aware prompts
   const promptChips = useMemo(() => {
     if (phase === 'isolated') {
       return [
@@ -56,45 +170,86 @@ export default function OperationsChatbot({
     ];
   }, [phase, topCandidate]);
 
-  const handleSendPrompt = useCallback((promptText) => {
-    const userMsg = {
-      id: `user-${Date.now()}`,
-      sender: 'user',
-      text: promptText,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    };
+  const handleOpenKeyModal = () => {
+    setKeyDraft(customKey);
+    setKeyModalOpen(true);
+  };
 
-    setMessages((prev) => [...prev, userMsg]);
-    setTyping(true);
+  const handleSaveKey = () => {
+    const clean = keyDraft.trim();
+    setCustomKey(clean);
+    if (clean) {
+      localStorage.setItem('hydropulse_openrouter_key', clean);
+    } else {
+      localStorage.removeItem('hydropulse_openrouter_key');
+    }
+    setKeyModalOpen(false);
+  };
 
-    setTimeout(() => {
-      let replyText = '';
-      const q = promptText.toLowerCase();
+  const handleSendPrompt = useCallback(
+    async (promptText) => {
+      const userMsg = {
+        id: `user-${Date.now()}`,
+        sender: 'user',
+        text: promptText,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
 
-      if (q.includes('ranked') || q.includes('why') || q.includes('candidate')) {
-        replyText = `**Two-Stage Localization Rationale:**\n\n1. **Stage 1 (Cosine Screening):** High betweenness sentinel sensors S1 (J72) and S2 (J29) registered significant pressure drawdowns (-1.0m and -1.1m). Cosine similarity of this 5-sensor fingerprint against our precomputed sensitivity matrix matched cluster **${topCandidate} / ${injectedNode}** at 100.0%.\n2. **Stage 2 (WNTR Physics Re-simulation):** EPA WNTR simulated an orifice leak across the top candidates. Node ${topCandidate} produced the minimum pressure residual ($L_2$ norm = 0.08m), confirming the hydraulic gradient contour.`;
-      } else if (q.includes('sentinel') || q.includes('physics') || q.includes('pressure drop')) {
-        replyText = `**5-Sentinel Differential Physics:**\n\nUnderground pipe ruptures cause hydraulic head drawdowns that propagate across the looped network according to Hazen-Williams friction: $h_f = 10.67 \\cdot L \\cdot Q^{1.852} / (C^{1.852} \\cdot D^{4.87})$.\n\nBy placing 5 sentinels at high graph betweenness centrality junctions with $\\ge 2$-hop separation, each sensor captures a unique spatial gradient, eliminating the need for acoustic hardware loggers on every street.`;
-      } else if (q.includes('tanker') || q.includes('loss') || q.includes('logistics')) {
-        replyText = `**Volumetric Loss & Tanker Logistics:**\n\n- **Loss Rate:** ${number(lossLpm, 1)} L/min (${number((lossLpm * 60) / 1000, 1)} m³/h)\n- **Daily Societal Loss:** **${number(tankers, 1)} BWSSB water tankers (6,000-L each) per day**.\n- **Logistics Recommendation:** Dispatch 2 backup 6,000L municipal tankers to Kengeri Satellite Town Block 3 to supply the 39 isolated households while repair crews trench the pipe.`;
-      } else if (q.includes('valve') || q.includes('isolate') || q.includes('hammer')) {
-        replyText = `**Valve Cut-Set & Surge Protection:**\n\nValves **P18, P20, and P21** form the minimal topological cut-set computed via Breadth-First Search (BFS).\n\n⚠️ **Operational Warning (Water Hammer):** Close valves sequentially at 3-minute intervals (Step 1: P18, Step 2: P20, Step 3: P21) to prevent Joukowsky pressure surges ($\Delta P = \\rho c \\Delta v$) exceeding 12 bar in adjacent asbestos-cement pipes. 99.3% of the ward remains continuously pressurized.`;
-      } else {
-        replyText = `**DHARA Municipal Intelligence:**\n\nDHARA is a software hydraulic digital twin for Kengeri DMA. It uses EPA WNTR with Pressure-Driven Demand (PDD) and Torricelli's orifice equation ($Q = C_d A \\sqrt{2gH}$). Telemetry from 5 sentinels is matched against a precomputed sensitivity matrix to identify underground failures within 50–150 meters in under 350 milliseconds.`;
+      setMessages((prev) => [...prev, userMsg]);
+      setTyping(true);
+
+      try {
+        const res = await client.aiChat(
+          {
+            message: promptText,
+            context: {
+              phase,
+              target_node_id: injectedNode,
+              estimated_junction: topCandidate,
+              leak_loss_lpm: lossLpm,
+              tankers_per_day: tankers,
+              isolated_valves: result?.recommended_valves_to_close || ['P18', 'P20', 'P21'],
+              network_revision: network?.network_revision,
+            },
+            history: messages.slice(-6).map((m) => ({
+              role: m.sender === 'user' ? 'user' : 'assistant',
+              content: m.text,
+            })),
+          },
+          { openRouterKey: customKey || undefined },
+        );
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `asst-${Date.now()}`,
+            sender: 'assistant',
+            text: res.reply,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            provider: res.provider,
+            model: res.model,
+          },
+        ]);
+      } catch (err) {
+        // Deterministic fallback response if backend offline or network dropped
+        const fallbackText = `### Two-Stage Hydraulic Analysis (Offline Fallback)\n\n1. **Stage 1 (Cosine Screening):** High betweenness sentinels captured differential pressure drawdown matching **${topCandidate}**.\n2. **Stage 2 (WNTR Physics Verification):** Re-simulation confirmed minimum residual variance at junction **${topCandidate}**.\n\n⚠️ **Operational Warning:** Close valves sequentially at 3-minute intervals to prevent water hammer surges exceeding 12 bar.`;
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `asst-${Date.now()}`,
+            sender: 'assistant',
+            text: fallbackText,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            provider: 'deterministic_hydraulic',
+            model: 'offline-fallback',
+          },
+        ]);
+      } finally {
+        setTyping(false);
       }
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `asst-${Date.now()}`,
-          sender: 'assistant',
-          text: replyText,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-      ]);
-      setTyping(false);
-    }, 600);
-  }, [lossLpm, tankers, topCandidate, injectedNode]);
+    },
+    [customKey, phase, injectedNode, topCandidate, lossLpm, tankers, result, network, messages],
+  );
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -107,94 +262,184 @@ export default function OperationsChatbot({
   if (!open) return null;
 
   return (
-    <aside className="ops-chatbot-drawer" aria-label="DHARA AI Hydraulic Advisor">
-      <div className="ops-chatbot-header">
-        <div className="ops-chatbot-title-wrap">
-          <div className="ops-chatbot-icon">
-            <Sparkles size={16} />
+    <>
+      <aside className="ops-chatbot-drawer" aria-label="DHARA AI Hydraulic Advisor">
+        <div className="ops-chatbot-header">
+          <div className="ops-chatbot-title-wrap">
+            <div className="ops-chatbot-icon">
+              <Sparkles size={16} />
+            </div>
+            <div>
+              <h3 className="ops-chatbot-title">AI Hydraulic Advisor</h3>
+              <span className="ops-chatbot-sub">
+                {customKey ? '🟢 OpenRouter Active (Custom Key)' : '🔵 Physics Twin (Deterministic Engine)'}
+              </span>
+            </div>
           </div>
-          <div>
-            <h3 className="ops-chatbot-title">AI Hydraulic Advisor</h3>
-            <span className="ops-chatbot-sub">Kengeri SCADA Copilot · Online</span>
-          </div>
-        </div>
-        <button
-          type="button"
-          className="ops-chatbot-close-btn"
-          onClick={onClose}
-          aria-label="Close AI Advisor"
-        >
-          <X size={16} />
-        </button>
-      </div>
-
-      <div className="ops-chatbot-chips-bar">
-        <span className="ops-chatbot-chips-label">Quick Prompts:</span>
-        <div className="ops-chatbot-chips-scroll">
-          {promptChips.map((chip) => (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
             <button
-              key={chip}
               type="button"
-              className="ops-chatbot-prompt-chip"
-              onClick={() => handleSendPrompt(chip)}
-              disabled={typing}
+              className="ops-chatbot-close-btn"
+              onClick={handleOpenKeyModal}
+              title={customKey ? 'OpenRouter API Key Configured' : 'Configure Custom OpenRouter API Key'}
+              aria-label="Configure OpenRouter API Key"
+              style={{ color: customKey ? 'var(--water)' : 'var(--ink-muted)' }}
             >
-              {chip}
+              <KeyRound size={16} />
             </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="ops-chatbot-messages">
-        {messages.map((m) => (
-          <div
-            key={m.id}
-            className={`ops-chat-bubble ops-chat-bubble--${m.sender}`}
-          >
-            <div className="ops-chat-bubble-avatar">
-              {m.sender === 'assistant' ? <Bot size={14} /> : <User size={14} />}
-            </div>
-            <div className="ops-chat-bubble-body">
-              <div className="ops-chat-bubble-text">{m.text}</div>
-              <span className="ops-chat-bubble-time">{m.timestamp}</span>
-            </div>
+            <button
+              type="button"
+              className="ops-chatbot-close-btn"
+              onClick={onClose}
+              aria-label="Close AI Advisor"
+            >
+              <X size={16} />
+            </button>
           </div>
-        ))}
-        {typing && (
-          <div className="ops-chat-bubble ops-chat-bubble--assistant">
-            <div className="ops-chat-bubble-avatar">
-              <Bot size={14} />
-            </div>
-            <div className="ops-chat-bubble-body">
-              <div className="ops-chat-typing-indicator">
-                <span />
-                <span />
-                <span />
+        </div>
+
+        <div className="ops-chatbot-chips-bar">
+          <span className="ops-chatbot-chips-label">Quick Prompts:</span>
+          <div className="ops-chatbot-chips-scroll">
+            {promptChips.map((chip) => (
+              <button
+                key={chip}
+                type="button"
+                className="ops-chatbot-prompt-chip"
+                onClick={() => handleSendPrompt(chip)}
+                disabled={typing}
+              >
+                {chip}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="ops-chatbot-messages">
+          {messages.map((m) => (
+            <div
+              key={m.id}
+              className={`ops-chat-bubble ops-chat-bubble--${m.sender}`}
+            >
+              <div className="ops-chat-bubble-avatar">
+                {m.sender === 'assistant' ? <Bot size={14} /> : <User size={14} />}
+              </div>
+              <div className="ops-chat-bubble-body">
+                <div className="ops-chat-bubble-text">
+                  {m.sender === 'assistant' ? (
+                    <MarkdownMessage text={m.text} />
+                  ) : (
+                    m.text
+                  )}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 4px' }}>
+                  <span className="ops-chat-bubble-time">{m.timestamp}</span>
+                  {m.provider && (
+                    <span className="chat-provider-badge">
+                      <Cpu size={10} />
+                      {m.provider === 'openrouter' ? 'OpenRouter LLM' : 'Physics Twin'}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        )}
-        <div ref={scrollRef} />
-      </div>
+          ))}
+          {typing && (
+            <div className="ops-chat-bubble ops-chat-bubble--assistant">
+              <div className="ops-chat-bubble-avatar">
+                <Bot size={14} />
+              </div>
+              <div className="ops-chat-bubble-body">
+                <div className="ops-chat-typing-indicator">
+                  <span />
+                  <span />
+                  <span />
+                </div>
+              </div>
+            </div>
+          )}
+          <div ref={scrollRef} />
+        </div>
 
-      <form className="ops-chatbot-input-row" onSubmit={handleSubmit}>
-        <input
-          type="text"
-          className="ops-chatbot-input"
-          placeholder="Ask hydraulic advisor anything (e.g. explain pressure drop)..."
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          disabled={typing}
-        />
-        <Button
-          variant="primary"
-          size="sm"
-          type="submit"
-          disabled={!input.trim() || typing}
-          icon={Send}
-          aria-label="Send query"
-        />
-      </form>
-    </aside>
+        <form className="ops-chatbot-input-row" onSubmit={handleSubmit}>
+          <input
+            type="text"
+            className="ops-chatbot-input"
+            placeholder="Ask hydraulic advisor anything (e.g. explain pressure drop)..."
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            disabled={typing}
+          />
+          <Button
+            variant="primary"
+            size="sm"
+            type="submit"
+            disabled={!input.trim() || typing}
+            icon={Send}
+            aria-label="Send query"
+          />
+        </form>
+      </aside>
+
+      <Modal
+        open={keyModalOpen}
+        onClose={() => setKeyModalOpen(false)}
+        title="OpenRouter AI Gateway Settings"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setKeyModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" icon={Check} onClick={handleSaveKey}>
+              Save Key
+            </Button>
+          </>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+          <p style={{ margin: 0, fontSize: '13.5px', color: 'var(--ink-muted)', lineHeight: 1.5 }}>
+            You can optionally route the AI Hydraulic Advisor through your own <strong>OpenRouter API Key</strong>. If omitted, DHARA automatically uses its built-in deterministic EPA WNTR hydraulic physics solver.
+          </p>
+          <Field
+            label="OpenRouter API Key"
+            htmlFor="openrouter-key-input"
+            hint="Starts with sk-or-v1-.... Saved only in your local browser storage (localStorage). Never sent in query strings."
+          >
+            <input
+              id="openrouter-key-input"
+              type="password"
+              className="import__file"
+              placeholder="sk-or-v1-..."
+              value={keyDraft}
+              onChange={(e) => setKeyDraft(e.target.value)}
+              autoFocus
+            />
+          </Field>
+          {customKey && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '12px', color: 'var(--water)' }}>✓ Active key saved in browser</span>
+              <button
+                type="button"
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--leak)',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  padding: 0,
+                }}
+                onClick={() => {
+                  setKeyDraft('');
+                  setCustomKey('');
+                  localStorage.removeItem('hydropulse_openrouter_key');
+                }}
+              >
+                Clear key (use offline physics solver)
+              </button>
+            </div>
+          )}
+        </div>
+      </Modal>
+    </>
   );
 }

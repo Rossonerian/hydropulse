@@ -17,6 +17,7 @@ from fastapi.testclient import TestClient
 
 from backend.main import app
 from data_utils.schemas import (
+    AiChatResponse,
     AiSuggestionsResponse,
     ApplySuggestionResponse,
     AutoValveResponse,
@@ -514,6 +515,99 @@ def test_network_import_preview_validation_and_safety(client):
     assert rev_before == rev_after
 
 
+def test_network_import_commit_and_reset_sample_inp(client):
+    """POST /api/network/import/preview followed by /api/network/import/commit successfully activates new network."""
+    sample_inp = """[TITLE]
+HydroPulse sample network
+
+[JUNCTIONS]
+;ID  Elev  Demand
+J1   900   2
+J2   898   2
+J3   897   2
+J4   896   2
+J5   895   2
+
+[RESERVOIRS]
+;ID  Head
+R1   935
+
+[PIPES]
+;ID Node1 Node2 Length Diameter Roughness MinorLoss Status
+P1  R1    J1    300    200      130       0         Open
+P2  J1    J2    250    150      130       0         Open
+P3  J2    J3    250    150      130       0         Open
+P4  J2    J4    250    100      130       0         Open
+P5  J4    J5    250    100      130       0         Open
+
+[OPTIONS]
+Units    LPS
+Headloss H-W
+
+[TIMES]
+Duration 0
+
+[COORDINATES]
+;Node  X        Y
+R1     77.4838  12.9081
+J1     77.4846  12.9081
+J2     77.4852  12.9081
+J3     77.4860  12.9081
+J4     77.4852  12.9073
+J5     77.4852  12.9065
+
+[END]
+"""
+    h_before = client.get("/api/health").json()
+    rev_before = h_before["network_revision"]
+
+    # 1. Preview
+    prev_r = client.post(
+        "/api/network/import/preview",
+        json={"format": "inp", "filename": "sample_test.inp", "content": sample_inp},
+    )
+    assert prev_r.status_code == 200, prev_r.text
+    prev_data = prev_r.json()
+    assert prev_data["valid"] is True
+    token = prev_data["preview_token"]
+    assert token is not None
+
+    # 2. Commit
+    commit_r = client.post(
+        "/api/network/import/commit",
+        json={
+            "preview_token": token,
+            "expected_network_revision": rev_before,
+            "confirm": True,
+        },
+    )
+    assert commit_r.status_code == 200, commit_r.text
+    commit_data = commit_r.json()
+    assert commit_data["committed"] is True
+    rev_imported = commit_data["new_network_revision"]
+    assert rev_imported != rev_before
+
+    # Verify active network state
+    h_active = client.get("/api/health").json()
+    assert h_active["network_revision"] == rev_imported
+    assert h_active["num_junctions"] == 5
+    assert set(h_active["sensor_ids"]) == {"J1", "J2", "J3", "J4", "J5"}
+
+    # Verify network endpoint
+    net_r = client.get("/api/network")
+    assert net_r.status_code == 200
+    net_data = net_r.json()
+    node_ids = {n["id"] for n in net_data["nodes"]}
+    assert {"J1", "J2", "J3", "J4", "J5", "R1"}.issubset(node_ids)
+
+    # 3. Reset back to baseline
+    reset_r = client.post("/api/network/reset", json={"target": "baseline"})
+    assert reset_r.status_code == 200, reset_r.text
+    h_reset = client.get("/api/health").json()
+    assert h_reset["num_junctions"] == h_before["num_junctions"]
+    assert h_reset["source"] in ("synthetic", "osm")
+
+
 def test_network_build_preview_commit_and_reset_lifecycle(client):
     """Full builder lifecycle: preview proposed elements, commit (rev advances), verify rollback via reset."""
     h0 = client.get("/api/health").json()
@@ -757,3 +851,62 @@ def test_safe_auto_valve_state_machine_and_safety_gates(client):
     assert res_reset.status == "reset"
     assert res_reset.active_valve_closures == []
     assert res_reset.emergency_stop is False
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# 6. AI Hydraulic Advisor Chat Endpoint (POST /api/ai/chat)
+# ═════════════════════════════════════════════════════════════════════════════
+
+def test_ai_chat_endpoint_deterministic_and_custom_key(client):
+    """POST /api/ai/chat returns structured markdown answer, provider, and model."""
+    # 1. Localization question
+    r1 = client.post(
+        "/api/ai/chat",
+        json={
+            "message": "Why was J13 ranked over J15?",
+            "context": {"estimated_junction": "J13", "phase": "located", "leak_loss_lpm": 210.0},
+        },
+    )
+    assert r1.status_code == 200, f"AI chat failed: {r1.text}"
+    resp1 = AiChatResponse.model_validate(r1.json())
+    assert resp1.provider == "deterministic_hydraulic"
+    assert "Two-Stage Physics" in resp1.reply
+    assert "J13" in resp1.reply
+
+    # 2. Water hammer and valve isolation question
+    r2 = client.post(
+        "/api/ai/chat",
+        json={
+            "message": "What is the water hammer risk during valve closure?",
+            "context": {"isolated_valves": ["P18", "P20"], "phase": "isolated"},
+        },
+    )
+    assert r2.status_code == 200
+    resp2 = AiChatResponse.model_validate(r2.json())
+    assert "Joukowsky" in resp2.reply or "hammer" in resp2.reply.lower()
+    assert "CAUTION" in resp2.reply
+
+    # 3. Tanker logistics question
+    r3 = client.post(
+        "/api/ai/chat",
+        json={
+            "message": "How many water tankers are lost per day?",
+            "context": {"leak_loss_lpm": 250.0},
+        },
+    )
+    assert r3.status_code == 200
+    resp3 = AiChatResponse.model_validate(r3.json())
+    assert "tanker" in resp3.reply.lower()
+    assert "L/min" in resp3.reply
+
+    # 4. Caller provided OpenRouter key header fallback test
+    r4 = client.post(
+        "/api/ai/chat",
+        headers={"X-OpenRouter-Key": "sk-or-v1-invalid-dummy-key"},
+        json={"message": "General hydraulic question"},
+    )
+    assert r4.status_code == 200
+    resp4 = AiChatResponse.model_validate(r4.json())
+    # With dummy key that fails auth/connect, gracefully falls back to deterministic hydraulic solver
+    assert resp4.provider in ("openrouter", "deterministic_hydraulic")
+    assert len(resp4.reply) > 20
