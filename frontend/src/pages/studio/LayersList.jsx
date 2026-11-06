@@ -7,7 +7,6 @@ const MAP_LAYERS = [
   { key: 'valves', label: 'Valves (sluice and air)', group: 'water' },
   { key: 'infrastructure', label: 'Pumping stations', group: 'water' },
   { key: 'groundwater', label: 'Public borewells', group: 'water' },
-  { key: 'terrain', label: 'Terrain surface', group: 'water' },
   { key: 'sewerage', label: 'Sewerage (non-potable)', group: 'sewer' },
   { key: 'surface_water', label: 'Hydrology and lakes', group: 'sewer' },
   { key: 'monitors', label: 'Telemetry and monitors', group: 'monitoring' },
@@ -36,9 +35,8 @@ export default function LayersList({
   activeLayerIds,
   toggleCatalogLayer,
   stagedLayers,
-  viewMode,
 }) {
-  const mapLayers = viewMode === 'terrain3d' ? MAP_LAYERS : MAP_LAYERS.filter((layer) => layer.key !== 'terrain');
+  const mapLayers = MAP_LAYERS;
   const onCount = mapLayers.filter((layer) => visibleLayers[layer.key] ?? true).length;
 
   return (

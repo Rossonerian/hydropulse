@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect } from 'react';
 import {
   Background,
   BackgroundVariant,
@@ -18,8 +18,6 @@ import { nodeTypes, NODE_TYPES } from './nodes.jsx';
 import { edgeTypes } from './edges.jsx';
 import { Button, IconButton } from '../../ui/index.js';
 import '../../styles/studio/canvas.css';
-import '../../styles/studio/terrain.css';
-import Terrain3DViewer from '../../components/Terrain3DViewer.jsx';
 import GeographicMapCanvas from '../../components/GeographicMapCanvas.jsx';
 
 function FlowViewport({ draft, viewVersion }) {
@@ -28,72 +26,6 @@ function FlowViewport({ draft, viewVersion }) {
     flow.setViewport(draft.editor_layout.viewport || { x: 0, y: 0, zoom: 1 }, { duration: 0 });
   }, [flow, draft.project.id, viewVersion]);
   return null;
-}
-
-const TERRAIN_TIMEOUT_MS = 8000;
-
-/** Terrain view of the draft: needs placed junctions (lat/lng); shows a reason otherwise. */
-function TerrainPane({ draft, onSwitchView, inspectedFeature, setInspectedFeature, showIllustrativeDepth, setShowIllustrativeDepth, visibleLayers }) {
-  const [selected, setSelected] = useState(null);
-  const [ready, setReady] = useState(false);
-  const [timedOut, setTimedOut] = useState(false);
-
-  // The viewer reads { nodes[{lat,lng,...}], pipes[{source,target,...}], sensor_ids }.
-  // Draft items without a geographic position (new, unplaced) cannot be drawn in 3D.
-  const network = useMemo(() => {
-    const nodes = draft.network.nodes.filter((n) => Number.isFinite(n.lat) && Number.isFinite(n.lng));
-    const ids = new Set(nodes.map((n) => n.id));
-    const pipes = draft.network.pipes
-      .filter((p) => ids.has(p.source) && ids.has(p.target))
-      .map((p) => ({ ...p, length_m: p.length_m ?? 0, diameter_mm: p.diameter_mm ?? 150, status: p.status || 'OPEN' }));
-    return { ...draft.network, nodes, pipes, sensor_ids: draft.network.sensor_ids || [] };
-  }, [draft.network]);
-
-  const total = draft.network.nodes.length;
-  const placed = network.nodes.length;
-
-  useEffect(() => {
-    if (ready || !placed) return undefined;
-    const timer = setTimeout(() => setTimedOut(true), TERRAIN_TIMEOUT_MS);
-    return () => clearTimeout(timer);
-  }, [ready, placed]);
-
-  if (!total || !placed) {
-    return (
-      <div className='stu-canvas__terrain'>
-        <div className='stu-terrain-note' role='status'>
-          <p>
-            {total
-              ? 'Terrain needs junctions with a map position. Items added in the schematic do not have one yet.'
-              : 'There is no network to show yet. Load the Kengeri sample first.'}
-          </p>
-          <Button onClick={onSwitchView}>Open Map view</Button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className='stu-canvas__terrain'>
-      <Terrain3DViewer
-        network={network}
-        selected={selected}
-        setSelected={setSelected}
-        selectedFeature={inspectedFeature}
-        onSelectFeature={(feat) => setInspectedFeature(feat)}
-        showIllustrativeDepth={showIllustrativeDepth}
-        onToggleDepth={() => setShowIllustrativeDepth((d) => !d)}
-        visibleLayers={visibleLayers}
-        onReady={() => setReady(true)}
-      />
-      {timedOut && !ready && (
-        <div className='stu-terrain-note' role='alert'>
-          <p>Terrain unavailable on this device. Try Map view.</p>
-          <Button variant='primary' onClick={onSwitchView}>Open Map view</Button>
-        </div>
-      )}
-    </div>
-  );
 }
 
 export default function SchematicCanvas({
@@ -125,9 +57,6 @@ export default function SchematicCanvas({
   visibleLayers,
   toggleLayer,
   stagedLayers,
-  showIllustrativeDepth,
-  setShowIllustrativeDepth,
-  setViewMode,
   onImport,
   readOnly = false,
 }) {
@@ -226,7 +155,7 @@ export default function SchematicCanvas({
             <div className='stu-canvas__hint'><MousePointer2 size={13} />{placeHint}</div>
           </div>
         </>
-      ) : viewMode === 'geographic' ? (
+      ) : (
         <GeographicMapCanvas
           draft={draft}
           tool={tool}
@@ -241,16 +170,6 @@ export default function SchematicCanvas({
           visibleLayers={visibleLayers}
           onToggleLayer={toggleLayer}
           stagedLayers={stagedLayers}
-        />
-      ) : (
-        <TerrainPane
-          draft={draft}
-          onSwitchView={() => setViewMode?.('geographic')}
-          inspectedFeature={inspectedFeature}
-          setInspectedFeature={setInspectedFeature}
-          showIllustrativeDepth={showIllustrativeDepth}
-          setShowIllustrativeDepth={setShowIllustrativeDepth}
-          visibleLayers={visibleLayers}
         />
       )}
     </section>

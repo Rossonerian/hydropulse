@@ -1061,6 +1061,7 @@
   flex-direction: column;
   gap: var(--space-2);
   z-index: var(--z-mapctl);
+  pointer-events: auto;
 }
 
 .map-control-stack .icon-btn {

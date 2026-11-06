@@ -49,8 +49,8 @@ function findTarget(name) {
       const r = el.getBoundingClientRect();
       if (r.width > 4 && r.height > 4 && r.bottom > 0 && r.top < window.innerHeight) return el;
     }
-  } catch {
-    /* ignore */
+  } catch (err) {
+    console.debug('[GuidedTour target search error]', err);
   }
   return null;
 }

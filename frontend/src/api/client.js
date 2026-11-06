@@ -135,6 +135,13 @@ export const client = {
   resetNetwork: ({ target = 'baseline', adminToken } = {}) =>
     networkAdminRequest('/api/network/reset', { target, confirm: true }, adminToken),
   // The OpenRouter key goes in a header only, never the query string.
+  aiChat: (body, { openRouterKey } = {}) =>
+    assistantRequest('/api/ai/chat', {
+      method: 'POST',
+      body,
+      headers: openRouterKey ? { 'X-OpenRouter-Key': openRouterKey } : {},
+      timeoutMs: 25000,
+    }),
   getSuggestions: ({ openRouterKey } = {}) =>
     assistantRequest('/api/ai/suggestions', {
       headers: openRouterKey ? { 'X-OpenRouter-Key': openRouterKey } : {},

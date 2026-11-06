@@ -43,8 +43,8 @@ function writeEntry(v) {
   try {
     if (v) localStorage.setItem(ENTRY_KEY, v);
     else localStorage.removeItem(ENTRY_KEY);
-  } catch {
-    /* storage unavailable: choice just isn't remembered */
+  } catch (err) {
+    console.debug('[HydroPulse entry storage unavailable]', err);
   }
 }
 
@@ -52,15 +52,16 @@ const TOUR_KEY = 'hp-tour';
 function tourDone() {
   try {
     return localStorage.getItem(TOUR_KEY) === 'done';
-  } catch {
+  } catch (err) {
+    console.debug('[HydroPulse tour storage read]', err);
     return false;
   }
 }
 function markTourDone() {
   try {
     localStorage.setItem(TOUR_KEY, 'done');
-  } catch {
-    /* storage unavailable: tour may show again */
+  } catch (err) {
+    console.debug('[HydroPulse tour storage write]', err);
   }
 }
 
@@ -137,16 +138,26 @@ export default function App() {
   }, [presets, activePresetId]);
 
   const handleSelectPreset = useCallback((p) => {
+    if (phase !== 'idle' || lastResult !== null) {
+      reset();
+      setRevealed(false);
+      setActiveTab('simulate');
+    }
     setActivePresetId(p.id);
     setSelected(p.target_node_id);
     setArea(p.leak_area_cm2);
     setNoise(p.noise_pct);
-  }, []);
+  }, [phase, lastResult, reset]);
 
   const handlePickSpot = useCallback((nodeId) => {
+    if (phase !== 'idle' || lastResult !== null) {
+      reset();
+      setRevealed(false);
+      setActiveTab('simulate');
+    }
     setSelected(nodeId);
     setActivePresetId(null);
-  }, []);
+  }, [phase, lastResult, reset]);
 
   const handleSizeChange = useCallback((newArea) => {
     setArea(newArea);
@@ -211,16 +222,22 @@ export default function App() {
   }, [error]);
 
   // Node selection: sets target junction cleanly as string ID and clears preset lock
+  // Auto-resets simulation state so operators can immediately retest a new junction
   const handleSelectNode = useCallback(
     (nodeOrId) => {
       const id = typeof nodeOrId === 'string' ? nodeOrId : nodeOrId?.id;
       if (!id) return;
       if (!judge) {
+        if (phase !== 'idle' || lastResult !== null) {
+          reset();
+          setRevealed(false);
+          setActiveTab('simulate');
+        }
         setSelected(id);
         setActivePresetId(null);
       }
     },
-    [judge],
+    [judge, phase, lastResult, reset],
   );
 
   const run = useCallback(
@@ -690,6 +707,8 @@ export default function App() {
           <NetworkStudio
             initialNetwork={activeNetwork}
             networkSource={networkSource}
+            onNetworkActivated={handleNetworkChanged}
+            onSwitchToOperations={() => setView('operations')}
           />
         </Suspense>
       }

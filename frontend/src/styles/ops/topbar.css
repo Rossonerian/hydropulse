@@ -67,6 +67,31 @@ header.topbar .topbar-custom {
   font-size: 13px;
 }
 
+.topbar-import-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 4px 10px;
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease);
+}
+.topbar-import-btn:hover {
+  background: var(--surface-sunken);
+  border-color: var(--water);
+  color: var(--water);
+}
+@media (max-width: 768px) {
+  .topbar-import-btn span {
+    display: none;
+  }
+}
+
 .topbar-ai-btn {
   display: flex;
   align-items: center;

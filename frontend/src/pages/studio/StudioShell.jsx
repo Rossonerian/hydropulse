@@ -13,26 +13,15 @@ import IntelliSenseHUD from './IntelliSenseHUD.jsx';
 import StudioSimulationBanner from './StudioSimulationBanner.jsx';
 import StudioAiAuditDrawer from './StudioAiAuditDrawer.jsx';
 import { client } from '../../api/client.js';
+import { exportNetworkToInp, normalizeDraft } from '../../lib/networkStudio.js';
 import DataCatalogModal from '../../components/DataCatalogModal.jsx';
 import ImportWizardModal from '../../components/ImportWizardModal.jsx';
 import BenchmarkAnalyticsModal from '../../components/BenchmarkAnalyticsModal.jsx';
 import FeatureInspectorPanel from '../../components/FeatureInspectorPanel.jsx';
+import { useMediaQuery } from '../../hooks/useMediaQuery.js';
 import '../../styles/studio/shell.css';
 
-function useMediaQuery(query) {
-  const [matches, setMatches] = useState(() => (typeof window !== 'undefined' && window.matchMedia ? window.matchMedia(query).matches : false));
-  useEffect(() => {
-    if (!window.matchMedia) return undefined;
-    const media = window.matchMedia(query);
-    const onChange = () => setMatches(media.matches);
-    onChange();
-    media.addEventListener('change', onChange);
-    return () => media.removeEventListener('change', onChange);
-  }, [query]);
-  return matches;
-}
-
-function StudioWorkspace({ initialNetwork, networkSource }) {
+function StudioWorkspace({ initialNetwork, networkSource, onNetworkActivated, onSwitchToOperations }) {
   const {
     draft,
     dirty,
@@ -87,7 +76,7 @@ function StudioWorkspace({ initialNetwork, networkSource }) {
   } = useStudioDraft({ initialNetwork, networkSource });
 
   // Real-World Data Layer States
-  const [viewMode, setViewMode] = useState('schematic'); // 'schematic' | 'geographic' | 'terrain3d'
+  const [viewMode, setViewMode] = useState('schematic'); // 'schematic' | 'geographic'
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [benchmarkOpen, setBenchmarkOpen] = useState(false);
@@ -111,13 +100,49 @@ function StudioWorkspace({ initialNetwork, networkSource }) {
     surface_water: true,
     monitors: true,
     admin_boundary: true,
-    terrain: true,
   });
-  const [showIllustrativeDepth, setShowIllustrativeDepth] = useState(true);
   const [stagedLayers, setStagedLayers] = useState([]);
   const [simResult, setSimResult] = useState(null);
   const [isSimulating, setIsSimulating] = useState(false);
+  const [isDeploying, setIsDeploying] = useState(false);
   const [aiAuditOpen, setAiAuditOpen] = useState(false);
+
+  const handleDeployToOperations = useCallback(async () => {
+    if (!draft?.network?.nodes?.length) {
+      setNotice('Network is empty. Add nodes and pipes or load a sample first.');
+      return;
+    }
+    setIsDeploying(true);
+    setNotice('Serializing network to EPANET format and activating in Operations SCADA…');
+    try {
+      const inpContent = exportNetworkToInp(draft.network, draft.project.name || 'Studio Custom Plan');
+      const filename = `${(draft.project.name || 'custom_plan').toLowerCase().replace(/\s+/g, '_')}.inp`;
+
+      const preview = await client.importPreview({
+        format: 'inp',
+        filename,
+        content: inpContent,
+        network_name: draft.project.name || 'Custom Plan',
+      });
+
+      if (!preview.valid) {
+        throw new Error(preview.errors?.join('; ') || 'Network validation failed');
+      }
+
+      await client.importCommit({
+        preview_token: preview.preview_token,
+        expected_network_revision: preview.expected_network_revision,
+      });
+
+      setNotice('Network plan successfully activated in Operations SCADA!');
+      await onNetworkActivated?.();
+      onSwitchToOperations?.();
+    } catch (err) {
+      setNotice(`Deploy failed: ${err.message}`);
+    } finally {
+      setIsDeploying(false);
+    }
+  }, [draft, onNetworkActivated, onSwitchToOperations, setNotice]);
 
   const handleSimulateWhatIf = useCallback(async () => {
     setIsSimulating(true);
@@ -266,8 +291,55 @@ function StudioWorkspace({ initialNetwork, networkSource }) {
     />
   );
 
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const files = e.dataTransfer?.files;
+    if (!files || !files.length) return;
+    const file = files[0];
+    const name = file.name.toLowerCase();
+    setNotice(`Reading dropped file "${file.name}"…`);
+    try {
+      const text = await file.text();
+      if (name.endsWith('.json') && text.includes('schema_version')) {
+        const parsed = JSON.parse(text);
+        commit(() => normalizeDraft(parsed));
+        setNotice(`Draft "${file.name}" loaded successfully.`);
+      } else if (name.endsWith('.inp') || name.endsWith('.geojson') || name.endsWith('.json')) {
+        const format = name.endsWith('.geojson') ? 'geojson' : 'inp';
+        const preview = await client.importPreview({
+          format,
+          filename: file.name,
+          content: text,
+        });
+        if (!preview.valid) {
+          throw new Error(preview.errors?.join('; ') || 'Invalid network format');
+        }
+        await client.importCommit({
+          preview_token: preview.preview_token,
+          expected_network_revision: preview.expected_network_revision,
+        });
+        await onNetworkActivated?.();
+        setNotice(`Network "${file.name}" imported and activated successfully.`);
+      } else {
+        setNotice('Please drop an EPANET .inp file, GeoJSON, or HydroPulse draft JSON.');
+      }
+    } catch (err) {
+      setNotice(`Drop import error: ${err.message}`);
+    }
+  };
+
   return (
-    <main className={classes.join(' ')}>
+    <main
+      className={classes.join(' ')}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
       <StudioBar
         projectNameDraft={projectNameDraft}
         setProjectNameDraft={setProjectNameDraft}
@@ -295,6 +367,8 @@ function StudioWorkspace({ initialNetwork, networkSource }) {
         onSimulateWhatIf={handleSimulateWhatIf}
         isSimulating={isSimulating}
         onOpenAiAudit={() => setAiAuditOpen(true)}
+        onDeployToOperations={handleDeployToOperations}
+        isDeploying={isDeploying}
       />
 
       {readOnly && (
@@ -342,8 +416,6 @@ function StudioWorkspace({ initialNetwork, networkSource }) {
               visibleLayers={visibleLayers}
               toggleLayer={toggleLayer}
               stagedLayers={stagedLayers}
-              showIllustrativeDepth={showIllustrativeDepth}
-              setShowIllustrativeDepth={setShowIllustrativeDepth}
               setViewMode={setViewMode}
               onImport={() => setImportOpen(true)}
               readOnly={readOnly}
@@ -450,10 +522,15 @@ function StudioWorkspace({ initialNetwork, networkSource }) {
   );
 }
 
-export default function StudioShell({ initialNetwork, networkSource }) {
+export default function StudioShell({ initialNetwork, networkSource, onNetworkActivated, onSwitchToOperations }) {
   return (
     <ReactFlowProvider>
-      <StudioWorkspace initialNetwork={initialNetwork} networkSource={networkSource} />
+      <StudioWorkspace
+        initialNetwork={initialNetwork}
+        networkSource={networkSource}
+        onNetworkActivated={onNetworkActivated}
+        onSwitchToOperations={onSwitchToOperations}
+      />
     </ReactFlowProvider>
   );
 }

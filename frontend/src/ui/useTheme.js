@@ -17,7 +17,7 @@ try {
     currentTheme = stored;
   }
 } catch (e) {
-  // Silently fail if localStorage is unavailable
+  console.debug('[Theme storage read error]', e);
 }
 
 const subscribers = new Set();
@@ -27,7 +27,7 @@ function broadcastTheme(newTheme) {
     try {
       cb(newTheme);
     } catch (e) {
-      // Ignore callback errors
+      console.debug('[Theme broadcast subscriber error]', e);
     }
   });
 }
@@ -72,7 +72,7 @@ export function useTheme() {
     try {
       localStorage.setItem(THEME_KEY, newTheme);
     } catch (e) {
-      // Silently fail if localStorage is unavailable
+      console.debug('[Theme storage write error]', e);
     }
     broadcastTheme(newTheme);
   }, []);

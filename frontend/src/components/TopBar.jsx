@@ -181,6 +181,16 @@ export default function TopBar({
           )}
         </div>
 
+        <button
+          type="button"
+          className="topbar-import-btn"
+          onClick={onResetCustom}
+          title="Import network (.inp / GeoJSON)"
+        >
+          <Upload size={14} />
+          <span>Import Network</span>
+        </button>
+
         {onAiAdvisor && (
           <button
             type="button"
