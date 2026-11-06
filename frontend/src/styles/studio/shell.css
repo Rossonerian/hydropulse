@@ -353,3 +353,123 @@
     width: 140px;
   }
 }
+
+/* Icon-only tool rail at 1366px and narrower: narrow column, tooltips may overflow it. */
+@media (min-width: 1025px) and (max-width: 1366px) {
+  .stu-shell-workspace {
+    grid-template-columns: 64px minmax(0, 1fr) 320px;
+  }
+  .stu-shell-tools {
+    position: relative;
+    z-index: var(--z-mapctl);
+    overflow: visible;
+  }
+  .stu-shell-tools .stu-rail {
+    overflow: visible;
+  }
+}
+
+/* Studio bar: status, undo/redo next to the name, view mode label read by screen readers only */
+.stu-bar-status {
+  color: var(--ink-muted);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.stu-bar-status.is-dirty {
+  color: var(--valve);
+}
+
+.stu-bar-history {
+  display: inline-flex;
+  gap: var(--space-1);
+}
+
+.stu-bar-views {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.stu-bar-views .segmented__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.stu-bar-views .segmented__btn {
+  flex: none;
+  white-space: nowrap;
+}
+
+.stu-bar-menusep {
+  width: 100%;
+  height: 0;
+  margin: var(--space-1) 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+.stu-bar-desktop {
+  margin-left: auto;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+@media (max-width: 767px) {
+  .stu-bar {
+    gap: var(--space-2);
+  }
+
+  .stu-bar-desktop {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+
+  .stu-bar-views {
+    flex: 1 1 auto;
+  }
+}
+
+/* Layers: one collapsed summary, four groups inside */
+.stu-layers-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.stu-layers-count {
+  color: var(--ink-muted);
+  font-size: 13px;
+}
+
+.stu-layers-body {
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+.stu-layers-body .stu-layers-heading:first-child {
+  margin-top: 0;
+}
+
+/* Toast: lift above the validation footer so it never covers it */
+.stu-shell > .toast {
+  bottom: calc(var(--space-7) + var(--space-5));
+}
+
+@media (max-width: 1023px) {
+  .stu-shell > .toast {
+    bottom: calc(var(--space-7) + var(--space-7));
+    max-width: calc(100% - 2 * var(--space-4));
+  }
+}

@@ -20,7 +20,7 @@
   /* Ink - text colors */
   --ink: #e6eef0;
   --ink-muted: #9db2b9;
-  --ink-faint: #7d959e;
+  --ink-faint: #8aa2ab;
 
   /* Semantic colors */
   --water: #3bc4d6;
@@ -157,8 +157,8 @@
 }
 
 .type-caption {
-  font-size: 12px;
-  line-height: 16px;
+  font-size: 13px;
+  line-height: 18px;
   font-weight: 400;
 }
 

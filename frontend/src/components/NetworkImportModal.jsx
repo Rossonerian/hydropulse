@@ -58,7 +58,7 @@ J5     77.4852  12.9065
 `;
 const SAMPLE_NAME = 'hydropulse-sample.inp';
 
-const STEPS = ['Upload', 'Validate', 'Activate'];
+const STEPS = ['Choose a file', 'Check it', 'Switch to it'];
 
 function detectFormat(name) {
   const lower = name.toLowerCase();
@@ -198,6 +198,14 @@ export default function NetworkImportModal({
   const needsToken = live && (preview?.valid || customActive || !preview);
 
   // 1 Upload, 2 Validate, 3 Activate. 4 means everything is complete.
+  // Shown beside the disabled button so it is always clear why it cannot be pressed.
+  let activateReason = '';
+  if (!live) activateReason = 'Needs the live backend.';
+  else if (checking || busy) activateReason = 'Please wait a moment.';
+  else if (!preview) activateReason = 'Choose a file first.';
+  else if (!preview.valid) activateReason = 'The file has errors. Fix them and choose it again.';
+  else if (!token.trim()) activateReason = 'Enter the admin token below first.';
+
   const stepNow = done ? 4 : preview?.valid ? 3 : preview || checking ? 2 : 1;
 
   const footer = done ? (
@@ -206,6 +214,9 @@ export default function NetworkImportModal({
     </Button>
   ) : (
     <>
+      {!canActivate && activateReason && (
+        <span className="import__reset-hint" role="status">{activateReason}</span>
+      )}
       <Button variant="ghost" onClick={onClose} disabled={!!busy}>
         Cancel
       </Button>
@@ -240,7 +251,7 @@ export default function NetworkImportModal({
           <div className="import__success" role="status">
             <CheckCircle2 size={28} aria-hidden="true" />
             <h3 className="import__success-title">{done}</h3>
-            <p className="import__reset-text">Pick a leak preset or press Simulate burst to see how the network responds.</p>
+            <p className="import__reset-text">Go to Operations and pick a problem to try to see how the network responds.</p>
           </div>
         ) : (
           <>
@@ -296,13 +307,13 @@ export default function NetworkImportModal({
         {preview && (
           <div className="import__result" role="status">
             <p className={`import__badge ${preview.valid ? 'import__badge--ok' : 'import__badge--bad'}`}>
-              {preview.valid ? 'Valid. Ready to activate' : 'Not valid. Fix the errors and try again'}
+              {preview.valid ? 'File is valid and ready to use' : 'File is not valid. Fix the errors and try again'}
             </p>
             {meta && (
               <dl className="import__meta">
                 <dt>Source</dt>
                 <dd>{SOURCE_LABELS[meta.source_type] || meta.source_type}{meta.source_filename ? ` (${meta.source_filename})` : ''}</dd>
-                <dt>Nodes</dt>
+                <dt>Junctions and sources</dt>
                 <dd>{meta.num_nodes}</dd>
                 <dt>Pipes</dt>
                 <dd>{meta.num_pipes}</dd>

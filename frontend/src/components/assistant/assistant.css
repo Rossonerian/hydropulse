@@ -1,0 +1,434 @@
+/* AI assistant surfaces: suggestions, apply confirm, leak explanation, pipe condition, IntelliSense.
+   Tokens only (no raw colours), minimum 12px text, 390px friendly. */
+
+.asst {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  font-family: var(--font-sans);
+  color: var(--ink);
+  min-width: 0;
+}
+
+.asst__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.asst__title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.asst__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.asst__msg {
+  margin: 0;
+  padding: var(--space-3);
+  font-size: 14px;
+  line-height: 1.45;
+  background: var(--surface-sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.asst__msg--warn {
+  border-color: var(--valve);
+}
+
+.asst__msg--bad {
+  border-color: var(--leak);
+}
+
+.asst__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+/* ---- Skeleton ---- */
+.asst-skel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.asst-skel__bar {
+  height: 14px;
+  border-radius: var(--radius-sm);
+  background: var(--line);
+  animation: asst-pulse 1.4s var(--ease) infinite;
+}
+
+.asst-skel__bar:nth-child(2) {
+  width: 80%;
+}
+
+.asst-skel__bar:nth-child(3) {
+  width: 55%;
+}
+
+@keyframes asst-pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* ---- Suggestion card ---- */
+.asst-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+}
+
+.asst-card__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.asst-card__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.asst-card__line {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.asst-card__note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ink-muted);
+}
+
+.asst-card__note--small {
+  color: var(--valve);
+  font-weight: 500;
+}
+
+.asst-card__extra {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-muted);
+  overflow-wrap: anywhere;
+}
+
+.asst-chip {
+  flex: none;
+  padding: 2px var(--space-2);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--ink-muted);
+  background: var(--surface-sunken);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+}
+
+.asst-details {
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+
+.asst-details summary {
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.asst-details summary:focus-visible,
+.asst-hold:focus-visible,
+.asst-input:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.asst-details p {
+  margin: var(--space-1) 0 0;
+  line-height: 1.45;
+}
+
+/* ---- Before / after table ---- */
+.asst-rows {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.asst-rows caption {
+  padding-bottom: var(--space-1);
+  text-align: left;
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+
+.asst-rows th,
+.asst-rows td {
+  padding: var(--space-1) var(--space-2);
+  text-align: left;
+  border-top: 1px solid var(--line);
+  vertical-align: top;
+}
+
+.asst-rows thead th {
+  font-weight: 500;
+  color: var(--ink-muted);
+  border-top: none;
+}
+
+.asst-rows tbody th {
+  font-weight: 400;
+}
+
+.asst-rows td {
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+
+/* ---- Apply modal ---- */
+.asst-apply {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.asst-apply__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.asst-input {
+  width: 100%;
+  min-height: 40px;
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  font-size: 15px;
+  color: var(--ink);
+  background: var(--surface-sunken);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+}
+
+/* Hold to confirm: fill animates over the hold time, keyboard Space/Enter works too. */
+.asst-hold {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--on-leak);
+  background: var(--leak);
+  border: 1px solid var(--leak);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+}
+
+.asst-hold:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.asst-hold__fill {
+  position: absolute;
+  inset: 0;
+  background: var(--ink);
+  opacity: 0.28;
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.asst-hold.is-holding .asst-hold__fill {
+  transform: scaleX(1);
+  transition: transform var(--hold-ms, 1200ms) linear;
+}
+
+.asst-hold__label {
+  position: relative;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .asst-hold.is-holding .asst-hold__fill,
+  .asst-hold__fill,
+  .asst-skel__bar {
+    transition: none;
+    animation: none;
+  }
+}
+
+/* ---- Success toast with Undo ---- */
+.asst-toast {
+  position: fixed;
+  bottom: var(--space-5);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-toast);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  width: min(480px, calc(100vw - 2 * var(--space-4)));
+  padding: var(--space-3) var(--space-4);
+  font-size: 14px;
+  background: var(--surface);
+  border: 1px solid var(--water);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-overlay);
+}
+
+.asst-toast p {
+  flex: 1 1 200px;
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* ---- Leak explain ---- */
+.asst-explain {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  font-family: var(--font-sans);
+  color: var(--ink);
+}
+
+.asst-explain__lines {
+  margin: 0;
+  padding-left: var(--space-4);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.asst-explain__lines li + li {
+  margin-top: var(--space-1);
+}
+
+/* ---- Pipe condition ---- */
+.asst-cond__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.asst-cond__table th,
+.asst-cond__table td {
+  padding: var(--space-2);
+  text-align: left;
+  border-top: 1px solid var(--line);
+}
+
+.asst-cond__table thead th {
+  border-top: none;
+  font-weight: 500;
+  color: var(--ink-muted);
+}
+
+.asst-cond__num {
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+
+.asst-cond__bar {
+  display: block;
+  height: 6px;
+  margin-top: var(--space-1);
+  background: var(--surface-sunken);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.asst-cond__bar > span {
+  display: block;
+  height: 100%;
+  background: var(--water);
+}
+
+.asst-cond__missing {
+  margin: 0;
+  padding-left: var(--space-4);
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+
+/* ---- IntelliSense ---- */
+.asst-facts {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+  font-size: 14px;
+}
+
+.asst-facts dt {
+  color: var(--ink-muted);
+}
+
+.asst-facts dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  text-align: right;
+}
+
+.asst-list {
+  margin: 0;
+  padding-left: var(--space-4);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.asst-list--warn {
+  color: var(--valve);
+}
+
+.asst-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

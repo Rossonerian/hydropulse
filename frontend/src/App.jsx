@@ -15,6 +15,10 @@ import NetworkImportModal from './components/NetworkImportModal.jsx';
 import GuidedTour from './components/GuidedTour.jsx';
 import { Toast } from './ui/index.js';
 import { useHydroPulse } from './hooks/useHydroPulse.js';
+import { Stepper, NextActionButton } from './components/NextAction.jsx';
+import AssistantPanel from './components/assistant/AssistantPanel.jsx';
+import { useAssistant } from './hooks/useAssistant.js';
+import { reportText, copyText } from './lib/opsFlow.js';
 
 // Lazy load NetworkStudio and PressureCharts with React.Suspense
 const NetworkStudio = lazy(() => import('./pages/NetworkStudio.jsx'));
@@ -86,6 +90,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('simulate'); // 'simulate' | 'incident' | 'sensors'
   const [statusAnnouncement, setStatusAnnouncement] = useState('');
   const [selected, setSelected] = useState('J15');
+  const [activePresetId, setActivePresetId] = useState(null);
   const [area, setArea] = useState(25);
   const [noise, setNoise] = useState(1.5);
   const [judge, setJudge] = useState(false);
@@ -100,6 +105,68 @@ export default function App() {
   const [tourOpen, setTourOpen] = useState(() => readEntry() === 'demo' && !tourDone());
 
   const customData = !!health?.source && health.source !== 'synthetic';
+
+  // The shared network changed: reload it, drop the old incident and pick a valid target.
+  const handleNetworkChanged = useCallback(async () => {
+    await pulse.load();
+    reset();
+    setRevealed(false);
+    setSelected('');
+  }, [pulse, reset]);
+
+  // Assistant hook for AI suggestions
+  const assistant = useAssistant({
+    networkRevision: health?.network_revision,
+    enabled: view === 'operations',
+    live: mode === 'live',
+    onNetworkChanged: handleNetworkChanged,
+  });
+
+  // Keep preset aligned initially
+  useEffect(() => {
+    if (!activePresetId && presets?.length) {
+      setActivePresetId(presets[0].id);
+    }
+  }, [presets, activePresetId]);
+
+  const handleSelectPreset = useCallback((p) => {
+    setActivePresetId(p.id);
+    setSelected(p.target_node_id);
+    setArea(p.leak_area_cm2);
+    setNoise(p.noise_pct);
+  }, []);
+
+  const handlePickSpot = useCallback((nodeId) => {
+    setSelected(nodeId);
+    setActivePresetId(null);
+  }, []);
+
+  const handleSizeChange = useCallback((newArea) => {
+    setArea(newArea);
+    setActivePresetId(null);
+  }, []);
+
+  const handleResetAll = useCallback(() => {
+    reset();
+    setRevealed(false);
+    setActivePresetId(null);
+  }, [reset]);
+
+  const handleExportReport = useCallback(async () => {
+    const text = reportText({
+      result: lastResult,
+      network: activeNetwork,
+      phase,
+      judge,
+      revealed,
+    });
+    const ok = await copyText(text);
+    if (ok) {
+      setNotice({ tone: 'water', message: 'Report copied to clipboard' });
+    } else {
+      setNotice({ tone: 'leak', message: 'Failed to copy report to clipboard' });
+    }
+  }, [lastResult, activeNetwork, phase, judge, revealed]);
 
   const chooseEntry = useCallback((choice) => {
     writeEntry(choice);
@@ -122,14 +189,6 @@ export default function App() {
     const t = setTimeout(() => setNotice(null), 6000);
     return () => clearTimeout(t);
   }, [notice]);
-
-  // The shared network changed: reload it, drop the old incident and pick a valid target.
-  const handleNetworkChanged = useCallback(async () => {
-    await pulse.load();
-    reset();
-    setRevealed(false);
-    setSelected('');
-  }, [pulse, reset]);
 
   // Keep the selected junction valid for whichever network is active.
   useEffect(() => {
@@ -362,12 +421,60 @@ export default function App() {
     return <WelcomeScreen onChoose={chooseEntry} />;
   }
 
+  const opsStep =
+    phase === 'simulating'
+      ? 'running'
+      : phase === 'isolated'
+        ? 'isolated'
+        : phase === 'located'
+          ? 'located'
+          : selected
+            ? 'ready'
+            : 'pick';
+
+  const nextActionFooter = (
+    <>
+      <Stepper step={opsStep} />
+      <NextActionButton
+        step={opsStep}
+        hasNetwork={!!activeNetwork}
+        cooldown={simulateCooldown}
+        onRun={() => run({ area_cm2: area, noise_pct: noise }, activePresetId)}
+        onIsolate={isolate}
+        onExport={handleExportReport}
+        onReset={handleResetAll}
+        onSeeWhy={() => setActiveTab('incident')}
+      />
+    </>
+  );
+
+  const mobileActionFooter = (
+    <NextActionButton
+      step={opsStep}
+      hasNetwork={!!activeNetwork}
+      cooldown={simulateCooldown}
+      onRun={() => run({ area_cm2: area, noise_pct: noise }, activePresetId)}
+      onIsolate={isolate}
+      onExport={handleExportReport}
+      onReset={handleResetAll}
+      onSeeWhy={() => setActiveTab('incident')}
+      showHelper={false}
+    />
+  );
+
   return (
     <BasemapProxyContext.Provider value={!!health?.basemap_proxy}>
     <AppShell
       customData={customData}
       onDataSource={openDataSource}
       onResetCustom={() => setImportOpen(true)}
+      assistantPanel={
+        <AssistantPanel
+          assistant={assistant}
+          onNotify={(tone, message) => setNotice({ tone, message })}
+        />
+      }
+      mobileAction={mobileActionFooter}
       extra={
         <>
           <NetworkImportModal
@@ -408,7 +515,7 @@ export default function App() {
       activeTab={activeTab}
       onTabChange={setActiveTab}
       statusAnnouncement={statusAnnouncement}
-      onSimulateBurst={() => run({ area_cm2: area, noise_pct: noise }, null)}
+      onSimulateBurst={() => run({ area_cm2: area, noise_pct: noise }, activePresetId)}
       onHelp={() => setHelp(true)}
       onReplayTour={() => setTourOpen(true)}
       onRoi={() => setRoi(true)}
@@ -425,29 +532,27 @@ export default function App() {
       onClearCache={clearCache}
       controlPanel={
         <ControlPanel
+          network={activeNetwork}
           presets={presets}
           selected={selected}
+          picked={Boolean(selected)}
+          activePresetId={activePresetId}
           area={area}
           noise={noise}
           judge={judge}
+          revealed={revealed}
           phase={phase}
-          onSelectedChange={handleSelectNode}
-          setSelected={handleSelectNode}
-          onAreaChange={setArea}
+          footer={nextActionFooter}
+          onSelectPreset={handleSelectPreset}
+          onPickSpot={handlePickSpot}
+          onSizeChange={handleSizeChange}
           onNoiseChange={setNoise}
-          onSimulate={(body, preset) => run(body, preset)}
-          onReset={reset}
-          onIsolate={isolate}
-          onJudgeToggle={() => {
-            setJudge((v) => !v);
+          onJudgeToggle={(checked) => {
+            setJudge(checked);
             setRevealed(false);
           }}
-          onReveal={() => setRevealed(true)}
-          revealed={revealed}
-          showTruth={showTruth}
-          network={activeNetwork}
-          mode={mode}
-          simulateCooldown={simulateCooldown}
+          onReveal={(show) => setRevealed(show)}
+          onReset={handleResetAll}
         />
       }
       mapCanvas={
@@ -487,16 +592,17 @@ export default function App() {
         <IncidentPanel
           network={activeNetwork}
           mode={mode}
-          onSimulate={simulate}
+          onSimulate={() => run({ area_cm2: area, noise_pct: noise }, activePresetId)}
           phase={phase}
           result={lastResult}
           lastResult={lastResult}
           judge={judge}
+          revealed={revealed}
           showTruth={showTruth}
           errorMeters={errorMeters}
           error={error}
           onIsolate={isolate}
-          onReset={reset}
+          onReset={handleResetAll}
           onJudgeToggle={() => {
             setJudge((v) => !v);
             setRevealed(false);

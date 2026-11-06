@@ -75,6 +75,27 @@ export default function GeographicMapCanvas({
     ? basemapProxyUrl(theme === 'day' ? 'light' : 'dark')
     : `https://{s}.basemaps.cartocdn.com/${tileStyle}/{z}/{x}/{y}{r}.png`;
 
+  // Probe one tile at mount: CARTO answers with an 'API KEY REQUIRED' watermark (or the proxy
+  // with an error status) when it is not usable. Anything but HTTP 200 counts as failed.
+  useEffect(() => {
+    const controller = new AbortController();
+    const probeUrl = tileUrl
+      .replace('{s}', 'a')
+      .replace('{z}', '10')
+      .replace('{x}', '727')
+      .replace('{y}', '488')
+      .replace('{r}', '');
+    fetch(probeUrl, { signal: controller.signal, cache: 'force-cache' })
+      .then((res) => {
+        if (res.status !== 200) setTileError(true);
+      })
+      .catch((err) => {
+        // A direct CARTO fetch can fail on CORS alone; only the proxy is same-origin.
+        if (err?.name !== 'AbortError' && proxy) setTileError(true);
+      });
+    return () => controller.abort();
+  }, [tileUrl, proxy]);
+
   return (
     <div className='stu-geo'>
       <MapContainer
@@ -371,6 +392,10 @@ export default function GeographicMapCanvas({
           </>
         )}
       </MapContainer>
+
+      {tileError && (
+        <p className='stu-geo__unavailable' role='status'>Basemap unavailable</p>
+      )}
 
       <div className='stu-geo__controls'>
         <Switch

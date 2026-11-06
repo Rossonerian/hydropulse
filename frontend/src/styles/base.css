@@ -49,3 +49,20 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* Touch targets: sliders and checkable controls get a >=24px hit area. */
+input[type='range'] {
+  min-height: 24px;
+  cursor: pointer;
+}
+
+input[type='range']::-webkit-slider-thumb {
+  min-width: 20px;
+  min-height: 20px;
+}
+
+input[type='checkbox'],
+input[type='radio'] {
+  min-width: 18px;
+  min-height: 18px;
+}

@@ -139,3 +139,18 @@
 .stu-terr__legend .map-legend__swatch--pump {
   background-color: #3b82f6; /* data colour */
 }
+
+/* Shown when the basemap probe or a tile request fails: the plain background stays. */
+.stu-geo__unavailable {
+  position: absolute;
+  top: var(--space-4);
+  left: var(--space-4);
+  z-index: var(--z-mapctl);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  font-size: 13px;
+}

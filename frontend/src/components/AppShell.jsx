@@ -33,6 +33,8 @@ export default function AppShell({
   mapCanvas,
   incidentPanel,
   pressureCharts,
+  assistantPanel,
+  mobileAction,
   studioShell,
   customData = false,
   onDataSource,
@@ -98,6 +100,19 @@ export default function AppShell({
             >
               Sensors
             </button>
+            {assistantPanel && (
+              <button
+                type="button"
+                role="tab"
+                id="tab-advisor"
+                aria-selected={activeTab === 'advisor'}
+                aria-controls="panel-advisor"
+                className={`ops-tab-btn ${activeTab === 'advisor' ? 'ops-tab-btn--active' : ''}`}
+                onClick={() => onTabChange?.('advisor')}
+              >
+                AI Advisor
+              </button>
+            )}
           </div>
 
           <div
@@ -127,15 +142,30 @@ export default function AppShell({
             {pressureCharts}
           </div>
 
-          <div className="mobile-bottom-bar">
-            <button
-              type="button"
-              className="mobile-simulate-btn"
-              disabled={!network || phase === 'simulating'}
-              onClick={onSimulateBurst}
+          {assistantPanel && (
+            <div
+              className="ops-panel ops-panel--assistant"
+              id="panel-advisor"
+              role="tabpanel"
+              aria-labelledby="tab-advisor"
             >
-              {phase === 'simulating' ? 'Scanning network…' : 'Simulate burst'}
-            </button>
+              {assistantPanel}
+            </div>
+          )}
+
+          <div className="mobile-bottom-bar">
+            {mobileAction ? (
+              mobileAction
+            ) : (
+              <button
+                type="button"
+                className="mobile-simulate-btn"
+                disabled={!network || phase === 'simulating'}
+                onClick={onSimulateBurst}
+              >
+                {phase === 'simulating' ? 'Scanning network…' : 'Simulate burst'}
+              </button>
+            )}
           </div>
 
           <div className="sr-only" aria-live="polite" role="status">

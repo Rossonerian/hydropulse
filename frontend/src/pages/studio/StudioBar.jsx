@@ -2,15 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import {
   ChevronDown,
   Compass,
-  Database,
-  FileUp,
   GitBranch,
   Map,
   Pencil,
   Redo2,
   Undo2,
 } from 'lucide-react';
-import { Button, DraftStatus, IconButton, SegmentedControl } from '../../ui/index.js';
+import { Button, IconButton, SegmentedControl } from '../../ui/index.js';
 import '../../styles/studio/shell.css';
 
 const VIEW_OPTIONS = [
@@ -85,6 +83,9 @@ function FileMenu({ items }) {
       {open && (
         <div className='stu-bar-menu' role='menu' aria-label='File' ref={menuRef} onKeyDown={onMenuKeyDown}>
           {items.map((item) => (
+            item.separator ? (
+              <hr key={item.separator} className='stu-bar-menusep' />
+            ) : (
             <button
               key={item.label}
               type='button'
@@ -97,8 +98,11 @@ function FileMenu({ items }) {
               }}
             >
               <span>{item.label}</span>
-              {item.hint && <span className='stu-bar-menuhint'>{item.hint}</span>}
+              {item.disabled && item.reason ? (
+                <span className='stu-bar-menuhint'>{item.reason}</span>
+              ) : item.hint && <span className='stu-bar-menuhint'>{item.hint}</span>}
             </button>
+            )
           ))}
         </div>
       )}
@@ -136,9 +140,15 @@ export default function StudioBar({
     { label: 'New blank', onSelect: newBlank, disabled: readOnly },
     { label: 'Reopen saved draft', onSelect: reopenDraft, disabled: readOnly },
     { label: 'Open draft JSON…', onSelect: () => fileInput.current?.click(), disabled: readOnly },
-    { label: 'Export draft JSON', onSelect: exportDraft, disabled: !canExport },
+    { label: 'Export draft JSON', onSelect: exportDraft, disabled: !canExport, reason: 'Nothing to export yet' },
     { label: 'Save draft', onSelect: saveDraft, hint: 'Ctrl+S', disabled: readOnly },
+    { separator: 'data' },
+    { label: 'Data catalog', onSelect: () => setCatalogOpen(true) },
+    { label: 'Import a file…', onSelect: () => setImportOpen(true), disabled: readOnly },
   ];
+  const timeStr = savedAt
+    ? new Date(savedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+    : '';
 
   return (
     <header className='stu-bar'>
@@ -159,25 +169,39 @@ export default function StudioBar({
           onKeyDown={(event) => event.key === 'Enter' && event.currentTarget.blur()}
         />
       </label>
-      {savedAt || dirty ? (
-        <DraftStatus dirty={dirty} savedAt={savedAt} />
-      ) : (
-        <span className='stu-bar-unsaved'>Not saved yet</span>
+      {!readOnly && (
+        <>
+          <span className={`stu-bar-status ${dirty || !savedAt ? 'is-dirty' : ''}`} role='status'>
+            {dirty || !savedAt ? 'Draft - not saved' : `Saved in this browser ${timeStr}`}
+          </span>
+          <span className='stu-bar-history'>
+            <IconButton
+              label={past.length ? 'Undo' : 'Undo (nothing to undo yet)'}
+              icon={Undo2}
+              disabled={!past.length}
+              onClick={undo}
+            />
+            <IconButton
+              label={future.length ? 'Redo' : 'Redo (nothing to redo yet)'}
+              icon={Redo2}
+              disabled={!future.length}
+              onClick={redo}
+            />
+          </span>
+        </>
       )}
 
       <span className='stu-bar-sep' aria-hidden='true' />
-      <SegmentedControl label='View mode' options={VIEW_OPTIONS} value={viewMode} onChange={setViewMode} />
+      <SegmentedControl label='View mode' className='stu-bar-views' options={VIEW_OPTIONS} value={viewMode} onChange={setViewMode} />
 
-      <span className='stu-bar-sep' aria-hidden='true' />
-      <Button icon={Database} onClick={() => setCatalogOpen(true)}>Catalog</Button>
-      <Button icon={FileUp} onClick={() => setImportOpen(true)} disabled={readOnly}>Import</Button>
-
-      <span className='stu-bar-sep' aria-hidden='true' />
-      <IconButton label='Undo' icon={Undo2} disabled={readOnly || !past.length} onClick={undo} />
-      <IconButton label='Redo' icon={Redo2} disabled={readOnly || !future.length} onClick={redo} />
-
-      <FileMenu items={fileItems} />
-      <input ref={fileInput} type='file' accept='application/json,.json' hidden onChange={importDraft} />
+      {readOnly ? (
+        <span className='stu-bar-desktop'>Open on desktop to edit</span>
+      ) : (
+        <>
+          <FileMenu items={fileItems} />
+          <input ref={fileInput} type='file' accept='application/json,.json' hidden onChange={importDraft} />
+        </>
+      )}
     </header>
   );
 }
