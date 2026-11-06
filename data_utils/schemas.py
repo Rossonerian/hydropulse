@@ -453,6 +453,34 @@ class ApplySuggestionResponse(BaseModel):
     metrics_after: Dict[str, Any]
 
 
+class AiChatContext(BaseModel):
+    phase: Optional[str] = None
+    target_node_id: Optional[str] = None
+    estimated_junction: Optional[str] = None
+    leak_loss_lpm: Optional[float] = None
+    tankers_per_day: Optional[float] = None
+    isolated_valves: Optional[List[str]] = None
+    network_revision: Optional[str] = None
+
+
+class AiChatMessage(BaseModel):
+    role: Literal["user", "assistant", "system"]
+    content: str
+
+
+class AiChatRequest(BaseModel):
+    message: str = Field(..., min_length=1, max_length=2000)
+    context: Optional[AiChatContext] = None
+    history: Optional[List[AiChatMessage]] = None
+
+
+class AiChatResponse(BaseModel):
+    reply: str
+    provider: Literal["openrouter", "deterministic_hydraulic"]
+    model: str
+    compute_time_ms: float
+
+
 # --- Network Importer, Presets & Builder ---
 
 class NetworkPresetInfo(BaseModel):

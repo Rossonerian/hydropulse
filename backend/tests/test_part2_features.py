@@ -17,6 +17,7 @@ from fastapi.testclient import TestClient
 
 from backend.main import app
 from data_utils.schemas import (
+    AiChatResponse,
     AiSuggestionsResponse,
     ApplySuggestionResponse,
     AutoValveResponse,
@@ -850,3 +851,62 @@ def test_safe_auto_valve_state_machine_and_safety_gates(client):
     assert res_reset.status == "reset"
     assert res_reset.active_valve_closures == []
     assert res_reset.emergency_stop is False
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# 6. AI Hydraulic Advisor Chat Endpoint (POST /api/ai/chat)
+# ═════════════════════════════════════════════════════════════════════════════
+
+def test_ai_chat_endpoint_deterministic_and_custom_key(client):
+    """POST /api/ai/chat returns structured markdown answer, provider, and model."""
+    # 1. Localization question
+    r1 = client.post(
+        "/api/ai/chat",
+        json={
+            "message": "Why was J13 ranked over J15?",
+            "context": {"estimated_junction": "J13", "phase": "located", "leak_loss_lpm": 210.0},
+        },
+    )
+    assert r1.status_code == 200, f"AI chat failed: {r1.text}"
+    resp1 = AiChatResponse.model_validate(r1.json())
+    assert resp1.provider == "deterministic_hydraulic"
+    assert "Two-Stage Physics" in resp1.reply
+    assert "J13" in resp1.reply
+
+    # 2. Water hammer and valve isolation question
+    r2 = client.post(
+        "/api/ai/chat",
+        json={
+            "message": "What is the water hammer risk during valve closure?",
+            "context": {"isolated_valves": ["P18", "P20"], "phase": "isolated"},
+        },
+    )
+    assert r2.status_code == 200
+    resp2 = AiChatResponse.model_validate(r2.json())
+    assert "Joukowsky" in resp2.reply or "hammer" in resp2.reply.lower()
+    assert "CAUTION" in resp2.reply
+
+    # 3. Tanker logistics question
+    r3 = client.post(
+        "/api/ai/chat",
+        json={
+            "message": "How many water tankers are lost per day?",
+            "context": {"leak_loss_lpm": 250.0},
+        },
+    )
+    assert r3.status_code == 200
+    resp3 = AiChatResponse.model_validate(r3.json())
+    assert "tanker" in resp3.reply.lower()
+    assert "L/min" in resp3.reply
+
+    # 4. Caller provided OpenRouter key header fallback test
+    r4 = client.post(
+        "/api/ai/chat",
+        headers={"X-OpenRouter-Key": "sk-or-v1-invalid-dummy-key"},
+        json={"message": "General hydraulic question"},
+    )
+    assert r4.status_code == 200
+    resp4 = AiChatResponse.model_validate(r4.json())
+    # With dummy key that fails auth/connect, gracefully falls back to deterministic hydraulic solver
+    assert resp4.provider in ("openrouter", "deterministic_hydraulic")
+    assert len(resp4.reply) > 20

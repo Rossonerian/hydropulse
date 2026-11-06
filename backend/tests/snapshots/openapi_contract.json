@@ -11,6 +11,19 @@
         }
       }
     },
+    "/api/ai/chat": {
+      "post": {
+        "admin": false,
+        "query_params": [
+          "openrouter_key"
+        ],
+        "request_body": "application/json:AiChatRequest",
+        "responses": {
+          "200": "application/json:AiChatResponse",
+          "422": "application/json:HTTPValidationError"
+        }
+      }
+    },
     "/api/ai/suggestions": {
       "get": {
         "admin": false,
@@ -243,6 +256,52 @@
     }
   },
   "schemas": {
+    "AiChatContext": {
+      "properties": {
+        "estimated_junction": "null|string",
+        "isolated_valves": "array[string]|null",
+        "leak_loss_lpm": "null|number",
+        "network_revision": "null|string",
+        "phase": "null|string",
+        "tankers_per_day": "null|number",
+        "target_node_id": "null|string"
+      },
+      "required": []
+    },
+    "AiChatMessage": {
+      "properties": {
+        "content": "string",
+        "role": "enum"
+      },
+      "required": [
+        "content",
+        "role"
+      ]
+    },
+    "AiChatRequest": {
+      "properties": {
+        "context": "AiChatContext|null",
+        "history": "array[AiChatMessage]|null",
+        "message": "string"
+      },
+      "required": [
+        "message"
+      ]
+    },
+    "AiChatResponse": {
+      "properties": {
+        "compute_time_ms": "number",
+        "model": "string",
+        "provider": "enum",
+        "reply": "string"
+      },
+      "required": [
+        "compute_time_ms",
+        "model",
+        "provider",
+        "reply"
+      ]
+    },
     "AiSuggestion": {
       "properties": {
         "affected_node_ids": "array[string]",
