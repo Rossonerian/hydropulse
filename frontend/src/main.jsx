@@ -11,10 +11,12 @@ import '@fontsource/ibm-plex-mono/500.css';
 import '@xyflow/react/dist/style.css';
 import 'leaflet/dist/leaflet.css';
 import './styles/ops/map.css';
+import { Analytics } from '@vercel/analytics/react';
 import App from './App.jsx';
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <App />
+    <Analytics />
   </React.StrictMode>,
 );
