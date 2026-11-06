@@ -23,6 +23,7 @@ import wntr
 from pathlib import Path
 from backend.hydraulic_engine import _atomic_save_npy
 from backend.openrouter_client import get_openrouter_client
+from backend import rag_engine
 from data_utils.geo_mapper import haversine_m
 from data_utils.schemas import (
     AiChatContext,
@@ -714,33 +715,25 @@ def generate_chat_response(
     history: Optional[List[AiChatMessage]] = None,
     client_api_key: Optional[str] = None,
     engine: Any = None,
-) -> Tuple[str, str, str]:
-    """Generate professional hydraulic copilot answer using OpenRouter or deterministic hydraulic twin."""
+) -> Tuple[str, str, str, List[str]]:
+    """Generate professional hydraulic copilot answer using OpenRouter + RAG or deterministic RAG twin."""
     client_openrouter = get_openrouter_client()
     effective_key = (client_api_key or client_openrouter.config.openrouter_api_key or "").strip()
 
     ctx = context or AiChatContext()
-    rev = ctx.network_revision or (getattr(engine, "network_revision", None) if engine else "kengeri-baseline")
-    phase = ctx.phase or "idle"
-    est_node = ctx.estimated_junction or ctx.target_node_id or "J13"
-    loss_lpm = ctx.leak_loss_lpm or 0.0
-    tankers = ctx.tankers_per_day or ((loss_lpm * 1440.0) / 6000.0 if loss_lpm > 0 else 0.0)
-    valves = ctx.isolated_valves or ["P18", "P20", "P21"]
 
+    # 1. Retrieve top-k relevant knowledge chunks from RAG engine
+    retrieved_chunks = rag_engine.retrieve_relevant_knowledge(
+        query=message,
+        engine=engine,
+        context=ctx,
+        top_k=3,
+    )
+    rag_sources = [c["title"] for c in retrieved_chunks]
+
+    # 2. If OpenRouter key is provided, build RAG-grounded system prompt and invoke OpenRouter
     if effective_key:
-        sys_prompt = (
-            "You are DHARA AI Hydraulic Advisor, a municipal water engineer assistant for Bengaluru water supply networks (Kengeri DMA).\n"
-            "You communicate strictly with professional, authentic CPHEEO and BWSSB engineering terminology.\n"
-            "Zero generic filler or corporate AI cliches. Structure responses in crisp Markdown:\n"
-            "- Use ### for section headers.\n"
-            "- Use **bold** for key metrics and node IDs.\n"
-            "- Wrap node/pipe IDs in backticks (e.g. `J15`, `P18`, `S1`).\n"
-            "- When warning of water hammer or residual pressure deficits, format as:\n"
-            "  ⚠️ **CAUTION**: [Warning detail]\n"
-            "- Give concise, numbered operational action steps.\n"
-            f"Current SCADA Context: Phase={phase}, Active Network Revision={rev}, Estimated Leak Node={est_node}, "
-            f"Loss Rate={loss_lpm:.1f} LPM ({tankers:.1f} 6,000-L tankers/day), Cut-Set Valves={valves}."
-        )
+        sys_prompt = rag_engine.build_rag_system_prompt(retrieved_chunks)
         msg_payload = [{"role": "system", "content": sys_prompt}]
         for h in (history or [])[-6:]:
             msg_payload.append({"role": h.role, "content": h.content})
@@ -751,60 +744,15 @@ def generate_chat_response(
             api_key=effective_key,
         )
         if llm_reply:
-            return llm_reply, "openrouter", client_openrouter.config.openrouter_model
+            return llm_reply, "openrouter", client_openrouter.config.openrouter_model, rag_sources
 
-    # Deterministic hydraulic twin domain fallback
-    q = message.lower()
-    if any(k in q for k in ("why", "ranked", "candidate", "stage", "cosine")):
-        reply = (
-            f"### Two-Stage Physics Localization Analysis\n\n"
-            f"1. **Stage 1 (Cosine Similarity Fingerprinting):**\n"
-            f"   - Sentinel sensors `S1` and `S2` captured distinct negative hydraulic head drawdowns.\n"
-            f"   - Normalizing observed sensor $\\Delta H$ vector against the precomputed sensitivity matrix narrowed the candidate set to block **`{est_node}`** with high spatial correlation.\n\n"
-            f"2. **Stage 2 (WNTR Verification Re-Simulation):**\n"
-            f"   - US EPA WNTR simulated Torricelli orifice discharge ($Q = C_d A \\sqrt{{2gH}}$) across candidate nodes.\n"
-            f"   - Junction **`{est_node}`** minimized the $L_2$ pressure residual ($0.08\\text{{ m}}$), confirming the underground pipe failure location."
-        )
-    elif any(k in q for k in ("sentinel", "sensor", "physics", "drop", "placement")):
-        reply = (
-            "### 5-Sentinel Centrality & Headloss Physics\n\n"
-            "Municipal distribution pipelines convey water under Hazen-Williams friction:\n"
-            "$$h_f = 10.67 \\cdot L \\cdot Q^{1.852} / (C^{1.852} \\cdot D^{4.87})$$\n\n"
-            "- **Sensor Placement Strategy:** 5 software sentinels are selected via graph **betweenness centrality** with a $\\ge 2$-hop separation constraint.\n"
-            "- **Hydraulic Propagation:** An underground crack creates a localized hydraulic cone of depression that disperses throughout the looped grid, enabling junction-level pinpointing without street-by-street acoustic logging."
-        )
-    elif any(k in q for k in ("tanker", "loss", "logistics", "water loss", "nrw")):
-        loss_disp = loss_lpm if loss_lpm > 0 else 185.0
-        tankers_disp = tankers if tankers > 0 else (loss_disp * 1440.0) / 6000.0
-        m3h = (loss_disp * 60.0) / 1000.0
-        reply = (
-            f"### Volumetric Water Loss & BWSSB Tanker Logistics\n\n"
-            f"- **Instantaneous Loss Rate:** **{loss_disp:.1f} L/min** ({m3h:.1f} m³/h)\n"
-            f"- **Daily Non-Revenue Water (NRW):** **{tankers_disp:.1f} BWSSB water tankers** (6,000-L standard) lost per 24 hours.\n\n"
-            f"### Mitigation Logistics Plan\n"
-            f"1. Isolate the cut-set boundary to arrest the underground loss.\n"
-            f"2. Dispatch **{max(1, round(tankers_disp * 0.4))} municipal relief tankers** to Kengeri ward sub-zones while BWSSB repair crews excavate the pipe joint."
-        )
-    elif any(k in q for k in ("valve", "isolate", "cut-set", "hammer", "shut")):
-        valves_str = ", ".join(f"`{v}`" for v in valves)
-        reply = (
-            f"### Minimal Topological Valve Isolation Cut-Set\n\n"
-            f"The network isolation boundary is established by closing valves: {valves_str}.\n\n"
-            f"⚠️ **CAUTION: Joukowsky Water Hammer Protocol**\n"
-            f"- Rapid valve actuation triggers transient shockwaves: $\\Delta P = \\rho c \\Delta v$.\n"
-            f"- **Mandatory Field Procedure:** Close boundary valves sequentially with a **3-minute interval** between each operation.\n"
-            f"- Ensures residual pressure in adjacent mains remains within 12 bar limits while preserving supply to 99.3% of unaffected households."
-        )
-    else:
-        reply = (
-            "### DHARA Hydraulic SCADA Intelligence\n\n"
-            "DHARA is a software hydraulic digital twin for the Kengeri distribution network in Bengaluru.\n\n"
-            "- **Simulation Engine:** US EPA WNTR with Pressure-Driven Demand (PDD) and Torricelli orifice physics.\n"
-            "- **Localization:** Two-stage matching using 5 strategic sentinels against a precomputed sensitivity matrix.\n"
-            "- **Operator Actions:** Select any junction on the map to simulate a leak burst, inspect pressure drawdowns, and execute valve isolation."
-        )
-
-    return reply, "deterministic_hydraulic", "hydraulic-physics-twin-v1.1"
+    # 3. Deterministic RAG fallback generator
+    reply = rag_engine.generate_deterministic_rag_response(
+        query=message,
+        chunks=retrieved_chunks,
+        context=ctx,
+    )
+    return reply, "deterministic_hydraulic", "hydraulic-rag-twin-v1.1", rag_sources
 
 
 def apply_suggestion(engine: Any, req: ApplySuggestionRequest) -> ApplySuggestionResponse:

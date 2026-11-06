@@ -479,6 +479,7 @@ class AiChatResponse(BaseModel):
     provider: Literal["openrouter", "deterministic_hydraulic"]
     model: str
     compute_time_ms: float
+    rag_sources: List[str] = Field(default_factory=list)
 
 
 # --- Network Importer, Presets & Builder ---
