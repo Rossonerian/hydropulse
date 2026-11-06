@@ -9,8 +9,14 @@ const timeout = 4000;
 const mockFiles = __HYDROPULSE_MOCK_FILES__;
 async function request(path, options = {}) {
   const controller = new AbortController();
-  const { timeoutMs, ...fetchOptions } = options;
+  const { timeoutMs, signal: externalSignal, ...fetchOptions } = options;
   const timer = setTimeout(() => controller.abort(), timeoutMs ?? timeout);
+  // A caller signal is merged with the timeout controller, never substituted for it.
+  const onExternalAbort = () => controller.abort();
+  if (externalSignal) {
+    if (externalSignal.aborted) controller.abort();
+    else externalSignal.addEventListener('abort', onExternalAbort, { once: true });
+  }
   try {
     const response = await fetch(`${BASE}${path}`, {
       ...fetchOptions,
@@ -32,6 +38,7 @@ async function request(path, options = {}) {
     return data;
   } finally {
     clearTimeout(timer);
+    externalSignal?.removeEventListener('abort', onExternalAbort);
   }
 }
 const mock = async (file) => {
@@ -57,6 +64,29 @@ async function networkAdminRequest(path, body, adminToken) {
     if (e.status === 401 || e.status === 403) e.message = 'Admin token required or invalid';
     else if (e.status === 409) e.message = 'Network changed, re-validate';
     else if (e.status === undefined) e.message = LIVE_ONLY_MSG;
+    throw e;
+  }
+}
+
+// AI assistant calls (suggestions, what-if, IntelliSense, pipe condition). Never fake data offline.
+const ASSISTANT_OFFLINE_MSG = 'This needs the live backend';
+async function assistantRequest(path, { method = 'GET', body, headers, timeoutMs, signal } = {}) {
+  if (forced) throw new Error(ASSISTANT_OFFLINE_MSG);
+  try {
+    return await request(path, {
+      method,
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+      headers: headers || {},
+      timeoutMs,
+      signal,
+    });
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      if (signal?.aborted) throw e; // the caller cancelled; let it ignore the result
+      e.message = 'The backend took too long to answer';
+    } else if (e.status === undefined) {
+      e.message = ASSISTANT_OFFLINE_MSG;
+    }
     throw e;
   }
 }
@@ -104,4 +134,41 @@ export const client = {
     ),
   resetNetwork: ({ target = 'baseline', adminToken } = {}) =>
     networkAdminRequest('/api/network/reset', { target, confirm: true }, adminToken),
+  // The OpenRouter key goes in a header only, never the query string.
+  getSuggestions: ({ openRouterKey } = {}) =>
+    assistantRequest('/api/ai/suggestions', {
+      headers: openRouterKey ? { 'X-OpenRouter-Key': openRouterKey } : {},
+      timeoutMs: 15000,
+    }),
+  whatIf: (body) => assistantRequest('/api/what-if', { method: 'POST', body, timeoutMs: 30000 }),
+  intellisense: (body, signal) =>
+    assistantRequest('/api/network/intellisense', { method: 'POST', body, timeoutMs: 8000, signal }),
+  buildPreview: (body) =>
+    assistantRequest('/api/network/build/preview', { method: 'POST', body, timeoutMs: 30000 }),
+  getPipeCondition: () => assistantRequest('/api/pipes/condition', { timeoutMs: 15000 }),
+  applySuggestion: async ({ suggestion_id, expected_network_revision, adminToken }) => {
+    if (forced) throw new Error(ASSISTANT_OFFLINE_MSG);
+    try {
+      return await networkAdminRequest(
+        '/api/ai/apply-suggestion',
+        { suggestion_id, expected_network_revision, confirm: true },
+        adminToken,
+      );
+    } catch (e) {
+      if (e.status === 404) e.message = 'Suggestion no longer exists';
+      else if (e.status === 409) e.message = 'The network changed. Refresh the suggestions';
+      else if (e.message === LIVE_ONLY_MSG) e.message = ASSISTANT_OFFLINE_MSG;
+      throw e;
+    }
+  },
+  // Undo = go back one network revision (the backend keeps exactly one).
+  undoLast: async ({ adminToken } = {}) => {
+    if (forced) throw new Error(ASSISTANT_OFFLINE_MSG);
+    try {
+      return await networkAdminRequest('/api/network/reset', { target: 'previous', confirm: true }, adminToken);
+    } catch (e) {
+      if (e.message === LIVE_ONLY_MSG) e.message = ASSISTANT_OFFLINE_MSG;
+      throw e;
+    }
+  },
 };
