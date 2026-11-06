@@ -67,6 +67,30 @@ header.topbar .topbar-custom {
   font-size: 13px;
 }
 
+.topbar-ai-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 4px 10px;
+  background: rgba(34, 211, 238, 0.12);
+  border: 1px solid var(--water);
+  border-radius: var(--radius-sm);
+  color: var(--water);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease);
+}
+.topbar-ai-btn:hover {
+  background: rgba(34, 211, 238, 0.22);
+  box-shadow: 0 0 10px rgba(34, 211, 238, 0.35);
+}
+@media (max-width: 600px) {
+  .topbar-ai-btn span {
+    display: none;
+  }
+}
+
 /* "..." menu */
 .topbar-menu {
   position: relative;

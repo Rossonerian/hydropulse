@@ -40,6 +40,7 @@ export default function AppShell({
   onDataSource,
   onResetCustom,
   onReplayTour,
+  onAiAdvisor,
   extra,
 }) {
   return (
@@ -56,6 +57,7 @@ export default function AppShell({
         customData={customData}
         onDataSource={onDataSource}
         onResetCustom={onResetCustom}
+        onAiAdvisor={onAiAdvisor}
       />
 
       {view === 'studio' ? (

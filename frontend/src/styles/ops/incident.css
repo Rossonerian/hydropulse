@@ -427,3 +427,228 @@
     opacity: 0.5;
   }
 }
+
+/* =============================================================================
+   Enhanced Isolation & Valve Actuation Card Styles
+   ============================================================================= */
+
+.incident-isolation-plan {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.isolation-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.isolation-header h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0;
+}
+
+.isolation-status-badge {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid var(--valve);
+  color: var(--valve);
+}
+
+.isolation-desc {
+  font-size: 12px;
+  color: var(--ink-muted);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.valve-cards-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.valve-actuation-card {
+  padding: var(--space-3);
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: all var(--dur-fast) var(--ease);
+}
+
+.valve-actuation-card:hover {
+  border-color: var(--valve);
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.2);
+}
+
+.valve-card-top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.valve-step-badge {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+}
+
+.valve-id-chip {
+  font-size: 12px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--valve);
+}
+
+.valve-tag {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid var(--leak);
+  color: var(--leak);
+  border-radius: 2px;
+}
+
+.valve-road {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.valve-meta-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 11px;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+}
+
+.valve-flow-prevented {
+  margin-left: auto;
+  color: var(--sensor);
+  font-weight: 600;
+}
+
+.supply-stats-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--ink-muted);
+  margin-top: 4px;
+}
+
+.dispatch-advisory-box {
+  padding: var(--space-3);
+  background: var(--surface-sunken);
+  border-left: 3px solid var(--water);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dispatch-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--water);
+}
+
+.dispatch-advisory-box p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink-muted);
+  line-height: 1.4;
+}
+
+/* =============================================================================
+   Export Report Modal & Print Styling (.md and .pdf)
+   ============================================================================= */
+
+.export-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-height: 65vh;
+}
+
+.export-modal-header-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.export-report-preview-scroll {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 45vh;
+  background: var(--surface-sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+}
+
+.export-markdown-preview {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.export-footer-hint {
+  font-size: 12px;
+  color: var(--ink-muted);
+  padding: var(--space-1) 0;
+}
+
+/* Print Styles for Save as PDF */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .export-modal-body,
+  .export-modal-body * {
+    visibility: visible;
+  }
+  .export-report-preview-scroll {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    max-height: none;
+    overflow: visible;
+    border: none;
+    background: transparent;
+    color: #000;
+  }
+  .export-markdown-preview {
+    font-size: 11pt;
+    color: #000;
+  }
+}
+
+

@@ -171,15 +171,15 @@ export default function useStudioDraft({ initialNetwork, networkSource }) {
     });
   }, [commit]);
 
-  const addNode = useCallback((type, position) => {
+  const addNode = useCallback((type, position, geo) => {
     const before = draftRef.current;
     const id = makeNextId(type, before.network.nodes, before.network.pipes);
     const node = {
       id,
       type,
-      lat: null,
-      lng: null,
-      elevation_m: null,
+      lat: geo?.lat ?? null,
+      lng: geo?.lng ?? null,
+      elevation_m: geo?.elevation_m ?? (geo ? Math.round(790 + (geo.lat - 12.9) * 200) : null),
       base_pressure_m: null,
       base_demand_lps: type === 'junction' ? null : 0,
       households: null,
@@ -196,7 +196,7 @@ export default function useStudioDraft({ initialNetwork, networkSource }) {
       return next;
     });
     setSelection({ type: 'node', id });
-    setNotice(`${type[0].toUpperCase()}${type.slice(1)} ${id} added. Set its required properties in the right panel.`);
+    setNotice(`${type[0].toUpperCase()}${type.slice(1)} ${id} added.${geo ? ' Position and elevation recorded on map.' : ' Set its required properties in the right panel.'}`);
   }, [commit]);
 
   const addPipe = useCallback((source, target) => {
@@ -214,13 +214,27 @@ export default function useStudioDraft({ initialNetwork, networkSource }) {
       return;
     }
     const id = makeNextId('pipe', current.network.nodes, current.network.pipes);
+    const srcNode = current.network.nodes.find((n) => n.id === source);
+    const tgtNode = current.network.nodes.find((n) => n.id === target);
+    let autoLength = null;
+    if (srcNode?.lat && srcNode?.lng && tgtNode?.lat && tgtNode?.lng) {
+      const R = 6371e3;
+      const dLat = ((tgtNode.lat - srcNode.lat) * Math.PI) / 180;
+      const dLng = ((tgtNode.lng - srcNode.lng) * Math.PI) / 180;
+      const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos((srcNode.lat * Math.PI) / 180) *
+          Math.cos((tgtNode.lat * Math.PI) / 180) *
+          Math.sin(dLng / 2) ** 2;
+      autoLength = Math.max(10, Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))));
+    }
     commit((next) => {
       next.network.pipes.push({
         id,
         source,
         target,
-        diameter_mm: null,
-        length_m: null,
+        diameter_mm: 150,
+        length_m: autoLength,
         flow_m3h: null,
         status: 'OPEN',
         road_class: null,
@@ -229,7 +243,7 @@ export default function useStudioDraft({ initialNetwork, networkSource }) {
     });
     setSelection({ type: 'pipe', id });
     setPendingConnection(null);
-    setNotice(`Pipe ${id} added. Enter its diameter and length in the right panel.`);
+    setNotice(`Pipe ${id} added${autoLength ? ` (${autoLength}m based on GPS coordinates)` : ''}.`);
   }, [commit]);
 
   const requestDelete = useCallback((item) => {
@@ -331,6 +345,9 @@ export default function useStudioDraft({ initialNetwork, networkSource }) {
       componentType: node.type,
       label: draft.editor_layout.labels[node.id] || node.id,
       pending: pendingConnection === node.id,
+      elevation_m: node.elevation_m,
+      pressure_m: node.simulated_pressure_m ?? node.base_pressure_m,
+      is_sensor: node.is_sensor,
     },
   })), [draft.network.nodes, draft.editor_layout.positions, draft.editor_layout.labels, selection, pendingConnection]);
 
@@ -477,6 +494,73 @@ export default function useStudioDraft({ initialNetwork, networkSource }) {
     return () => window.removeEventListener('keydown', onSaveKey);
   }, [saveDraft]);
 
+  const autoLayout = useCallback(() => {
+    const current = draftRef.current;
+    const nodes = current.network.nodes;
+    const pipes = current.network.pipes;
+    if (!nodes.length) return;
+
+    const adj = new Map();
+    nodes.forEach((n) => adj.set(n.id, []));
+    pipes.forEach((p) => {
+      if (adj.has(p.source)) adj.get(p.source).push(p.target);
+      if (adj.has(p.target)) adj.get(p.target).push(p.source);
+    });
+
+    const visited = new Set();
+    const levels = new Map();
+    const roots = nodes.filter((n) => n.type === 'reservoir' || n.type === 'tank').map((n) => n.id);
+    const queue = roots.length ? roots.slice() : [nodes[0].id];
+    queue.forEach((r) => { visited.add(r); levels.set(r, 0); });
+
+    let qHead = 0;
+    while (qHead < queue.length) {
+      const cur = queue[qHead++];
+      const curLvl = levels.get(cur) || 0;
+      for (const neighbor of adj.get(cur) || []) {
+        if (!visited.has(neighbor)) {
+          visited.add(neighbor);
+          levels.set(neighbor, curLvl + 1);
+          queue.push(neighbor);
+        }
+      }
+    }
+    nodes.forEach((n) => {
+      if (!visited.has(n.id)) levels.set(n.id, 0);
+    });
+
+    const levelGroups = new Map();
+    nodes.forEach((n) => {
+      const lvl = levels.get(n.id) || 0;
+      if (!levelGroups.has(lvl)) levelGroups.set(lvl, []);
+      levelGroups.get(lvl).push(n.id);
+    });
+
+    const X_SPACING = 200;
+    const Y_SPACING = 90;
+    const newPositions = {};
+
+    levelGroups.forEach((groupNodes, lvl) => {
+      const totalH = (groupNodes.length - 1) * Y_SPACING;
+      const startY = 120 - totalH / 2;
+      groupNodes.forEach((nodeId, idx) => {
+        newPositions[nodeId] = {
+          x: 100 + lvl * X_SPACING,
+          y: Math.round((startY + idx * Y_SPACING) / 20) * 20,
+        };
+      });
+    });
+
+    commit((next) => {
+      next.editor_layout.positions = {
+        ...next.editor_layout.positions,
+        ...newPositions,
+      };
+      return next;
+    });
+    setNotice('Schematic layout reorganized.');
+  }, [commit]);
+
   const placeHint = NODE_TYPES.includes(tool)
     ? `Click the canvas to place a ${tool}.`
     : tool === 'pipe'
@@ -537,6 +621,7 @@ export default function useStudioDraft({ initialNetwork, networkSource }) {
     changeTool,
     validation,
     allIssues,
+    autoLayout,
     placeHint,
   };
 }

@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { Play, RotateCcw, Search, SlidersHorizontal, Zap } from 'lucide-react';
 import { Button, Field, Select, Slider, Switch } from '../ui/index.js';
 import { LEAK_SIZES, getPresetList, sizeForArea } from '../lib/opsFlow.js';
@@ -36,6 +36,14 @@ export default function ControlPanel({
   const [query, setQuery] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [ownSpotOpen, setOwnSpotOpen] = useState(false);
+
+  // Auto-open custom spot section when a map node is picked without a preset
+  useEffect(() => {
+    if (picked && !activePresetId) {
+      setOwnSpotOpen(true);
+    }
+  }, [picked, activePresetId, selected]);
 
   const busy = phase === 'simulating';
   const presetList = useMemo(() => getPresetList(presets), [presets]);
@@ -113,7 +121,11 @@ export default function ControlPanel({
           </div>
         </section>
 
-        <details className="own-spot">
+        <details
+          className="own-spot"
+          open={ownSpotOpen}
+          onToggle={(e) => setOwnSpotOpen(e.currentTarget.open)}
+        >
           <summary>Or choose your own spot</summary>
           <div className="own-spot__body">
             <Field

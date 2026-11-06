@@ -17,6 +17,8 @@ import { Toast } from './ui/index.js';
 import { useHydroPulse } from './hooks/useHydroPulse.js';
 import { Stepper, NextActionButton } from './components/NextAction.jsx';
 import AssistantPanel from './components/assistant/AssistantPanel.jsx';
+import ExportReportModal from './components/ExportReportModal.jsx';
+import OperationsChatbot from './components/assistant/OperationsChatbot.jsx';
 import { useAssistant } from './hooks/useAssistant.js';
 import { reportText, copyText } from './lib/opsFlow.js';
 
@@ -98,6 +100,8 @@ export default function App() {
   const [chartsOpen, setChartsOpen] = useState(true);
   const [help, setHelp] = useState(false);
   const [roi, setRoi] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [aiAdvisorOpen, setAiAdvisorOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [entry, setEntry] = useState(readEntry);
   const [importOpen, setImportOpen] = useState(false);
@@ -152,21 +156,9 @@ export default function App() {
     setActivePresetId(null);
   }, [reset]);
 
-  const handleExportReport = useCallback(async () => {
-    const text = reportText({
-      result: lastResult,
-      network: activeNetwork,
-      phase,
-      judge,
-      revealed,
-    });
-    const ok = await copyText(text);
-    if (ok) {
-      setNotice({ tone: 'water', message: 'Report copied to clipboard' });
-    } else {
-      setNotice({ tone: 'leak', message: 'Failed to copy report to clipboard' });
-    }
-  }, [lastResult, activeNetwork, phase, judge, revealed]);
+  const handleExportReport = useCallback(() => {
+    setExportOpen(true);
+  }, []);
 
   const chooseEntry = useCallback((choice) => {
     writeEntry(choice);
@@ -215,11 +207,14 @@ export default function App() {
     }
   }, [error]);
 
-  // Node selection: sets target junction only when not in judge mode
+  // Node selection: sets target junction cleanly as string ID and clears preset lock
   const handleSelectNode = useCallback(
-    (nodeId) => {
+    (nodeOrId) => {
+      const id = typeof nodeOrId === 'string' ? nodeOrId : nodeOrId?.id;
+      if (!id) return;
       if (!judge) {
-        setSelected(nodeId);
+        setSelected(id);
+        setActivePresetId(null);
       }
     },
     [judge],
@@ -228,7 +223,8 @@ export default function App() {
   const run = useCallback(
     (params, preset) => {
       const presetId = typeof preset === 'string' ? preset : preset?.id || null;
-      const targetId = params?.target_node_id || params?.target_junction_id || selected;
+      const rawTarget = params?.target_node_id || params?.target_junction_id || selected;
+      const targetId = typeof rawTarget === 'string' ? rawTarget : rawTarget?.id || 'J1';
       const leakArea = params?.leak_area_cm2 ?? params?.area_cm2 ?? area;
       const noisePct = params?.noise_pct ?? noise;
 
@@ -484,6 +480,7 @@ export default function App() {
       customData={customData}
       onDataSource={openDataSource}
       onResetCustom={() => setImportOpen(true)}
+      onAiAdvisor={() => setAiAdvisorOpen((v) => !v)}
       assistantPanel={
         <AssistantPanel
           assistant={assistant}
@@ -502,6 +499,22 @@ export default function App() {
             customActive={customData}
             onActivated={handleNetworkChanged}
             onNotify={(tone, message) => setNotice({ tone, message })}
+          />
+          <ExportReportModal
+            open={exportOpen}
+            onClose={() => setExportOpen(false)}
+            result={lastResult}
+            network={activeNetwork}
+            phase={phase}
+            judge={judge}
+            revealed={revealed}
+          />
+          <OperationsChatbot
+            open={aiAdvisorOpen}
+            onClose={() => setAiAdvisorOpen(false)}
+            result={lastResult}
+            network={activeNetwork}
+            phase={phase}
           />
           {tourOpen && entry === 'demo' && !importOpen && view === 'operations' && (
             <GuidedTour
@@ -627,6 +640,7 @@ export default function App() {
           onReveal={() => setRevealed(true)}
           onFocus={handleSelectNode}
           onSelectNode={handleSelectNode}
+          onOpenAiAdvisor={() => setAiAdvisorOpen(true)}
         />
       }
       pressureCharts={
