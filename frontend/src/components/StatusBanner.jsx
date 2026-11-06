@@ -40,28 +40,26 @@ function StatusBanner({
 
   if (mode === 'offline') {
     const sourceLabel =
-      networkSource === 'recorded'
-        ? 'using recorded baseline snapshot'
-        : networkSource === 'live'
-          ? 'using cached live snapshot'
-          : 'using local demo model';
+      networkSource === 'live'
+        ? 'Showing the last saved copy of your network.'
+        : 'Showing demo data, so results are examples, not live readings.';
 
     return (
       <div className="status-banner status-banner--offline" role="status" aria-live="polite">
         <AlertTriangle size={16} aria-hidden="true" />
         <span>
-          <b>Backend offline:</b> {sourceLabel}
-          {formattedTime && ` (last valid update: ${formattedTime})`}. You can keep exploring with offline demo data; results are recorded or generated, not live.
+          <b>Can&apos;t reach the server.</b> {sourceLabel}
+          {formattedTime && ` Last update ${formattedTime}.`} You can keep exploring.
         </span>
         <div className="status-banner-actions" style={{ display: 'flex', gap: '8px', marginLeft: 'auto' }}>
           {onRetry && (
-            <button type="button" onClick={onRetry} aria-label="Retry backend connection">
-              <RefreshCw size={14} className={isRefreshing ? 'spin-icon' : ''} aria-hidden="true" /> Retry connection
+            <button type="button" onClick={onRetry} aria-label="Retry connecting to the server">
+              <RefreshCw size={14} className={isRefreshing ? 'spin-icon' : ''} aria-hidden="true" /> Retry
             </button>
           )}
           {onClearCache && (
-            <button type="button" onClick={onClearCache} aria-label="Clear local cache and reload" className="secondary">
-              <Trash2 size={12} aria-hidden="true" /> Clear cache
+            <button type="button" onClick={onClearCache} aria-label="Clear saved data and reload" className="secondary">
+              <Trash2 size={12} aria-hidden="true" /> Clear saved data
             </button>
           )}
         </div>
@@ -73,7 +71,7 @@ function StatusBanner({
     return (
       <div className="status-banner status-banner--refreshing" role="status" aria-live="polite">
         <RefreshCw size={14} className="spin-icon" aria-hidden="true" />
-        <span>Revalidating network telemetry in background…</span>
+        <span>Checking for updates…</span>
       </div>
     );
   }
@@ -82,10 +80,10 @@ function StatusBanner({
     return (
       <div className="status-banner status-banner--cached" role="status">
         <Clock size={14} aria-hidden="true" />
-        <span>Showing cached network data · Synchronized at {formattedTime}</span>
+        <span>Showing saved data from {formattedTime}</span>
         {onClearCache && (
-          <button type="button" onClick={onClearCache} aria-label="Clear local cache" style={{ marginLeft: 'auto' }}>
-            <Trash2 size={12} aria-hidden="true" /> Clear cache
+          <button type="button" onClick={onClearCache} aria-label="Clear saved data" style={{ marginLeft: 'auto' }}>
+            <Trash2 size={12} aria-hidden="true" /> Clear saved data
           </button>
         )}
       </div>
@@ -95,7 +93,7 @@ function StatusBanner({
   if (mode === 'loading') {
     return (
       <div className="status-banner status-banner--loading" role="status" aria-busy="true">
-        <span>CONNECTING TO KENGERI WATER NETWORK API…</span>
+        <span>Loading network…</span>
       </div>
     );
   }

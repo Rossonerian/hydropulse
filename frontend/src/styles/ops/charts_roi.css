@@ -144,7 +144,8 @@
 
 .roi-intro {
   color: var(--ink-muted);
-  font-size: 12px;
+  font-size: 14px;
+  line-height: 1.5;
   margin: 14px 0 17px;
 }
 
@@ -157,25 +158,26 @@
 .roi-fields label {
   display: flex;
   flex-direction: column;
+  justify-content: flex-end;
   gap: 6px;
   color: var(--ink);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .roi-fields label small {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--ink-faint);
 }
 
 .roi-fields input {
-  height: 35px;
-  padding: 0 9px;
+  height: 44px;
+  padding: 0 var(--space-3);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   background: var(--surface-sunken);
   color: var(--ink);
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 15px;
   outline: 0;
 }
 
@@ -205,8 +207,7 @@
   align-items: center;
   gap: 5px;
   color: var(--ink-muted);
-  font-size: 12px;
-  letter-spacing: 0.55px;
+  font-size: 13px;
 }
 
 .roi-result > span svg {
@@ -218,17 +219,18 @@
   font-size: 16px;
   font-weight: 600;
   color: var(--ink);
+  overflow-wrap: anywhere;
 }
 
 .roi-result > b small {
   font-family: var(--font-sans);
-  font-size: 12px;
+  font-size: 13px;
   color: var(--ink-muted);
 }
 
 .roi-result > small {
-  color: var(--ink-faint);
-  font-size: 12px;
+  color: var(--ink-muted);
+  font-size: 13px;
 }
 
 .roi-result.emphasis {
@@ -242,7 +244,7 @@
 
 .roi-result.emphasis > b {
   color: var(--valve);
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .roi-foot {
@@ -250,15 +252,41 @@
   justify-content: space-between;
   align-items: center;
   margin-top: 17px;
+  gap: var(--space-3);
   color: var(--ink-muted);
-  font-size: 12px;
+  font-size: 13px;
+}
+
+.roi-use-last {
+  align-self: flex-start;
+  min-height: 32px;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--water);
+  font: inherit;
+  font-size: 13px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+@media (max-width: 767px) {
+  .roi-fields {
+    grid-template-columns: 1fr;
+  }
+  .roi-results {
+    grid-template-columns: 1fr;
+  }
+  .roi-foot {
+    flex-wrap: wrap;
+  }
 }
 
 /* Help Modal */
 .help-shortcuts {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0;
 }
 
 .help-shortcut-row {
@@ -281,7 +309,18 @@
 
 .help-shortcut-action {
   color: var(--ink);
-  font-size: 12px;
+  font-size: 14px;
+}
+
+.help-group__title {
+  margin: var(--space-3) 0 var(--space-1);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.help-group:first-child .help-group__title {
+  margin-top: 0;
 }
 
 /* Ensure modal content uses tokens */

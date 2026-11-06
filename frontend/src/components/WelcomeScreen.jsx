@@ -4,9 +4,9 @@ import { Button } from '../ui/index.js';
 import '../styles/ops/welcome.css';
 
 const STEPS = [
-  { icon: MousePointerClick, title: 'Pick a leak', text: 'Choose a ready-made burst or any junction.' },
-  { icon: Activity, title: 'Watch 5 sensors react', text: 'Pressure drops at the sentinel junctions.' },
-  { icon: MapPin, title: 'Get the location + valves to close', text: 'See the likely spot, the loss and the isolation plan.' },
+  { icon: MousePointerClick, title: 'Pick a problem', text: 'Choose a ready-made leak, or any spot on the map.' },
+  { icon: Activity, title: 'Run the test', text: 'See 5 sensors notice the pressure drop.' },
+  { icon: MapPin, title: 'Get the answer', text: 'Where the leak is, how much water is lost, and which valves to shut.' },
 ];
 
 export default function WelcomeScreen({ onChoose }) {
@@ -29,16 +29,25 @@ export default function WelcomeScreen({ onChoose }) {
           Find a burst pipe from just 5 pressure sensors
         </h1>
         <p className="welcome__lead">
-          HydroPulse detects a pipe burst, pinpoints where it is, and estimates the loss in L/min and tankers per day.
+          HydroPulse finds where a pipe has burst, estimates how much water is lost, and tells you which valves to shut.
         </p>
 
         <div className="welcome__cta">
-          <Button variant="primary" size="lg" onClick={() => onChoose('demo')}>
-            Explore the demo
-          </Button>
-          <Button variant="secondary" size="lg" onClick={() => onChoose('import')}>
-            Use your own data
-          </Button>
+          <div className="welcome__choice">
+            <Button variant="primary" size="lg" onClick={() => onChoose('demo')}>
+              Explore the demo
+            </Button>
+            <p className="welcome__hint">Uses a sample network of Kengeri. Nothing to set up.</p>
+          </div>
+          <div className="welcome__choice">
+            <Button variant="secondary" size="lg" onClick={() => onChoose('import')}>
+              Use your own data
+            </Button>
+            <p className="welcome__hint">
+              Needs the live server and an admin token. The &ldquo;how well it fits&rdquo; figure shows how closely
+              the sensor pattern matches a spot. It is not a guarantee.
+            </p>
+          </div>
         </div>
 
         <section className="welcome__how" aria-labelledby="welcome-how-title">
@@ -59,10 +68,6 @@ export default function WelcomeScreen({ onChoose }) {
           </ol>
         </section>
 
-        <p className="welcome__note">
-          The demo uses a synthetic Kengeri network. The match score is a pattern-match score, not certainty.
-          Using your own data needs the live backend and an admin token.
-        </p>
       </div>
     </main>
   );

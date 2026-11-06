@@ -1,6 +1,8 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { MousePointer2, X } from 'lucide-react';
 import { Button, Field, Select } from '../../ui/index.js';
+import IntelliSenseBlock from './IntelliSenseBlock.jsx';
+import PipeConditionPanel from '../../components/PipeConditionPanel.jsx';
 import '../../styles/studio/canvas.css';
 
 function StudioField({ label, value, type = 'text', unit, onCommit, min, step, readOnly = false, mono = false }) {
@@ -45,7 +47,43 @@ function StudioNotesField({ value, onCommit }) {
   );
 }
 
-export default function PropertiesPanel({ draft, selection, onField, onRemove }) {
+/** Size advice for a pipe: only asks the backend when both ends are real junctions of the live network. */
+function PipeAdvice({ pipe, liveNetwork, live, onUseDiameter }) {
+  const liveIds = useMemo(() => new Set((liveNetwork?.nodes || []).map((node) => node.id)), [liveNetwork]);
+  const known = liveIds.has(pipe.source) && liveIds.has(pipe.target);
+  return (
+    <section className='stu-insp__group' aria-label='Size advice'>
+      <h3>Size advice</h3>
+      {known ? (
+        <IntelliSenseBlock
+          fromNodeId={pipe.source}
+          toNodeId={pipe.target}
+          networkRevision={liveNetwork?.network_revision}
+          live={live}
+          onUseDiameter={onUseDiameter}
+        />
+      ) : (
+        <p className='stu-insp__note'>Connect to existing junctions to get size advice.</p>
+      )}
+    </section>
+  );
+}
+
+/** Hydraulic load of the pipes. Fetches only once the section is opened. */
+function PipeConditionSection({ liveNetwork, live }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <details
+      className='stu-insp__details'
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
+      <summary>Pipe condition (no remaining-life data)</summary>
+      {open && <PipeConditionPanel networkRevision={liveNetwork?.network_revision} live={live} />}
+    </details>
+  );
+}
+
+export default function PropertiesPanel({ draft, selection, onField, onRemove, liveNetwork, live = true }) {
   const network = draft.network;
   const selectedNode =
     selection?.type === 'node'
@@ -68,7 +106,7 @@ export default function PropertiesPanel({ draft, selection, onField, onRemove })
       {!selected ? (
         <div className='stu-insp__empty'>
           <MousePointer2 size={20} aria-hidden='true' />
-          <p>Select a station or pipe to inspect and edit its draft properties.</p>
+          <p>Select a station or pipe to see and edit its details.</p>
         </div>
       ) : (
         <div className='stu-insp__body' key={`${selection.type}:${selected.id}`}>
@@ -149,6 +187,17 @@ export default function PropertiesPanel({ draft, selection, onField, onRemove })
               </Field>
               <p className='stu-insp__note'>Roughness and material are not stored in the current network contract.</p>
             </section>
+          )}
+          {selectedPipe && (
+            <>
+              <PipeAdvice
+                pipe={selectedPipe}
+                liveNetwork={liveNetwork}
+                live={live}
+                onUseDiameter={(mm) => onField(selected.id, 'diameter_mm', mm, 'pipe')}
+              />
+              <PipeConditionSection liveNetwork={liveNetwork} live={live} />
+            </>
           )}
           <section className='stu-insp__group'>
             <h3>Notes</h3>

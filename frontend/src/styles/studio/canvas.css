@@ -377,3 +377,91 @@
   pointer-events: none;
 }
 .stu-edge__label--preview { font-family: var(--font-sans); color: var(--ink-muted); }
+
+/* ---------- Tool rail: icons only at 1366px and narrower ---------- */
+.stu-rail__tool { position: relative; }
+.stu-rail__tool[aria-pressed='true'] .stu-rail__label { font-weight: 600; }
+
+@media (max-width: 1366px) {
+  .stu-rail { align-items: center; }
+  .stu-rail__title,
+  .stu-rail__note { display: none; }
+  .stu-rail__tool {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    justify-content: center;
+    border-left: 0;
+    border-radius: var(--radius-md);
+  }
+  .stu-rail__tool[aria-pressed='true'] {
+    border: 1px solid var(--water);
+  }
+  .stu-rail__tool--danger[aria-pressed='true'] { border-color: var(--leak); }
+  .stu-rail__label,
+  .stu-rail__tool .kbd,
+  .stu-rail__tool kbd {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .stu-rail__list { gap: var(--space-1); }
+  .stu-rail__legend { padding: 0; align-items: center; }
+  .stu-rail__ltext {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  /* Visible tooltip on hover and keyboard focus */
+  .stu-rail__tool::after {
+    content: attr(data-tip);
+    position: absolute;
+    left: calc(100% + var(--space-2));
+    top: 50%;
+    z-index: var(--z-mapctl);
+    padding: var(--space-1) var(--space-2);
+    transform: translateY(-50%);
+    color: var(--ink);
+    background: var(--surface-raised);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-overlay);
+    font-size: 13px;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity var(--dur-fast) var(--ease);
+  }
+  .stu-rail__tool:hover::after,
+  .stu-rail__tool:focus-visible::after { opacity: 1; }
+}
+
+@media (max-width: 1024px) {
+  .stu-rail { align-items: stretch; }
+  .stu-rail__tool::after { display: none; }
+}
+
+/* Inspector: collapsible pipe condition section */
+.stu-insp__details {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+.stu-insp__details > summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+}
+.stu-insp__details[open] > summary { border-bottom: 1px solid var(--line); }
+.stu-insp__details > .asst { padding: var(--space-3); }

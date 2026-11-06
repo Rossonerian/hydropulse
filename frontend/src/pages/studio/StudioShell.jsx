@@ -133,6 +133,13 @@ function StudioWorkspace({ initialNetwork, networkSource }) {
     if (readOnly && tool !== 'select') changeTool('select');
   }, [readOnly, tool, changeTool]);
 
+  // Notices fade after a few seconds so they never linger over the footer.
+  useEffect(() => {
+    if (!notice) return undefined;
+    const timer = setTimeout(() => setNotice(''), 6000);
+    return () => clearTimeout(timer);
+  }, [notice, setNotice]);
+
   useEffect(() => {
     if (selection || inspectedFeature) setSheetOpen(true);
   }, [selection, inspectedFeature]);
@@ -155,11 +162,18 @@ function StudioWorkspace({ initialNetwork, networkSource }) {
       {inspectedFeature ? (
         <FeatureInspectorPanel feature={inspectedFeature} onClose={() => setInspectedFeature(null)} />
       ) : (
-        <p className='stu-shell-hint'>Select a feature on the map to see its source, licence and attributes.</p>
+        <p className='stu-shell-hint'>Select something on the map to see where its data comes from and what it says.</p>
       )}
     </>
   ) : (
-    <Inspector draft={draft} selection={selection} onField={updateField} onRemove={requestDelete} />
+    <Inspector
+      draft={draft}
+      selection={selection}
+      onField={updateField}
+      onRemove={requestDelete}
+      liveNetwork={initialNetwork}
+      live={networkSource !== 'recorded'}
+    />
   );
 
   return (
@@ -192,7 +206,7 @@ function StudioWorkspace({ initialNetwork, networkSource }) {
 
       {readOnly && (
         <p className='stu-mobile-notice' role='note'>
-          Network Studio editing needs a larger screen — you can still view and export drafts
+          Open on desktop to edit. You can still look around the network here.
         </p>
       )}
 
@@ -232,6 +246,9 @@ function StudioWorkspace({ initialNetwork, networkSource }) {
               stagedLayers={stagedLayers}
               showIllustrativeDepth={showIllustrativeDepth}
               setShowIllustrativeDepth={setShowIllustrativeDepth}
+              setViewMode={setViewMode}
+              onImport={() => setImportOpen(true)}
+              readOnly={readOnly}
             />
           </div>
 

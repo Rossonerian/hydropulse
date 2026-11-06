@@ -6,7 +6,7 @@ export default function ValidationBar({ draft, validation, issuesOpen, setIssues
   const errors = validation.errors.length;
   const warnings = validation.warnings.length;
   return (
-    <footer className={`stu-val ${issuesOpen ? 'stu-val--open' : ''}`} aria-label='Topology check'>
+    <footer className={`stu-val ${issuesOpen ? 'stu-val--open' : ''}`} aria-label='Network checks'>
       <div className='stu-val__summary'>
         <span className='stu-val__text'>
           <span className='stu-val__num'>{draft.network.nodes.length}</span> nodes
@@ -30,14 +30,14 @@ export default function ValidationBar({ draft, validation, issuesOpen, setIssues
           onClick={() => setIssuesOpen((open) => !open)}
           aria-expanded={issuesOpen}
         >
-          {issuesOpen ? 'Hide details' : 'Review'}
+          {issuesOpen ? 'Hide details' : 'Show details'}
         </Button>
-        <span className='stu-val__note'>Topology check only — no hydraulic calculation</span>
+        <span className='stu-val__note'>Checks that pipes connect (does not simulate flow)</span>
       </div>
       {issuesOpen && (
         <div className='stu-val__list'>
           {!allIssues.length ? (
-            <p className='stu-val__none'><CheckCircle2 size={15} aria-hidden='true' /> No topology or property issues found.</p>
+            <p className='stu-val__none'><CheckCircle2 size={15} aria-hidden='true' /> No problems found with how the pipes connect.</p>
           ) : allIssues.slice(0, 12).map((issue, index) => (
             <button
               type='button'

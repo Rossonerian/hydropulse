@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { AlertTriangle, ExternalLink, Eye, EyeOff } from 'lucide-react';
-import { Button, DataTable, Drawer, Field, StatusDot } from '../ui/index.js';
+import { Button, Drawer, Field, StatusDot } from '../ui/index.js';
 import { DATA_CATALOG, KENGERI_AOI, filterCatalog } from '../lib/realWorldData.js';
 import '../styles/studio/dialogs.css';
 
@@ -45,55 +45,18 @@ export default function DataCatalogModal({
     onSelectDataset?.(item);
   };
 
-  const columns = [
-    {
-      key: 'displayName',
-      label: 'Name',
-      render: (value, row) => (
-        <button
-          type='button'
-          className='stu-cat__rowbtn'
-          aria-current={selectedItem?.id === row.id ? 'true' : undefined}
-          onClick={(e) => {
-            e.stopPropagation();
-            handleSelect(row);
-          }}
-        >
-          {value}
-        </button>
-      ),
-    },
-    { key: 'publisher', label: 'Source', render: (value) => <span>{value}</span> },
-    {
-      key: 'featureCount',
-      label: 'Features',
-      align: 'right',
-      render: (value) => <span className='stu-mono'>{value}</span>,
-    },
-    {
-      key: 'dataStatus',
-      label: 'Status',
-      render: (value) => (
-        <span className='stu-cat__status'>
-          <StatusDot tone={statusTone(value)} />
-          {statusLabel(value)}
-        </span>
-      ),
-    },
-  ];
-
   const isActive = selectedItem ? activeLayerIds.includes(selectedItem.id) : false;
 
   return (
-    <Drawer open={open} onClose={onClose} title='Data catalogue' width={480}>
+    <Drawer open={open} onClose={onClose} title='Data catalog' width={480}>
       <div className='stu-cat'>
-        <div className='stu-cat__note' role='note'>
-          <AlertTriangle size={16} aria-hidden='true' />
-          <div>
-            <b>Provenance and audit caveat</b>
-            <p>{KENGERI_AOI.auditCaveat}</p>
-          </div>
-        </div>
+        <details className='stu-cat__note' role='note'>
+          <summary>
+            <AlertTriangle size={16} aria-hidden='true' />
+            <span>These maps are source-based and may be a few metres off. <u>Learn more</u></span>
+          </summary>
+          <p>{KENGERI_AOI.auditCaveat}</p>
+        </details>
 
         <Field label='Search datasets' htmlFor='stu-cat-search'>
           <input
@@ -130,15 +93,27 @@ export default function DataCatalogModal({
             groundwater.
           </p>
         ) : (
-          <div className='stu-cat__table'>
-            <DataTable
-              columns={columns}
-              rows={filtered}
-              rowKey='id'
-              onRowClick={handleSelect}
-              caption='Datasets in the catalogue'
-            />
-          </div>
+          <ul className='stu-cat__cards' aria-label='Datasets in the catalogue'>
+            {filtered.map((row) => (
+              <li key={row.id}>
+                <button
+                  type='button'
+                  className='stu-cat__card'
+                  aria-current={selectedItem?.id === row.id ? 'true' : undefined}
+                  onClick={() => handleSelect(row)}
+                >
+                  <span className='stu-cat__card-name'>{row.displayName}</span>
+                  <span className='stu-cat__card-meta'>
+                    {row.publisher} · {row.featureCount} features
+                  </span>
+                  <span className='stu-cat__status'>
+                    <StatusDot tone={statusTone(row.dataStatus)} />
+                    {statusLabel(row.dataStatus)}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
         )}
 
         {selectedItem && (

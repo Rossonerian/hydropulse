@@ -93,8 +93,10 @@ export default function Terrain3DViewer({
   visibleLayers = {},
   selectedFeature,
   onSelectFeature,
+  onReady,
 }) {
   const canvasRef = useRef(null);
+  const readyRef = useRef(false);
   const [internalDepth, setInternalDepth] = useState(true);
   const showIllustrativeDepth = propDepth ?? internalDepth;
   const toggleDepth = propToggleDepth ?? (() => setInternalDepth((d) => !d));
@@ -509,6 +511,10 @@ export default function Terrain3DViewer({
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, width, height);
     const proj = makeProjector(camRef.current, width, height);
+    if (!readyRef.current) {
+      readyRef.current = true;
+      onReady?.();
+    }
 
     // 1. Sky & Atmospheric Haze
     const bg = ctx.createLinearGradient(0, 0, 0, height);
@@ -1015,7 +1021,7 @@ export default function Terrain3DViewer({
               <b>{selectedPipe ? `PIPE ${selectedPipe.id}` : `JUNCTION ${selectedNode.id}`}</b>
               <span className='hud-type-badge'>{selectedPipe ? selectedPipe.road_class : selectedNode.type}</span>
             </div>
-            <button className='hud-close-btn' onClick={() => setSelected(null)} type='button'>
+            <button className='hud-close-btn' onClick={() => setSelected?.(null)} type='button' aria-label='Close inspector'>
               <X size={13} />
             </button>
           </div>
@@ -1194,28 +1200,33 @@ export default function Terrain3DViewer({
         </div>
       )}
 
-      {/* Mandatory Disclaimer Watermark */}
-      <div className='map-disclaimer-watermark'>
-        SIMULATED NETWORK · DEMO GEOGRAPHIC PLACEMENT · NOT VERIFIED BWSSB GEOMETRY
-      </div>
+      <div className='terrain-3d-foot'>
+        {/* 3D Legend & Attribution: collapsed to a chip; swatches are data colours */}
+        <details className='terrain-3d-legend'>
+          <summary>Legend</summary>
+          <div className='terrain-3d-legend-items'>
+            <span className='legend-item'>
+              <i style={{ background: '#5BC0DE' }} /> Water mains
+            </span>
+            <span className='legend-item'>
+              <i style={{ background: '#10B981' }} /> Sensors
+            </span>
+            <span className='legend-item'>
+              <i style={{ background: '#D97706' }} /> Valves / low pressure
+            </span>
+            <span className='legend-item'>
+              <i style={{ background: '#EF4444' }} /> Leak candidate
+            </span>
+            <span className='legend-item'>
+              <i style={{ background: '#64748B' }} /> Isolated pipe
+            </span>
+          </div>
+        </details>
 
-      {/* 3D Legend & Attribution Bar */}
-      <div className='terrain-3d-legend'>
-        <span className='legend-item'>
-          <i style={{ background: '#5BC0DE' }} /> Potable Mains (BWSSB Kengeri)
-        </span>
-        <span className='legend-item'>
-          <i style={{ background: '#10B981' }} /> Sentinel Sensors
-        </span>
-        <span className='legend-item'>
-          <i style={{ background: '#D97706' }} /> Valves / Low Pressure
-        </span>
-        <span className='legend-item'>
-          <i style={{ background: '#EF4444' }} /> Leak Candidate
-        </span>
-        <span className='legend-item'>
-          <i style={{ background: '#64748B' }} /> Isolated Pipeline
-        </span>
+        {/* Mandatory Disclaimer Watermark */}
+        <div className='map-disclaimer-watermark'>
+          SIMULATED NETWORK · DEMO GEOGRAPHIC PLACEMENT · NOT VERIFIED BWSSB GEOMETRY
+        </div>
       </div>
     </div>
   );

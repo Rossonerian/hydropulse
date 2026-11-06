@@ -17,7 +17,7 @@ const ASSET_TYPES = [
   { id: 'road', label: 'Urban road / street centreline' },
 ];
 
-const STEPS = ['Choose file', 'Map fields', 'Review', 'Stage'];
+const STEPS = ['Choose a file', 'Name and type', 'Check it', 'Add to map'];
 
 export default function ImportWizardModal({ open, onClose, onImportStaged }) {
   const [step, setStep] = useState(1);
@@ -98,7 +98,7 @@ export default function ImportWizardModal({ open, onClose, onImportStaged }) {
           Back
         </Button>
         <Button variant='primary' onClick={() => setStep(3)}>
-          Review geometry <ArrowRight size={16} aria-hidden='true' />
+          Check the file <ArrowRight size={16} aria-hidden='true' />
         </Button>
       </div>
     );
@@ -108,8 +108,13 @@ export default function ImportWizardModal({ open, onClose, onImportStaged }) {
         <Button variant='secondary' onClick={() => setStep(2)}>
           Back
         </Button>
+        {!validation?.valid && (
+          <span className='stu-wiz__reason' role='status'>
+            Cannot continue: the file has problems listed above. Go back and choose another file.
+          </span>
+        )}
         <Button variant='primary' disabled={!validation?.valid} onClick={() => setStep(4)}>
-          Continue to staging <ArrowRight size={16} aria-hidden='true' />
+          Continue <ArrowRight size={16} aria-hidden='true' />
         </Button>
       </div>
     );
@@ -120,14 +125,14 @@ export default function ImportWizardModal({ open, onClose, onImportStaged }) {
           Back
         </Button>
         <Button variant='primary' icon={Check} onClick={handleConfirm}>
-          Stage layer
+          Add layer to the map
         </Button>
       </div>
     );
   }
 
   return (
-    <Modal open={open} onClose={onClose} title='Import layer' footer={footer}>
+    <Modal open={open} onClose={onClose} title='Import a map layer' footer={footer}>
       <div className='stu-wiz'>
         <ol className='stu-wiz__steps' aria-label='Import progress'>
           {STEPS.map((label, i) => {
@@ -149,7 +154,7 @@ export default function ImportWizardModal({ open, onClose, onImportStaged }) {
           <div className='stu-wiz__pane'>
             <div className='stu-wiz__drop'>
               <Upload size={32} aria-hidden='true' />
-              <h3>Choose a geospatial file to import</h3>
+              <h3>Choose a map file to import</h3>
               <p>
                 Supported: GeoJSON (.geojson, .json), KML (.kml), CSV with lat/lon, EPANET (.inp)
               </p>
@@ -172,8 +177,7 @@ export default function ImportWizardModal({ open, onClose, onImportStaged }) {
             <div className='stu-wiz__note'>
               <ShieldAlert size={16} aria-hidden='true' />
               <p>
-                Security boundary: files are processed client-side into local draft staging.
-                Imported files will <b>never</b> overwrite the committed EPANET benchmark model.
+                Your file stays in this browser. It will <b>never</b> replace the demo network.
               </p>
             </div>
           </div>
@@ -229,10 +233,10 @@ export default function ImportWizardModal({ open, onClose, onImportStaged }) {
               <h4>
                 {validation?.valid ? (
                   <>
-                    <CheckCircle2 size={16} aria-hidden='true' /> Format and topology validated
+                    <CheckCircle2 size={16} aria-hidden='true' /> File looks good
                   </>
                 ) : (
-                  'Validation issues detected'
+                  'Problems found in this file'
                 )}
               </h4>
               <p className='stu-mono'>
@@ -245,9 +249,9 @@ export default function ImportWizardModal({ open, onClose, onImportStaged }) {
                   <dd>{validation?.featureCount || 0}</dd>
                 </div>
                 <div>
-                  <dt>Hydraulic status</dt>
+                  <dt>Can it be simulated?</dt>
                   <dd className={validation?.modelReady ? 'is-good' : 'is-warn'}>
-                    {validation?.modelReady ? 'Model ready' : 'Geographic only'}
+                    {validation?.modelReady ? 'Yes' : 'No, map only'}
                   </dd>
                 </div>
                 <div>
@@ -264,7 +268,7 @@ export default function ImportWizardModal({ open, onClose, onImportStaged }) {
 
               {validation?.blockingReasons?.length > 0 && (
                 <div>
-                  <h4 className='stu-wiz__heading'>Hydraulic simulation readiness gate</h4>
+                  <h4 className='stu-wiz__heading'>Why this cannot be simulated yet</h4>
                   <ul className='stu-wiz__reasons'>
                     {validation.blockingReasons.map((r, i) => (
                       <li key={i}>{r}</li>
@@ -279,7 +283,7 @@ export default function ImportWizardModal({ open, onClose, onImportStaged }) {
         {step === 4 && (
           <div className='stu-wiz__pane'>
             <div className='stu-wiz__confirm'>
-              <h3>Ready to stage layer</h3>
+              <h3>Ready to add this layer</h3>
               <p>
                 <b>{importName}</b> will be added to your draft workspace with{' '}
                 <b>{validation?.featureCount}</b> features.
@@ -288,8 +292,8 @@ export default function ImportWizardModal({ open, onClose, onImportStaged }) {
                 <StagedBadge />
               </div>
               <ul>
-                <li>Staged as a reference overlay in the Map and Terrain views.</li>
-                <li>The WNTR hydraulic model remains untouched.</li>
+                <li>Shown as a reference layer in the Map and Terrain views.</li>
+                <li>The flow simulation is not changed.</li>
               </ul>
             </div>
           </div>

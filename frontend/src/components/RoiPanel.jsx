@@ -1,13 +1,19 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ArrowUpRight, Calculator, Droplet, IndianRupee, Truck } from 'lucide-react';
 import { Modal, Button } from '../ui/index.js';
-import { compactINR, number } from '../lib/format.js';
 import '../styles/ops/charts_roi.css';
 
+// One number style for this whole panel: Indian digit grouping (en-IN), formatted here only.
+const nf = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 });
+const fmt = (v) => nf.format(Math.round(Number(v) || 0));
+const rupees = (v) => `₹${fmt(v)}`;
+const TANKER_L = 6000;
+
 export default function RoiPanel({ open, onClose, lastResult }) {
-  const initialLeaks = 20;
-  const initialLpm = lastResult?.actual_loss_lpm || 482.1;
-  const initialDays = 12;
+  // Conservative, editable starting points (assumptions, not measurements).
+  const initialLeaks = 4;
+  const initialLpm = 300;
+  const initialDays = 3;
   const initialCost = 45;
 
   const [leaks, setLeaks] = useState(initialLeaks);
@@ -15,9 +21,8 @@ export default function RoiPanel({ open, onClose, lastResult }) {
   const [days, setDays] = useState(initialDays);
   const [cost, setCost] = useState(initialCost);
 
-  useEffect(() => {
-    if (lastResult?.actual_loss_lpm != null) setLpm(lastResult.actual_loss_lpm);
-  }, [lastResult?.actual_loss_lpm]);
+  const lastLpm = Number(lastResult?.actual_loss_lpm);
+  const hasLast = Number.isFinite(lastLpm) && lastLpm > 0;
 
   const validateInput = (value, min) => Math.max(Number.isFinite(value) ? value : min, min);
 
@@ -35,10 +40,10 @@ export default function RoiPanel({ open, onClose, lastResult }) {
     <Modal
       open={open}
       onClose={onClose}
-      title='Water saved. Value recovered.'
+      title='Estimate the water you could save'
       footer={
         <div className='roi-foot'>
-          <span>Model based on leak volume × 12 months × recovery days.</span>
+          <span>Illustrative estimate. Change the numbers to match your network.</span>
           <Button variant='secondary' onClick={handleReset}>Reset</Button>
           <Button variant='primary' onClick={onClose}>
             Done <ArrowUpRight size={14} />
@@ -50,11 +55,12 @@ export default function RoiPanel({ open, onClose, lastResult }) {
         <Calculator size={18} />
       </div>
       <p className='roi-intro'>
-        Estimate the annual benefit of faster leak localization across this district.
+        <b>Illustrative estimate.</b> How much water a year you might save by finding leaks faster.
+        The starting numbers are cautious guesses you can edit.
       </p>
       <div className='roi-fields'>
         <label>
-          Leaks detected / month
+          Leaks per month
           <input
             type='number'
             min='1'
@@ -63,16 +69,21 @@ export default function RoiPanel({ open, onClose, lastResult }) {
           />
         </label>
         <label>
-          Average water loss <small>L/min</small>
+          Typical leak <small>litres per minute</small>
           <input
             type='number'
             min='0'
             value={lpm}
             onChange={(e) => setLpm(validateInput(+e.target.value, 0))}
           />
+          {hasLast && (
+            <button type='button' className='roi-use-last' onClick={() => setLpm(Math.round(lastLpm))}>
+              Use my last test ({fmt(lastLpm)} L/min)
+            </button>
+          )}
         </label>
         <label>
-          Days saved per leak
+          Days found sooner <small>per leak</small>
           <input
             type='number'
             min='1'
@@ -81,7 +92,7 @@ export default function RoiPanel({ open, onClose, lastResult }) {
           />
         </label>
         <label>
-          Production cost <small>₹ / kL · editable assumption</small>
+          Cost of making water <small>₹ per 1,000 litres</small>
           <input
             type='number'
             min='0'
@@ -90,31 +101,30 @@ export default function RoiPanel({ open, onClose, lastResult }) {
           />
         </label>
       </div>
-      <div className='roi-results'>
+      <div className='roi-results' aria-live='polite'>
         <div className='roi-result'>
           <span>
-            <Droplet size={14} /> Water recovered per year
+            <Droplet size={14} aria-hidden='true' /> Water saved a year
           </span>
           <b>
-            {number(litres / 1e6, 2)} <small>ML</small>
+            {fmt(litres)} <small>litres</small>
           </b>
-          <small>{number(litres, 0)} litres</small>
         </div>
         <div className='roi-result'>
           <span>
-            <Truck size={14} /> Tankers saved per year
+            <Truck size={14} aria-hidden='true' /> Tanker trips avoided
           </span>
           <b>
-            {number(litres / 6000, 0)} <small>trips</small>
+            {fmt(litres / TANKER_L)} <small>a year</small>
           </b>
-          <small>6,000 L capacity</small>
+          <small>One tanker holds {fmt(TANKER_L)} litres</small>
         </div>
         <div className='roi-result emphasis'>
           <span>
-            <IndianRupee size={14} /> Production value per year
+            <IndianRupee size={14} aria-hidden='true' /> Value a year
           </span>
-          <b>{compactINR((litres / 1000) * cost)}</b>
-          <small>at ₹{number(cost)} per kL</small>
+          <b>{rupees((litres / 1000) * cost)}</b>
+          <small>at {rupees(cost)} per 1,000 litres</small>
         </div>
       </div>
     </Modal>

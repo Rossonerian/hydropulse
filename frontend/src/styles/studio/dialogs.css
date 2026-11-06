@@ -552,7 +552,7 @@
 
 @media (max-width: 1024px) {
   .stu-cat__chip,
-  .stu-cat__rowbtn,
+  .stu-cat__card,
   .stu-cat__link,
   .stu-wiz__type {
     min-height: 44px;
@@ -563,4 +563,82 @@
   .stu-wiz__file-label {
     min-height: 44px;
   }
+}
+
+/* Data catalog as a card list (no horizontal scrolling); audit caveat behind 'Learn more' */
+details.stu-cat__note {
+  display: block;
+}
+
+.stu-cat__note > summary {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  cursor: pointer;
+  list-style: none;
+}
+
+.stu-cat__note > summary::-webkit-details-marker {
+  display: none;
+}
+
+.stu-cat__note > summary:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.stu-cat__cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stu-cat__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: 100%;
+  min-height: 56px;
+  padding: var(--space-3);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.stu-cat__card:hover {
+  background: var(--surface-raised);
+}
+
+.stu-cat__card[aria-current='true'] {
+  border-color: var(--water);
+  box-shadow: inset 3px 0 0 var(--water);
+}
+
+.stu-cat__card:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.stu-cat__card-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.stu-cat__card-meta {
+  color: var(--ink-muted);
+  font-size: 13px;
+}
+
+.stu-wiz__reason {
+  flex: 1 1 100%;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 18px;
 }
