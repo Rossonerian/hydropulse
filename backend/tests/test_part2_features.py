@@ -514,6 +514,99 @@ def test_network_import_preview_validation_and_safety(client):
     assert rev_before == rev_after
 
 
+def test_network_import_commit_and_reset_sample_inp(client):
+    """POST /api/network/import/preview followed by /api/network/import/commit successfully activates new network."""
+    sample_inp = """[TITLE]
+HydroPulse sample network
+
+[JUNCTIONS]
+;ID  Elev  Demand
+J1   900   2
+J2   898   2
+J3   897   2
+J4   896   2
+J5   895   2
+
+[RESERVOIRS]
+;ID  Head
+R1   935
+
+[PIPES]
+;ID Node1 Node2 Length Diameter Roughness MinorLoss Status
+P1  R1    J1    300    200      130       0         Open
+P2  J1    J2    250    150      130       0         Open
+P3  J2    J3    250    150      130       0         Open
+P4  J2    J4    250    100      130       0         Open
+P5  J4    J5    250    100      130       0         Open
+
+[OPTIONS]
+Units    LPS
+Headloss H-W
+
+[TIMES]
+Duration 0
+
+[COORDINATES]
+;Node  X        Y
+R1     77.4838  12.9081
+J1     77.4846  12.9081
+J2     77.4852  12.9081
+J3     77.4860  12.9081
+J4     77.4852  12.9073
+J5     77.4852  12.9065
+
+[END]
+"""
+    h_before = client.get("/api/health").json()
+    rev_before = h_before["network_revision"]
+
+    # 1. Preview
+    prev_r = client.post(
+        "/api/network/import/preview",
+        json={"format": "inp", "filename": "sample_test.inp", "content": sample_inp},
+    )
+    assert prev_r.status_code == 200, prev_r.text
+    prev_data = prev_r.json()
+    assert prev_data["valid"] is True
+    token = prev_data["preview_token"]
+    assert token is not None
+
+    # 2. Commit
+    commit_r = client.post(
+        "/api/network/import/commit",
+        json={
+            "preview_token": token,
+            "expected_network_revision": rev_before,
+            "confirm": True,
+        },
+    )
+    assert commit_r.status_code == 200, commit_r.text
+    commit_data = commit_r.json()
+    assert commit_data["committed"] is True
+    rev_imported = commit_data["new_network_revision"]
+    assert rev_imported != rev_before
+
+    # Verify active network state
+    h_active = client.get("/api/health").json()
+    assert h_active["network_revision"] == rev_imported
+    assert h_active["num_junctions"] == 5
+    assert set(h_active["sensor_ids"]) == {"J1", "J2", "J3", "J4", "J5"}
+
+    # Verify network endpoint
+    net_r = client.get("/api/network")
+    assert net_r.status_code == 200
+    net_data = net_r.json()
+    node_ids = {n["id"] for n in net_data["nodes"]}
+    assert {"J1", "J2", "J3", "J4", "J5", "R1"}.issubset(node_ids)
+
+    # 3. Reset back to baseline
+    reset_r = client.post("/api/network/reset", json={"target": "baseline"})
+    assert reset_r.status_code == 200, reset_r.text
+    h_reset = client.get("/api/health").json()
+    assert h_reset["num_junctions"] == h_before["num_junctions"]
+    assert h_reset["source"] in ("synthetic", "osm")
+
+
 def test_network_build_preview_commit_and_reset_lifecycle(client):
     """Full builder lifecycle: preview proposed elements, commit (rev advances), verify rollback via reset."""
     h0 = client.get("/api/health").json()

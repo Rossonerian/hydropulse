@@ -486,8 +486,10 @@ class HydraulicEngine:
         q = res.link["flowrate"].iloc[0]
         self.base_pressure = {n: float(p[n]) for n in self.wn.node_name_list}
         self.base_flow_m3h = {l: float(q[l]) * 3600.0 for l in self.wn.link_name_list}
-        if self.sensor_ids:
+        if self.sensor_ids and all(s in self.base_pressure for s in self.sensor_ids):
             self.P_base = np.array([self.base_pressure[s] for s in self.sensor_ids])
+        else:
+            self.P_base = None
 
     # ─────────────────────────── sensors ───────────────────────────
     def select_sentinel_sensors(self, min_hop_separation: int = MIN_HOP_SEPARATION, strategy: str = "betweenness_separated") -> list[str]:
@@ -1080,17 +1082,31 @@ class HydraulicEngine:
                     self._fast = None
                     self.solver_path = "wntr_simulator"
                 self.area_grid = AREA_GRID_FAST_CM2 if self._fast is not None else AREA_GRID_SLOW_CM2
-                self.run_baseline()
+
+                # Invalidate existing sensors if any are missing in the new network topology
+                valid_existing_sensors = (
+                    self.sensor_ids
+                    and len(self.sensor_ids) == self.num_sensors
+                    and all(s in self.junctions for s in self.sensor_ids)
+                )
 
                 if sensor_ids and len(sensor_ids) == self.num_sensors and all(s in self.junctions for s in sensor_ids):
                     self.sensor_ids = list(sensor_ids)
                     self.sensor_idx = {s: i for i, s in enumerate(self.sensor_ids)}
-                    if self.base_pressure:
-                        self.P_base = np.array([self.base_pressure[s] for s in self.sensor_ids])
                     self.matrix_ready = False
-                else:
+                elif not valid_existing_sensors:
+                    self.sensor_ids = []
                     self.select_sentinel_sensors()
 
+                self.run_baseline()
+
+                if not (self.sensor_ids and all(s in self.base_pressure for s in self.sensor_ids)):
+                    self.select_sentinel_sensors()
+
+                if self.sensor_ids and all(s in self.base_pressure for s in self.sensor_ids):
+                    self.P_base = np.array([self.base_pressure[s] for s in self.sensor_ids])
+
+                self.matrix_ready = False
                 self.build_or_load_sensitivity_matrix(use_cache=False)
 
                 self.revision_seq = prev_snap["revision_seq"] + 1
