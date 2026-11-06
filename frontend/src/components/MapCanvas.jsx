@@ -9,7 +9,7 @@ import {
   useMap,
 } from 'react-leaflet';
 import L from 'leaflet';
-import { Layers2, Crosshair, Navigation, Maximize2, Minimize2 } from 'lucide-react';
+import { Layers2, Crosshair, Navigation, Maximize2, Minimize2, Flame } from 'lucide-react';
 import SkeletonLoader from './SkeletonLoader.jsx';
 import { basemapProxyUrl } from '../api/client.js';
 import { MapControlStack, MapLegend, IconButton } from '../ui/index.js';
@@ -382,27 +382,25 @@ function MapCanvas({
           />
         ))}
 
-        {/* Heat circles */}
-        {showHeatmap && Object.entries(heat).map(([id, value]) => {
+        {/* Heat circles (only render high-confidence candidate zone P >= 0.35 to prevent clutter) */}
+        {showHeatmap && phase !== 'idle' && Object.entries(heat).map(([id, value]) => {
           const n = byId[id];
-          if (!n || value < 0.05) return null;
+          if (!n || value < 0.35) return null;
           const heatColor =
-            value >= 1.0 ? colors.heat4 :
-            value >= 0.75 ? colors.heat3 :
-            value >= 0.5 ? colors.heat2 :
-            value >= 0.25 ? colors.heat1 : colors.heat0;
-          const sizeBoost = value >= 0.25 ? 4 : 0;
+            value >= 0.85 ? colors.heat4 :
+            value >= 0.65 ? colors.heat3 :
+            value >= 0.45 ? colors.heat2 : colors.heat1;
           return (
             <CircleMarker
               key={`h${id}`}
               center={[n.lat, n.lng]}
-              radius={4 + value * 10 + sizeBoost}
+              radius={7 + value * 5}
               pathOptions={{
                 color: heatColor,
                 fillColor: heatColor,
-                fillOpacity: 0.1 + value * 0.3,
-                weight: 1,
-                opacity: 0.5,
+                fillOpacity: 0.2 + value * 0.25,
+                weight: 1.5,
+                opacity: 0.7,
               }}
             />
           );
@@ -424,11 +422,13 @@ function MapCanvas({
             ? colors.inkFaint
             : isTopCandidate
               ? colors.leak
-              : colors.inkFaint;
+              : picked
+                ? colors.water
+                : colors.inkFaint;
 
-          const radius = isTopCandidate ? 10 : picked ? 8 : 5.5;
-          const weight = truth || picked || isTopCandidate ? 2.5 : 1;
-          const opacity = isIsolated ? 0.4 : 1;
+          const radius = isTopCandidate ? 8.5 : picked ? 6.5 : 3.5;
+          const weight = truth || picked || isTopCandidate ? 2 : 1;
+          const opacity = isIsolated ? 0.35 : 0.85;
 
           return (
             <CircleMarker
@@ -438,7 +438,7 @@ function MapCanvas({
               pathOptions={{
                 color: truth ? colors.surface : picked ? colors.surface : fill,
                 fillColor: hiddenTarget ? colors.surface : fill,
-                fillOpacity: hiddenTarget ? 0.3 : isIsolated ? 0.3 : 0.85,
+                fillOpacity: hiddenTarget ? 0.3 : isIsolated ? 0.25 : isTopCandidate ? 0.95 : 0.7,
                 weight,
                 opacity,
                 dashArray: isIsolated ? '4 3' : null,
@@ -639,6 +639,13 @@ function MapCanvas({
             size='sm'
             pressed={showFlowArrows}
             onClick={() => setShowFlowArrows((v) => !v)}
+          />
+          <IconButton
+            label={showHeatmap ? 'Hide heatmap' : 'Show heatmap'}
+            icon={Flame}
+            size='sm'
+            pressed={showHeatmap}
+            onClick={() => setShowHeatmap((v) => !v)}
           />
           <IconButton
             label='Center map'

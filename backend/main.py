@@ -300,7 +300,7 @@ def ai_chat(
     """Consult the AI Hydraulic Advisor using OpenRouter or deterministic hydraulic twin."""
     t0 = time.perf_counter()
     effective_key = x_openrouter_key or openrouter_key
-    reply, provider, model = ai_advisor.generate_chat_response(
+    reply, provider, model, sources = ai_advisor.generate_chat_response(
         message=req.message,
         context=req.context,
         history=req.history,
@@ -313,6 +313,7 @@ def ai_chat(
         provider=provider,
         model=model,
         compute_time_ms=dt_ms,
+        rag_sources=sources,
     )
 
 @app.get("/api/network/presets", response_model=NetworkPresetsListResponse)

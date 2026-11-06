@@ -228,6 +228,7 @@ export default function OperationsChatbot({
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             provider: res.provider,
             model: res.model,
+            rag_sources: res.rag_sources || [],
           },
         ]);
       } catch (err) {
@@ -272,7 +273,7 @@ export default function OperationsChatbot({
             <div>
               <h3 className="ops-chatbot-title">AI Hydraulic Advisor</h3>
               <span className="ops-chatbot-sub">
-                {customKey ? '🟢 OpenRouter Active (Custom Key)' : '🔵 Physics Twin (Deterministic Engine)'}
+                {customKey ? '🟢 OpenRouter Active (Custom Key)' : '🔵 Hydraulic Twin (Deterministic RAG)'}
               </span>
             </div>
           </div>
@@ -296,6 +297,11 @@ export default function OperationsChatbot({
               <X size={16} />
             </button>
           </div>
+        </div>
+
+        <div className="ops-chatbot-rag-banner">
+          <Sparkles size={12} style={{ color: 'var(--water)', flexShrink: 0 }} />
+          <span><b>RAG Active</b>: Grounded in Live SCADA · BWSSB Field SOPs · Benchmark</span>
         </div>
 
         <div className="ops-chatbot-chips-bar">
@@ -332,15 +338,25 @@ export default function OperationsChatbot({
                     m.text
                   )}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 4px', marginTop: '4px' }}>
                   <span className="ops-chat-bubble-time">{m.timestamp}</span>
                   {m.provider && (
                     <span className="chat-provider-badge">
                       <Cpu size={10} />
-                      {m.provider === 'openrouter' ? 'OpenRouter LLM' : 'Physics Twin'}
+                      {m.provider === 'openrouter' ? `OpenRouter · ${m.model || 'Llama 3.3 70B'}` : 'Physics Twin (RAG)'}
                     </span>
                   )}
                 </div>
+                {m.rag_sources && m.rag_sources.length > 0 && (
+                  <div className="chat-sources-row">
+                    <span className="chat-sources-label">RAG Sources:</span>
+                    {m.rag_sources.map((src, sIdx) => (
+                      <span key={sIdx} className="chat-source-chip" title={src}>
+                        {src}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           ))}

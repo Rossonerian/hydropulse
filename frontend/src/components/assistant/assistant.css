@@ -779,3 +779,47 @@
   box-shadow: 0 0 20px rgba(34, 211, 238, 0.5);
 }
 
+/* RAG banner & Source citations */
+.ops-chatbot-rag-banner {
+  padding: 6px 12px;
+  background: rgba(34, 211, 238, 0.08);
+  border-bottom: 1px solid rgba(34, 211, 238, 0.2);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 11px;
+  color: var(--ink-muted);
+}
+.ops-chatbot-rag-banner b {
+  color: var(--water);
+}
+
+.chat-sources-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--line);
+}
+.chat-sources-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-faint);
+  font-weight: 600;
+}
+.chat-source-chip {
+  font-size: 10px;
+  padding: 1px 6px;
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--ink-muted);
+  max-width: 240px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+

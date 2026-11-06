@@ -94,7 +94,7 @@ export default function ControlPanel({
           </h2>
           <div className="preset-list" role="group" aria-labelledby={`${uid}-pick`}>
             {presetList.map((p) => {
-              const active = activePresetId === p.id;
+              const active = activePresetId === p.id && (!selected || selected === p.target_node_id);
               return (
                 <button
                   key={p.id}

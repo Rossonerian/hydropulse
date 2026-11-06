@@ -293,6 +293,7 @@
         "compute_time_ms": "number",
         "model": "string",
         "provider": "enum",
+        "rag_sources": "array[string]",
         "reply": "string"
       },
       "required": [

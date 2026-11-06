@@ -90,6 +90,15 @@ async function assistantRequest(path, { method = 'GET', body, headers, timeoutMs
     throw e;
   }
 }
+function getStoredOpenRouterKey() {
+  try {
+    return localStorage.getItem('hydropulse_openrouter_key') || '';
+  } catch (err) {
+    console.debug('Failed to read OpenRouter key from localStorage:', err);
+    return '';
+  }
+}
+
 export const client = {
   forcedMock: forced,
   hasMockFile: (file) => mockFiles.includes(file),
@@ -135,18 +144,22 @@ export const client = {
   resetNetwork: ({ target = 'baseline', adminToken } = {}) =>
     networkAdminRequest('/api/network/reset', { target, confirm: true }, adminToken),
   // The OpenRouter key goes in a header only, never the query string.
-  aiChat: (body, { openRouterKey } = {}) =>
-    assistantRequest('/api/ai/chat', {
+  aiChat: (body, { openRouterKey } = {}) => {
+    const key = openRouterKey || getStoredOpenRouterKey();
+    return assistantRequest('/api/ai/chat', {
       method: 'POST',
       body,
-      headers: openRouterKey ? { 'X-OpenRouter-Key': openRouterKey } : {},
+      headers: key ? { 'X-OpenRouter-Key': key } : {},
       timeoutMs: 25000,
-    }),
-  getSuggestions: ({ openRouterKey } = {}) =>
-    assistantRequest('/api/ai/suggestions', {
-      headers: openRouterKey ? { 'X-OpenRouter-Key': openRouterKey } : {},
+    });
+  },
+  getSuggestions: ({ openRouterKey } = {}) => {
+    const key = openRouterKey || getStoredOpenRouterKey();
+    return assistantRequest('/api/ai/suggestions', {
+      headers: key ? { 'X-OpenRouter-Key': key } : {},
       timeoutMs: 15000,
-    }),
+    });
+  },
   whatIf: (body) => assistantRequest('/api/what-if', { method: 'POST', body, timeoutMs: 30000 }),
   intellisense: (body, signal) =>
     assistantRequest('/api/network/intellisense', { method: 'POST', body, timeoutMs: 8000, signal }),
