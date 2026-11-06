@@ -9,8 +9,17 @@ with `length` and `highway`) and then run through one shared pipeline:
 rename → elevation/households proxies → pipe sizing → reservoir → pressure
 validation → write .inp + network_meta.json.
 
+Options for other areas / real elevation (defaults reproduce the original Kengeri behaviour):
+    python backend/generate_bangalore_dma.py --name indiranagar --lat 12.9784 --lng 77.6408 \
+        --dist 450 --out backend/networks/indiranagar.inp --meta backend/networks/indiranagar_meta.json \
+        --dem opentopodata --dem-file backend/networks/indiranagar_dem.json
+    --dem proxy         planar-slope proxy (default)
+    --dem opentopodata  sample SRTM 30 m at every junction and write the samples to --dem-file
+    --dem file          read the samples back from --dem-file (offline and reproducible)
+
 Modelling proxies (documented, not survey data):
-- Elevation = 815 m + a gentle planar slope (~15 m across the bbox) + N(0, 0.5) noise.
+- Elevation (--dem proxy) = 815 m + a gentle planar slope (~15 m across the bbox) + N(0, 0.5) noise.
+  With --dem opentopodata/file it is the SRTM 30 m value sampled at each junction.
 - Households per junction = uniform 10–80; demand = households × 4.5 persons × 135 LPCD.
 - Pipe diameter follows the road class (trunk/primary 400 mm, secondary/tertiary 250 mm, else 110 mm).
 """
@@ -21,6 +30,7 @@ import argparse
 import json
 import math
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -60,11 +70,60 @@ def _clean_graph(g: nx.Graph) -> nx.Graph:
     return out.subgraph(largest).copy()
 
 
-def osm_graph(lat: float, lng: float, dist: float) -> nx.Graph:
-    """Download the OSM drive network and return a cleaned undirected graph."""
+def osm_graph(lat: float, lng: float, dist: float, cache_dir: str | None = None,
+              retries: int = 5, info: dict | None = None) -> nx.Graph:
+    """Download the OSM drive network and return a cleaned undirected graph.
+
+    Uses the osmnx on-disk HTTP cache (`cache_dir`, default osmnx's own) so repeated runs
+    are offline, and retries Overpass failures with exponential backoff. `info` receives
+    {"fresh_fetch": bool}: True when a new cache file appeared during the call.
+    """
     import osmnx as ox
 
-    gm = ox.graph_from_point((lat, lng), dist=dist, network_type="drive")
+    if cache_dir:
+        ox.settings.cache_folder = str(cache_dir)
+    ox.settings.use_cache = True
+    ox.settings.requests_timeout = 180
+    cache = Path(ox.settings.cache_folder)
+    before = set(cache.glob("*.json")) if cache.exists() else set()
+    gm = None
+
+    # Check offline cache first to avoid hanging when Overpass is unavailable
+    if cache.exists():
+        for cached_file in sorted(cache.glob("*.json")):
+            try:
+                raw_data = json.loads(cached_file.read_text(encoding="utf-8"))
+                if isinstance(raw_data, dict) and "elements" in raw_data and len(raw_data["elements"]) > 10:
+                    gm_candidate = ox.graph._create_graph([raw_data], bidirectional=False)
+                    R = 6371000.0
+                    def _hm(la, ln):
+                        p1, p2 = math.radians(lat), math.radians(la)
+                        dp, dl = math.radians(la - lat), math.radians(ln - lng)
+                        a = math.sin(dp/2)**2 + math.cos(p1)*math.cos(p2)*math.sin(dl/2)**2
+                        return 2 * R * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+                    nodes_in = [n for n, d_attr in gm_candidate.nodes(data=True) if "y" in d_attr and "x" in d_attr and _hm(d_attr["y"], d_attr["x"]) <= dist]
+                    if len(nodes_in) >= MIN_JUNCTIONS:
+                        print(f"  Loaded {len(nodes_in)} intersections from offline cache: {cached_file.name}", file=sys.stderr)
+                        gm = gm_candidate.subgraph(nodes_in).copy()
+                        break
+            except Exception as err:
+                pass
+
+    if gm is None:
+        ox.settings.requests_timeout = 10
+        for attempt in range(1, retries + 1):
+            try:
+                gm = ox.graph_from_point((lat, lng), dist=dist, network_type="drive")
+                break
+            except Exception as exc:  # Overpass / requests errors differ by library version
+                print(f"  Overpass attempt {attempt}/{retries} failed: {type(exc).__name__}: {str(exc)[:120]}",
+                      file=sys.stderr)
+                if attempt == retries:
+                    raise
+                time.sleep(min(60, 5 * 2 ** (attempt - 1)))
+    if info is not None:
+        after = set(cache.glob("*.json")) if cache.exists() else set()
+        info["fresh_fetch"] = bool(after - before)
     if hasattr(ox, "convert") and hasattr(ox.convert, "to_undirected"):
         gu = ox.convert.to_undirected(gm)  # osmnx v2
     else:
@@ -150,6 +209,77 @@ def synthetic_graph(lat: float, lng: float, dist: float, seed: int) -> nx.Graph:
     return _clean_graph(g)
 
 
+# ───────────────────────────── elevation (DEM) ─────────────────────────────
+OPENTOPODATA_URL = "https://api.opentopodata.org/v1/srtm30m"
+DEM_BATCH = 100
+
+
+def sample_srtm(points: dict[str, tuple[float, float]], retries: int = 5) -> dict[str, float]:
+    """Sample SRTM 30 m via the public opentopodata API (100 pts/request, 1 request/s)."""
+    import requests
+
+    keys = list(points)
+    out: dict[str, float] = {}
+    for i in range(0, len(keys), DEM_BATCH):
+        chunk = keys[i:i + DEM_BATCH]
+        locs = "|".join(f"{points[k][0]:.6f},{points[k][1]:.6f}" for k in chunk)
+        for attempt in range(1, retries + 1):
+            try:
+                r = requests.get(OPENTOPODATA_URL, params={"locations": locs}, timeout=60,
+                                 headers={"User-Agent": "hydropulse-network-generator"})
+                r.raise_for_status()
+                results = r.json()["results"]
+                if len(results) != len(chunk):
+                    raise ValueError("opentopodata returned a different number of results")
+                for k, res in zip(chunk, results):
+                    if res.get("elevation") is not None:
+                        out[k] = float(res["elevation"])
+                break
+            except Exception as exc:
+                print(f"  DEM attempt {attempt}/{retries} failed: {type(exc).__name__}: {str(exc)[:100]}",
+                      file=sys.stderr)
+                if attempt == retries:
+                    raise
+                time.sleep(min(30, 2 ** attempt))
+        time.sleep(1.1)  # public API: 1 request per second
+    return out
+
+
+def load_elevations(order: list, g: nx.Graph, mode: str, dem_file: Path | None) -> tuple[np.ndarray, dict]:
+    """Return (elevation per junction in `order`, DEM provenance) for mode opentopodata|file.
+
+    Samples are keyed by OSM node id so a cached file reproduces the network offline.
+    """
+    pts = {str(n): (g.nodes[n]["y"], g.nodes[n]["x"]) for n in order}
+    if mode == "file":
+        if dem_file is None:
+            raise RuntimeError("--dem file needs --dem-file")
+        doc = json.loads(Path(dem_file).read_text())
+        samples = {str(k): v for k, v in doc["samples"].items()}
+        missing = [k for k in pts if k not in samples]
+        if missing:
+            raise RuntimeError(f"{dem_file} has no sample for {len(missing)} OSM nodes (e.g. {missing[:3]}); "
+                               "OSM changed since it was written. Re-run with --dem opentopodata.")
+        info = {k: v for k, v in doc.items() if k not in ("samples", "coordinates")}
+    else:
+        samples = sample_srtm(pts)
+        missing = [k for k in pts if k not in samples]
+        if missing:
+            raise RuntimeError(f"SRTM returned no value for {len(missing)} junctions: {missing[:5]}")
+        info = {
+            "source": "SRTM 30 m via api.opentopodata.org/v1/srtm30m",
+            "fetched_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "points": len(samples),
+        }
+        if dem_file:
+            Path(dem_file).parent.mkdir(parents=True, exist_ok=True)
+            doc = dict(info, samples={k: samples[k] for k in sorted(samples, key=int)},
+                       coordinates={k: [round(pts[k][0], 6), round(pts[k][1], 6)] for k in sorted(pts, key=int)})
+            Path(dem_file).write_text(json.dumps(doc, indent=1) + "\n")
+    elev = np.array([samples[str(n)] for n in order], dtype=float)
+    return elev, info
+
+
 # ───────────────────────────── network build ─────────────────────────────
 def diameter_for(highway: str) -> float:
     """Pipe diameter (m) from the OSM highway class."""
@@ -171,17 +301,22 @@ def road_class_for(highway: str) -> str:
     return "residential"
 
 
-def build_network(g: nx.Graph, seed: int) -> tuple[wntr.network.WaterNetworkModel, dict]:
+def build_network(g: nx.Graph, seed: int, dem: str = "proxy",
+                  dem_file: Path | None = None) -> tuple[wntr.network.WaterNetworkModel, dict]:
     """Turn a cleaned street graph into a WNTR model plus metadata."""
     rng = np.random.default_rng(seed)
     order = sorted(g.nodes, key=lambda n: int(n) if str(n).isdigit() else str(n))
     jname = {n: f"J{i + 1}" for i, n in enumerate(order)}
     xs = np.array([g.nodes[n]["x"] for n in order])
     ys = np.array([g.nodes[n]["y"] for n in order])
-    # Planar slope: ~15 m drop from north-east to south-west across the bbox.
-    span = max(np.ptp(xs) + np.ptp(ys), 1e-9)
-    slope = 15.0 * (((xs - xs.min()) + (ys - ys.min())) / span)
-    elev = 815.0 + slope + rng.normal(0, 0.5, size=len(order))
+    dem_info: dict = {}
+    if dem == "proxy":
+        # Planar slope: ~15 m drop from north-east to south-west across the bbox.
+        span = max(np.ptp(xs) + np.ptp(ys), 1e-9)
+        slope = 15.0 * (((xs - xs.min()) + (ys - ys.min())) / span)
+        elev = 815.0 + slope + rng.normal(0, 0.5, size=len(order))
+    else:
+        elev, dem_info = load_elevations(order, g, dem, dem_file)
 
     wn = wntr.network.WaterNetworkModel()
     households: dict[str, int] = {}
@@ -232,7 +367,8 @@ def build_network(g: nx.Graph, seed: int) -> tuple[wntr.network.WaterNetworkMode
     wn.add_pipe("P0", "R1", jname[order[top]], length=50.0, diameter=0.50, roughness=120.0)
     road_class["P0"] = "feeder"
     apply_options(wn)
-    meta = {"households": households, "road_class": road_class, "osmid": osmid}
+    meta = {"households": households, "road_class": road_class, "osmid": osmid,
+            "dem_info": dem_info, "elevations": [float(e) for e in elev]}
     return wn, meta
 
 
@@ -291,14 +427,23 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--dist", type=float, default=600.0)
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--out", default="backend/bangalore_kengeri.inp")
+    ap.add_argument("--meta", default=None, help="meta JSON path (default: <out dir>/network_meta.json)")
+    ap.add_argument("--name", default=None,
+                    help="network_name (default: bangalore_kengeri for osm, kengeri_synthetic for synthetic)")
     ap.add_argument("--source", choices=["osm", "synthetic"], default="osm",
                     help="osm = download real streets (default); synthetic = offline street-like grid")
+    ap.add_argument("--dem", choices=["proxy", "opentopodata", "file"], default="proxy",
+                    help="elevation: planar proxy (default), SRTM 30 m via opentopodata, or a cached DEM file")
+    ap.add_argument("--dem-file", default=None, help="DEM samples JSON (written by opentopodata, read by file)")
+    ap.add_argument("--cache-dir", default=None, help="osmnx HTTP cache folder (default: osmnx's own)")
+    ap.add_argument("--retries", type=int, default=5, help="Overpass retries with exponential backoff")
     args = ap.parse_args(argv)
 
     dist = args.dist
+    osm_info: dict = {}
     for attempt in range(4):
-        g = osm_graph(args.lat, args.lng, dist) if args.source == "osm" else synthetic_graph(
-            args.lat, args.lng, dist, args.seed)
+        g = (osm_graph(args.lat, args.lng, dist, args.cache_dir, args.retries, osm_info)
+             if args.source == "osm" else synthetic_graph(args.lat, args.lng, dist, args.seed))
         n = g.number_of_nodes()
         print(f"[attempt {attempt + 1}] source={args.source} dist={dist:.0f} m → {n} intersections")
         if MIN_JUNCTIONS <= n <= MAX_JUNCTIONS:
@@ -308,14 +453,22 @@ def main(argv: list[str] | None = None) -> int:
         print(f"ERROR: could not reach {MIN_JUNCTIONS}-{MAX_JUNCTIONS} junctions", file=sys.stderr)
         return 1
 
-    wn, meta = build_network(g, args.seed)
+    dem_file = Path(args.dem_file) if args.dem_file else None
+    wn, meta = build_network(g, args.seed, args.dem, dem_file)
     validate_pressures(wn)
     p, res = junction_pressures(wn)
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     write_inp(wn, out)
 
-    network_name = "bangalore_kengeri" if args.source == "osm" else "kengeri_synthetic"
+    network_name = args.name or ("bangalore_kengeri" if args.source == "osm" else "kengeri_synthetic")
+    elev = np.array(meta["elevations"])
+    params = {
+        "source": args.source, "lat": args.lat, "lng": args.lng, "dist": dist,
+        "seed": args.seed, "reservoir_head_m": round(wn.get_node("R1").base_head, 2),
+        "elevation": ("proxy: 815 m + ~15 m planar slope + N(0, 0.5) noise" if args.dem == "proxy"
+                      else f"SRTM 30 m sampled at each junction (--dem {args.dem})"),
+    }
     meta_doc = {
         "network_name": network_name,
         "center": {"lat": args.lat, "lng": args.lng},
@@ -323,19 +476,42 @@ def main(argv: list[str] | None = None) -> int:
         "road_class": meta["road_class"],
         "osmid": meta["osmid"],
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "params": {
-            "source": args.source, "lat": args.lat, "lng": args.lng, "dist": dist,
-            "seed": args.seed, "reservoir_head_m": round(wn.get_node("R1").base_head, 2),
-            "elevation": "proxy: 815 m + ~15 m planar slope + N(0, 0.5) noise",
-        },
+        "params": params,
     }
-    (out.parent / "network_meta.json").write_text(json.dumps(meta_doc, indent=2) + "\n")
+    if args.source == "osm" and args.dem != "proxy":
+        fresh = bool(osm_info.get("fresh_fetch"))
+        meta_doc["source"] = "osm"
+        meta_doc["provenance"] = {
+            "summary": "Street geometry is real OpenStreetMap; hydraulics are modelled, not BWSSB asset data.",
+            "street_geometry": "OpenStreetMap drive network via osmnx (Overpass API), largest connected component",
+            "osm_fetch_utc": (datetime.now(timezone.utc).isoformat(timespec="seconds") if fresh
+                              else "from osmnx cache (original fetch earlier than generated_at)"),
+            "osm_radius_m": dist,
+            "diameters": "by OSM road class: trunk/primary 400 mm, secondary/tertiary 250 mm, else 110 mm "
+                         "(110 mm lanes upsized to 150 mm if the pressure window needs it)",
+            "hazen_williams_c": 120,
+            "households": f"modelled, seed {args.seed}: uniform integer 10-80 per junction (not a census)",
+            "demand": "households x 4.5 persons x 135 LPCD",
+            "elevation": meta["dem_info"],
+            "elevation_range_m": [round(float(elev.min()), 1), round(float(elev.max()), 1)],
+            "reservoir": "single reservoir ~50 m off the highest junction on a primary road; head tuned so "
+                         f"all junction pressures sit in [{MIN_P:.0f}, {MAX_P:.0f}] m",
+            "counts": {
+                "junctions": len(wn.junction_name_list), "pipes": len(wn.pipe_name_list),
+                "households": sum(meta["households"].values()),
+            },
+            "disclaimer": "modelled, not BWSSB asset data",
+        }
+    meta_path = Path(args.meta) if args.meta else out.parent / "network_meta.json"
+    meta_path.parent.mkdir(parents=True, exist_ok=True)
+    meta_path.write_text(json.dumps(meta_doc, indent=2) + "\n")
 
     total_demand_lps = sum(wn.get_node(j).base_demand for j in wn.junction_name_list) * 1000
-    print(f"wrote {out} and {out.parent / 'network_meta.json'}")
+    print(f"wrote {out} and {meta_path}")
     print(f"network_name={network_name} junctions={len(wn.junction_name_list)} "
           f"pipes={len(wn.pipe_name_list)} reservoirs={len(wn.reservoir_name_list)}")
     print(f"pressure m: min={p.min():.1f} mean={p.mean():.1f} max={p.max():.1f}")
+    print(f"elevation m: min={elev.min():.1f} max={elev.max():.1f} (dem={args.dem})")
     print(f"total demand: {total_demand_lps:.2f} L/s; households: {sum(meta['households'].values())}")
     return 0
 

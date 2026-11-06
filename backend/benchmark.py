@@ -53,6 +53,9 @@ def run_trials(engine: HydraulicEngine, nodes: list[str], noise: float, seed: in
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
+    ap.add_argument("--inp", default="backend/bangalore_kengeri.inp", help="Path to .inp file")
+    ap.add_argument("--meta", default="backend/network_meta.json", help="Path to meta JSON")
+    ap.add_argument("--cache", default=None, help="Path to sensitivity matrix cache")
     ap.add_argument("--sample", type=int, default=80)
     ap.add_argument("--seed", type=int, default=2026)
     ap.add_argument("--out", default="backend/benchmark_report.md")
@@ -60,7 +63,11 @@ def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
     t0 = time.perf_counter()
-    base = HydraulicEngine().boot()
+    base = HydraulicEngine(
+        inp_path=args.inp,
+        meta_path=args.meta,
+        cache_path=args.cache,
+    ).boot()
     boot_s = time.perf_counter() - t0
     rng = np.random.default_rng(args.seed)
     nodes = list(base.junctions)
