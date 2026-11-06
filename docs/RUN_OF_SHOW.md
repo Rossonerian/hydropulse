@@ -1,115 +1,79 @@
-# HydroPulse: Demo-Day Run of Show & Stage Playbook
+# DHARA / HydroPulse: Demo-Day Run of Show & Stage Playbook
 
-**Event:** Lakshya 2026 @ SJBIT, Bengaluru Â· **Track 02:** Smart and Sustainable Future
-**Team:** Hardhik (Backend Lead), Gangu (Pipeline/DevOps), Badri (Frontend/UI), Jasmine (Pitch/ROI)
+**Event:** Lakshya 2026 @ SJBIT, Bengaluru · **Track 02:** Smart and Sustainable Future  
+**Brand:** DHARA — Smart Water Leakage & Consumption Tracker (System Identifier: HydroPulse)  
+**Team:** Hardhik (Backend & Hydraulics Lead), Gangu (Pipeline/DevOps), Badri (Frontend/UI), Jasmine (Pitch/ROI)
 
 ---
 
-## 1. Stage Roles & Responsibilities
+## 1. Quick One-Command Startup (Arch Linux)
+
+To boot the entire full-stack live demo with hydraulic matrix verification:
+
+```bash
+make demo
+```
+
+To run in forced offline mode (using recorded API snapshots):
+```bash
+make demo-offline
+```
+
+To reset the demo state between presentations without restarting services:
+```bash
+make demo-reset
+```
+
+To stop all services cleanly:
+```bash
+make stop
+```
+
+---
+
+## 2. Stage Roles & Responsibilities
 
 | Team Member | Role on Stage | Active Responsibilities |
 | :--- | :--- | :--- |
 | **Jasmine** | Speaker 1 (The Hook & Story) | Delivers slide deck, problem hook, business/BWSSB economics, ROI defense. |
 | **Hardhik** | Speaker 2 (Engineering & Physics) | Explains EPANET PDD model, Torricelli orifice equation, cosine triangulation, stage-2 re-simulation. Answers technical questions from judges. |
-| **Badri** | Driver / Operator | Operates the SCADA dashboard on projector: runs presets, selects burst junctions, triggers valve isolation, highlights telemetry. |
+| **Badri** | Driver / Operator | Operates the SCADA dashboard on projector: runs presets, triggers valve isolation, highlights telemetry. |
 | **Gangu** | Flight Controller / Tech Insurance | Manages terminal runs, verifies offline caches, keeps hot-backup laptop ready with mock mode switch if network drops. |
 
 ---
 
-## 2. Master System Boot Order
-
-Follow this exact sequence 10 minutes before going on stage:
-
-```mermaid
-flowchart TD
-    A["Step 1: Start Backend (Terminal 1)"] --> B["Wait for 'Matrix ready' log (<5s warm)"]
-    B --> C["Step 2: Start Frontend (Terminal 2)"]
-    C --> D["Step 3: Open Chrome at http://localhost:5173"]
-    D --> E["Step 4: Open Pitch Deck (file://.../pitch_and_roi/deck/index.html)"]
-    E --> F["Step 5: Run Pre-Flight Smoke Test"]
-```
-
-### Command Execution:
-
-1. **Terminal 1 (Backend):**
-   ```bash
-   make backend
-   # Windows: .\scripts\run_backend.ps1
-   ```
-   *Look for:* `INFO: Uvicorn running on http://0.0.0.0:8000` and `[HydraulicEngine] Matrix ready (N junctions, 5 sensors).`
-
-2. **Terminal 2 (Frontend SCADA Dashboard):**
-   ```bash
-   make frontend
-   # Windows: .\scripts\run_frontend.ps1
-   ```
-   *Runs at:* `http://localhost:5173`
-
-3. **Pitch Deck (Browser Tab 1):**
-   Open directly via `file://`:
-   `pitch_and_roi/deck/index.html`
-
-4. **Live Dashboard (Browser Tab 2):**
-   `http://localhost:5173`
-
-5. **API Documentation / Swagger (Browser Tab 3, backup):**
-   `http://localhost:8000/docs`
-
----
-
-## 3. Demo Insurance & Emergency Mock Fallback
-
-If the live backend or Python environment crashes on stage, **do not debug in front of the judges**. Switch to mock mode instantly.
-
-### One-Command Instant Mock Switch:
-In Terminal 2 (frontend):
-```bash
-# Windows PowerShell:
-$env:VITE_USE_MOCK="true"; npm run dev -- --host
-
-# Linux / Mac Bash:
-VITE_USE_MOCK=true npm run dev -- --host
-```
-*Note:* After `make snapshot` succeeds, mock mode uses saved real API results in
-`frontend/public/mock/*.json`. Until then, the fixtures are clearly labelled Phase A
-synthetic data and must not be presented as live physics output.
-
----
-
-## 4. Pre-Pitch Stage Checklist (T-15 Minutes)
+## 3. Pre-Pitch Stage Checklist (T-15 Minutes)
 
 - [ ] **Power Adapter:** Laptop plugged into AC mains; power mode set to "High Performance".
-- [ ] **Display Setup:** Resolution set to 1920Ã—1080 (or 1366Ã—768 on older venue projectors). Display mode set to **Duplicate / Mirror** (not extend).
-- [ ] **Browser Window:** Chrome zoom level set to exactly **100%** (Ctrl + 0). Press F11 for full-screen during presentation.
+- [ ] **Display Setup:** Resolution set to 1920×1080 (or 1366×768 on venue projectors). Display mode set to **Duplicate / Mirror**.
+- [ ] **Browser Window:** Browser zoom level set to **100%** (Ctrl + 0). Press F11 for full-screen presentation mode.
 - [ ] **Distraction Shield:** Turn ON "Do Not Disturb" / Focus Assist. Close Slack, Discord, WhatsApp, email, and IDE notifications.
 - [ ] **Wi-Fi Independence:** Turn Airplane mode ON to prove zero cloud reliance. Verify backend boots from local `bangalore_kengeri.inp` and cached `sensitivity_matrix.npy`.
 - [ ] **Volume / Sound:** System audio muted.
 
 ---
 
-## 5. Live Pitch Run-of-Show Script (5-Minute Hackathon Format)
+## 4. Live Pitch Run-of-Show Script (5-Minute Hackathon Format)
 
-- **0:00 â€“ 1:30 (Jasmine):** The Problem
-  - Open on Slide 1: Use only the sourced non-revenue-water figure from the deck;
-    otherwise label it `[VERIFY]`.
-  - The reality: Kengeri pipeline bursts flood streets, and BWSSB spends hours driving around trying to locate the breach.
-  - The solution: HydroPulse â€” a software digital twin using existing municipal telemetry with only 5 sentinel sensors.
-- **1:30 â€“ 3:30 (Hardhik & Badri):** The Live Demonstration
+- **0:00 – 1:30 (Jasmine): The Problem & Value Proposition**
+  - Open on the problem: Municipal water distribution in Indian metros (like BWSSB in Bengaluru) loses 35–40% of treated water as Non-Revenue Water (NRW).
+  - Underground pipe bursts buried 1.5–2.5 m under roads go unnoticed for days until roads cave in.
+  - The solution: **DHARA** — a software-only hydraulic digital twin that converts OpenStreetMap road topology into a WNTR PDD hydraulic network, using just **5 sentinel pressure-monitoring junctions** to pinpoint leaks in under a second.
+
+- **1:30 – 3:30 (Hardhik & Badri): The Live Demonstration**
   - Switch to SCADA dashboard (`http://localhost:5173`).
-  - *Action 1:* Badri selects **Preset 1: Kengeri Mainline Rupture** (45 cmÂ²).
-  - *Visual:* Real-time pressure drop observed on Sentinel Sensors S1â€“S5.
-  - *Action 2:* Engine runs cosine screening + stage-2 verification; inspect the
-    resulting heatmap rather than pre-announcing a node ID.
-  - *Visual:* Read the displayed confidence, localization error, and loss rate from
-    the current response. Do not describe confidence as benchmark accuracy.
-  - *Action 3:* Badri clicks "Isolate Segment" and describes the returned valve and
-    household-impact values; do not pre-script fixture-specific IDs or totals.
-- **3:30 â€“ 4:30 (Jasmine):** ROI & Municipal Economics
-  - Switch to ROI calculator: present only figures sourced in the deck, or mark them
-    `[VERIFY]`.
-  - Scalability: explain the five-sentinel-node simulation design without claiming
-    unverified city-wide deployment counts.
-- **4:30 â€“ 5:00 (Team):** Conclusion & Q&A Defense
-  - Hardhik defends Torricelli equation & WNTR PDD pressure exponents.
-  - Gangu and Badri stand by for system inspection.
+  - *Action 1:* Badri clicks **START DHARA DEMO** on the left panel (or picks Kengeri Mainline Rupture).
+  - *Visual 1:* Real-time pressure drop observed on Sentinel Sensors S1–S5. Max drop sensor highlighted.
+  - *Visual 2:* 2-stage verification: cosine similarity candidate ranking followed by physical orifice re-simulation. Top candidate junction, confidence badge, and probability heatmap rendered on Leaflet map.
+  - *Visual 3:* Incident card displays loss in L/min and equivalent 6,000-L BWSSB tankers per day.
+  - *Action 2:* Badri clicks **3. Shut the valves** (`I` key).
+  - *Visual 4:* Recommended isolation valves highlighted on map; affected households and preserved network zones computed.
+  - *Action 3:* Badri clicks **Reset** (`R` key) and shows instant return to normal baseline state.
 
+- **3:30 – 4:30 (Jasmine): ROI & Municipal Economics**
+  - Scalability: explain the 5-sentinel graph betweenness centrality design (software monitoring junctions that map to existing municipal loggers).
+  - BWSSB impact: saving millions in treated water and avoiding disruptive road excavations.
+
+- **4:30 – 5:00 (Team): Conclusion & Q&A Defense**
+  - Hardhik defends Torricelli equation, PDD pressure exponent $P_{\text{exp}} = 0.5$, and WNTR simulation physics.
+  - Badri and Gangu stand by for code and contract inspection.

@@ -1,4 +1,4 @@
-.PHONY: help setup network network-synthetic backend frontend dev lint fmt-check typecheck test test-live warm benchmark smoke fixtures snapshot presets clean
+.PHONY: help setup network network-synthetic backend frontend dev lint fmt-check typecheck test test-live warm benchmark smoke fixtures snapshot presets clean demo demo-offline demo-reset preflight stop build
 
 VENV ?= .venv
 PYTHON ?= $(VENV)/bin/python
@@ -83,4 +83,23 @@ snapshot:
 
 clean:
 	 rm -rf __pycache__ data_utils/__pycache__ backend/__pycache__ tests/__pycache__ .pytest_cache
+
+preflight:
+	@bash scripts/preflight.sh
+
+demo:
+	@bash scripts/demo.sh
+
+demo-offline:
+	@bash scripts/demo.sh --offline
+
+demo-reset:
+	@bash scripts/demo_reset.sh
+
+stop:
+	@bash scripts/stop.sh
+
+build:
+	npm run build --prefix frontend
+
 
