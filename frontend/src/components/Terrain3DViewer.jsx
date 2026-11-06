@@ -33,6 +33,51 @@ import {
   interpolateMidpoint,
 } from '../lib/realWorldData.js';
 
+
+const DEFAULT_CAM = { azimuth: 45, elevation: 35, zoom: 1.0, panX: 0, panY: 0 };
+
+// Forward isometric projection with trig/scale computed once per frame; `to` writes into x/y.
+function makeProjector(cam, width, height) {
+  const azRad = (cam.azimuth * Math.PI) / 180;
+  const elRad = (cam.elevation * Math.PI) / 180;
+  const cosAz = Math.cos(azRad);
+  const sinAz = Math.sin(azRad);
+  const cosEl = Math.cos(elRad);
+  const sinEl = Math.sin(elRad);
+  const scale = (cam.zoom * 0.22 * Math.min(width, height)) / 600;
+  const cx = width / 2 + cam.panX;
+  const cy = height / 2 + cam.panY;
+  const o = {
+    x: 0,
+    y: 0,
+    to(x, y, z) {
+      const rx = x * cosAz - z * sinAz;
+      const rz = x * sinAz + z * cosAz;
+      const py = y * cosEl - rz * sinEl;
+      o.x = cx + rx * scale;
+      o.y = cy - py * scale;
+    },
+  };
+  return o;
+}
+
+// Inverse projection: screen point to metric scene (x, z) at target plane y.
+function unprojectScreen(cam, screenX, screenY, yTarget, width, height) {
+  const azRad = (cam.azimuth * Math.PI) / 180;
+  const elRad = (cam.elevation * Math.PI) / 180;
+  const cosAz = Math.cos(azRad);
+  const sinAz = Math.sin(azRad);
+  const cosEl = Math.cos(elRad);
+  const sinEl = Math.sin(elRad);
+  const scale = (cam.zoom * 0.22 * Math.min(width, height)) / 600;
+  const rx = (screenX - width / 2 - cam.panX) / scale;
+  const py = (height / 2 + cam.panY - screenY) / scale;
+  const safeSinEl = Math.abs(sinEl) < 0.05 ? (sinEl < 0 ? -0.05 : 0.05) : sinEl;
+  const rz = (yTarget * cosEl - py) / safeSinEl;
+  return { x: rx * cosAz + rz * sinAz, z: -rx * sinAz + rz * cosAz };
+}
+
+
 export default function Terrain3DViewer({
   network,
   result,
@@ -57,14 +102,19 @@ export default function Terrain3DViewer({
   // Interaction Mode: 'navigate' (camera orbit/pan/zoom) vs 'edit' (pipe/junction modification)
   const [interactionMode, setInteractionMode] = useState('navigate');
 
-  // Camera State: azimith (deg), elevation (deg), zoom, pan {x, y}
-  const [rotation, setRotation] = useState({ azimuth: 45, elevation: 35 });
-  const [zoom, setZoom] = useState(1.0);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
+  // Camera lives in a ref, not React state: orbit/pan/zoom must not re-render the component
+  // (and the HUD inspector) on every mouse event. A draw is scheduled on demand instead.
+  const camRef = useRef({ ...DEFAULT_CAM });
+  const compassIconRef = useRef(null);
+  const compassTextRef = useRef(null);
+  const sizeRef = useRef({ w: 0, h: 0, dpr: 1 });
+  const rafRef = useRef(0);
+  const drawRef = useRef(null);
 
-  // Camera Dragging State
+  // Camera Dragging State (cursor only; the drag itself is tracked in a ref)
   const [isNavDragging, setIsNavDragging] = useState(false);
-  const navDragStart = useRef({ x: 0, y: 0, azimuth: 45, elevation: 35, panX: 0, panY: 0, button: 0 });
+  const navDragStart = useRef({ x: 0, y: 0, azimuth: 45, elevation: 35, panX: 0, panY: 0, button: 0, active: false });
+
 
   // Active Draft Network for Local Edits
   const [draftNetwork, setDraftNetwork] = useState(network || null);
@@ -85,9 +135,8 @@ export default function Terrain3DViewer({
   const [activeDragHandle, setActiveDragHandle] = useState(null); // { type: 'vertex'|'node', pipeId, vertexIdx, nodeId }
   const dragHandleRef = useRef(null);
 
-  // Generate DEM terrain grid points across Kengeri AOI (808m to 838m)
-  const terrainGrid = useRef([]);
-  useEffect(() => {
+  // DEM terrain grid across Kengeri AOI (808m to 838m), built once.
+  const terrainGrid = useMemo(() => {
     const grid = [];
     const cols = 16;
     const rows = 16;
@@ -104,67 +153,43 @@ export default function Terrain3DViewer({
           (r / rows) * 8.5 +
           Math.sin(c * 0.45) * 3.5 +
           Math.cos(r * 0.4) * 2.0;
-        const pt = projectToMetricScene(lat, lng, elevation);
-        row.push({ lat, lng, elevation, ...pt });
+        row.push(projectToMetricScene(lat, lng, elevation));
       }
       grid.push(row);
     }
-    terrainGrid.current = grid;
+    return grid;
   }, []);
 
-  // Forward Isometric 3D Projection
-  const project = useCallback(
-    (x, y, z, width, height) => {
-      const azRad = (rotation.azimuth * Math.PI) / 180;
-      const elRad = (rotation.elevation * Math.PI) / 180;
-
-      // Rotate around Y (Azimuth)
-      const cosAz = Math.cos(azRad);
-      const sinAz = Math.sin(azRad);
-      const rx = x * cosAz - z * sinAz;
-      const rz = x * sinAz + z * cosAz;
-
-      // Tilt with Elevation (Pitch)
-      const cosEl = Math.cos(elRad);
-      const sinEl = Math.sin(elRad);
-      const py = y * cosEl - rz * sinEl;
-      const depth = y * sinEl + rz * cosEl;
-
-      const scale = (zoom * 0.22 * Math.min(width, height)) / 600;
-      const screenX = width / 2 + rx * scale + pan.x;
-      const screenY = height / 2 - py * scale + pan.y;
-
-      return { x: screenX, y: screenY, depth };
-    },
-    [rotation, zoom, pan],
+  const waterLines = useMemo(
+    () =>
+      REAL_WORLD_FEATURES.waterBodies
+        .filter((wb) => wb.type === 'line')
+        .map((wb) => wb.coordinates.map((coord) => projectToMetricScene(coord[0], coord[1], 808))),
+    [],
   );
 
-  // Inverse 3D Projection: screen point to metric scene (x, z) at target plane y
-  const unproject = useCallback(
-    (screenX, screenY, yTarget = 0, width, height) => {
-      const azRad = (rotation.azimuth * Math.PI) / 180;
-      const elRad = (rotation.elevation * Math.PI) / 180;
+  // Schedule one draw on the next animation frame (coalesces any number of requests).
+  const requestDraw = useCallback(() => {
+    if (rafRef.current) return;
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = 0;
+      drawRef.current?.();
+    });
+  }, []);
 
-      const cosAz = Math.cos(azRad);
-      const sinAz = Math.sin(azRad);
-      const cosEl = Math.cos(elRad);
-      const sinEl = Math.sin(elRad);
+  // Update the compass readout straight in the DOM (no React render per orbit event).
+  const syncCompass = () => {
+    const { azimuth, elevation } = camRef.current;
+    if (compassIconRef.current) compassIconRef.current.style.transform = `rotate(${-azimuth}deg)`;
+    if (compassTextRef.current)
+      compassTextRef.current.textContent = `${Math.round(azimuth)}° Az · ${Math.round(elevation)}° El`;
+  };
+  const updateCam = (patch) => {
+    Object.assign(camRef.current, patch);
+    syncCompass();
+    requestDraw();
+  };
 
-      const scale = (zoom * 0.22 * Math.min(width, height)) / 600;
-      const rx = (screenX - width / 2 - pan.x) / scale;
-      const py = (height / 2 + pan.y - screenY) / scale;
-
-      // py = yTarget * cosEl - rz * sinEl => rz = (yTarget * cosEl - py) / sinEl
-      const safeSinEl = Math.abs(sinEl) < 0.05 ? (sinEl < 0 ? -0.05 : 0.05) : sinEl;
-      const rz = (yTarget * cosEl - py) / safeSinEl;
-
-      const x = rx * cosAz + rz * sinAz;
-      const z = -rx * sinAz + rz * cosAz;
-
-      return { x, z };
-    },
-    [rotation, zoom, pan],
-  );
 
   // Nodes indexed by ID
   const activeNodes = draftNetwork?.nodes || [];
@@ -195,60 +220,61 @@ export default function Terrain3DViewer({
   const selectedNode = byId[selected];
   const selectedPipe = activePipes.find((p) => p.id === selected);
 
-  // Camera Control Actions
-  const resetCamera = () => {
-    setRotation({ azimuth: 45, elevation: 35 });
-    setZoom(1.0);
-    setPan({ x: 0, y: 0 });
-  };
+  // Projected-to-metric geometry, rebuilt only when the network itself changes
+  // (not on camera moves, selection, or theme changes).
+  const scene = useMemo(() => {
+    const nodes = activeNodes.map((n) => {
+      const pt = projectToMetricScene(n.lat, n.lng, n.elevation_m || 818);
+      return { n, x: pt.x, y: pt.y, z: pt.z };
+    });
+    const pipes = [];
+    for (const p of activePipes) {
+      const a = byId[p.source];
+      const b = byId[p.target];
+      if (!a || !b) continue;
+      const ptA = projectToMetricScene(a.lat, a.lng, a.elevation_m || 815);
+      const ptB = projectToMetricScene(b.lat, b.lng, b.elevation_m || 815);
+      const mids = (p.coordinates || []).map((c) =>
+        projectToMetricScene(c.lat ?? c[0], c.lng ?? c[1], 815),
+      );
+      pipes.push({ p, pts: [ptA, ...mids, ptB], mids: mids.length });
+    }
+    return { nodes, pipes };
+  }, [activeNodes, activePipes, byId]);
 
-  const topDownCamera = () => {
-    setRotation({ azimuth: 0, elevation: 84 });
-    setPan({ x: 0, y: 0 });
-  };
+
+  // Camera Control Actions
+  const resetCamera = () => updateCam({ ...DEFAULT_CAM });
+  const topDownCamera = () => updateCam({ azimuth: 0, elevation: 84, panX: 0, panY: 0 });
+  const zoomBy = (f) => updateCam({ zoom: Math.max(0.4, Math.min(4.5, camRef.current.zoom * f)) });
 
   const fitNetwork = () => {
-    if (!activeNodes.length) return;
-    const xs = [],
-      zs = [];
-    activeNodes.forEach((n) => {
-      const pt = projectToMetricScene(n.lat, n.lng, n.elevation_m || 818);
-      xs.push(pt.x);
-      zs.push(pt.z);
-    });
-    const minX = Math.min(...xs),
-      maxX = Math.max(...xs);
-    const minZ = Math.min(...zs),
-      maxZ = Math.max(...zs);
+    if (!scene.nodes.length) return;
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    for (const s of scene.nodes) {
+      if (s.x < minX) minX = s.x;
+      if (s.x > maxX) maxX = s.x;
+      if (s.z < minZ) minZ = s.z;
+      if (s.z > maxZ) maxZ = s.z;
+    }
     const midX = (minX + maxX) / 2;
     const midZ = (minZ + maxZ) / 2;
-
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const width = canvas.width || 800;
-    const height = canvas.height || 600;
+    const { w, h } = sizeRef.current;
+    const width = w || 800;
+    const height = h || 600;
 
     const span = Math.max(maxX - minX, maxZ - minZ, 400);
     const targetZoom = Math.max(0.6, Math.min(2.8, 1400 / span));
-
-    setZoom(targetZoom);
-    // Center on the network centroid
-    const azRad = (rotation.azimuth * Math.PI) / 180;
-    const cosAz = Math.cos(azRad);
-    const sinAz = Math.sin(azRad);
-    const rx = midX * cosAz - midZ * sinAz;
+    const azRad = (camRef.current.azimuth * Math.PI) / 180;
+    const rx = midX * Math.cos(azRad) - midZ * Math.sin(azRad);
     const scale = (targetZoom * 0.22 * Math.min(width, height)) / 600;
-    setPan({ x: -rx * scale, y: 20 });
+    updateCam({ zoom: targetZoom, panX: -rx * scale, panY: 20 });
   };
 
   const focusSelected = () => {
     let target = null;
     if (selectedNode) {
-      target = projectToMetricScene(
-        selectedNode.lat,
-        selectedNode.lng,
-        selectedNode.elevation_m || 818,
-      );
+      target = projectToMetricScene(selectedNode.lat, selectedNode.lng, selectedNode.elevation_m || 818);
     } else if (selectedPipe) {
       const a = byId[selectedPipe.source];
       const b = byId[selectedPipe.target];
@@ -258,36 +284,17 @@ export default function Terrain3DViewer({
       }
     }
     if (!target) return;
-
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const width = canvas.width || 800;
-    const height = canvas.height || 600;
-
-    const azRad = (rotation.azimuth * Math.PI) / 180;
-    const cosAz = Math.cos(azRad);
-    const sinAz = Math.sin(azRad);
-    const rx = target.x * cosAz - target.z * sinAz;
-
-    const scale = (zoom * 0.22 * Math.min(width, height)) / 600;
-    setPan({ x: -rx * scale, y: 0 });
+    const { w, h } = sizeRef.current;
+    const width = w || 800;
+    const height = h || 600;
+    const cam = camRef.current;
+    const azRad = (cam.azimuth * Math.PI) / 180;
+    const rx = target.x * Math.cos(azRad) - target.z * Math.sin(azRad);
+    const scale = (cam.zoom * 0.22 * Math.min(width, height)) / 600;
+    updateCam({ panX: -rx * scale, panY: 0 });
   };
 
-  // Keyboard Navigation & Undo/Redo Shortcuts
-  useEffect(() => {
-    const handleKey = (e) => {
-      if (['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return;
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
-        e.preventDefault();
-        e.shiftKey ? handleRedo() : handleUndo();
-      } else if (e.key === 'Escape') {
-        setActiveDragHandle(null);
-        if (interactionMode === 'edit') setInteractionMode('navigate');
-      }
-    };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  });
+
 
   // Commit a draft update into undo history
   const commitMutation = (mutator) => {
@@ -439,15 +446,69 @@ export default function Terrain3DViewer({
     onUpdateDraft?.(null);
   }, [network, onUpdateDraft]);
 
-  // Canvas Render Loop
+  // Keyboard Navigation & Undo/Redo Shortcuts (subscribed once; reads latest handlers via ref)
+  const keyRef = useRef({});
+  keyRef.current = { handleUndo, handleRedo, interactionMode };
+  useEffect(() => {
+    const handleKey = (e) => {
+      if (['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return;
+      const k = keyRef.current;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        e.shiftKey ? k.handleRedo() : k.handleUndo();
+      } else if (e.key === 'Escape') {
+        setActiveDragHandle(null);
+        if (k.interactionMode === 'edit') setInteractionMode('navigate');
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, []);
+
+  // Canvas size + DPR (capped at 2): resize only when the container changes, never per frame.
+  const hasNetwork = !!draftNetwork;
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    const width = (canvas.width = canvas.parentElement.clientWidth);
-    const height = (canvas.height = canvas.parentElement.clientHeight);
+    const host = canvas?.parentElement;
+    if (!canvas || !host) return undefined;
+    const apply = () => {
+      const w = host.clientWidth;
+      const h = host.clientHeight;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const s = sizeRef.current;
+      if (w === s.w && h === s.h && dpr === s.dpr) return;
+      sizeRef.current = { w, h, dpr };
+      canvas.width = Math.max(1, Math.round(w * dpr));
+      canvas.height = Math.max(1, Math.round(h * dpr));
+      requestDraw();
+    };
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(host);
+    const onVis = () => {
+      if (!document.hidden) requestDraw();
+    };
+    document.addEventListener('visibilitychange', onVis);
+    syncCompass();
+    return () => {
+      ro.disconnect();
+      document.removeEventListener('visibilitychange', onVis);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = 0;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasNetwork, requestDraw]);
 
+  // Draw function: reads the latest props through this closure and the camera from camRef.
+  drawRef.current = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const { w: width, h: height, dpr } = sizeRef.current;
+    if (!width || !height) return;
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, width, height);
+    const proj = makeProjector(camRef.current, width, height);
 
     // 1. Sky & Atmospheric Haze
     const bg = ctx.createLinearGradient(0, 0, 0, height);
@@ -457,106 +518,94 @@ export default function Terrain3DViewer({
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, width, height);
 
-    // 2. Terrain Wireframe & Elevation Grid
-    const grid = terrainGrid.current;
+    // 2. Terrain Wireframe & Elevation Grid (single path)
+    const grid = terrainGrid;
     if (grid.length > 0 && (visibleLayers.terrain ?? true)) {
       ctx.strokeStyle = '#3A506B33';
       ctx.lineWidth = 1;
-
+      ctx.beginPath();
       for (let r = 0; r < grid.length; r++) {
-        ctx.beginPath();
         for (let c = 0; c < grid[r].length; c++) {
           const pt = grid[r][c];
-          const sc = project(pt.x, pt.y, pt.z, width, height);
-          if (c === 0) ctx.moveTo(sc.x, sc.y);
-          else ctx.lineTo(sc.x, sc.y);
+          proj.to(pt.x, pt.y, pt.z);
+          if (c === 0) ctx.moveTo(proj.x, proj.y);
+          else ctx.lineTo(proj.x, proj.y);
         }
-        ctx.stroke();
       }
-
       for (let c = 0; c < grid[0].length; c++) {
-        ctx.beginPath();
         for (let r = 0; r < grid.length; r++) {
           const pt = grid[r][c];
-          const sc = project(pt.x, pt.y, pt.z, width, height);
-          if (r === 0) ctx.moveTo(sc.x, sc.y);
-          else ctx.lineTo(sc.x, sc.y);
+          proj.to(pt.x, pt.y, pt.z);
+          if (r === 0) ctx.moveTo(proj.x, proj.y);
+          else ctx.lineTo(proj.x, proj.y);
         }
-        ctx.stroke();
       }
+      ctx.stroke();
     }
 
     // 3. Water Bodies (Kengeri Lake & Stream)
     if (visibleLayers.water_bodies ?? true) {
-      REAL_WORLD_FEATURES.waterBodies.forEach((wb) => {
-        if (wb.type === 'line') {
-          ctx.beginPath();
-          ctx.strokeStyle = '#5BC0DE66';
-          ctx.lineWidth = 4;
-          wb.coordinates.forEach((coord, idx) => {
-            const pt = projectToMetricScene(coord[0], coord[1], 808);
-            const sc = project(pt.x, pt.y, pt.z, width, height);
-            if (idx === 0) ctx.moveTo(sc.x, sc.y);
-            else ctx.lineTo(sc.x, sc.y);
-          });
-          ctx.stroke();
-        }
-      });
+      ctx.strokeStyle = '#5BC0DE66';
+      ctx.lineWidth = 4;
+      for (const line of waterLines) {
+        ctx.beginPath();
+        line.forEach((pt, idx) => {
+          proj.to(pt.x, pt.y, pt.z);
+          if (idx === 0) ctx.moveTo(proj.x, proj.y);
+          else ctx.lineTo(proj.x, proj.y);
+        });
+        ctx.stroke();
+      }
     }
 
     // Depth offset for pipe stratification (-12m or 0m)
     const depthOffset = showIllustrativeDepth ? -12 : 0;
 
-    // 4. Draw Canonical Network Pipes
-    activePipes.forEach((p) => {
-      const a = byId[p.source];
-      const b = byId[p.target];
-      if (!a || !b) return;
-
-      const isSelected = selected === p.id;
-      const isValving = valving.has(p.id);
-      const isClosed = p.status === 'CLOSED';
-
-      const ptA = projectToMetricScene(a.lat, a.lng, a.elevation_m || 815);
-      const ptB = projectToMetricScene(b.lat, b.lng, b.elevation_m || 815);
-
-      // Collect all polyline vertices (start, intermediates, end)
-      const intermediatePts = (p.coordinates || []).map((c) =>
-        projectToMetricScene(c.lat ?? c[0], c.lng ?? c[1], 815),
-      );
-      const allPts = [ptA, ...intermediatePts, ptB];
-
-      ctx.beginPath();
-      ctx.strokeStyle = isSelected
-        ? '#F4D6B0'
-        : isValving
-          ? '#D97706'
-          : isClosed
-            ? '#64748B'
-            : '#5BC0DE';
-      ctx.lineWidth = isSelected ? 6.5 : isValving ? 5 : p.diameter_mm >= 400 ? 4.5 : 2.5;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-
-      if (isSelected) {
-        ctx.shadowColor = 'rgba(244, 214, 176, 0.6)';
-        ctx.shadowBlur = 10;
+    // 4. Pipes, batched by style: one stroke per style instead of one per pipe.
+    const groups = new Map();
+    let selectedEntry = null;
+    for (const entry of scene.pipes) {
+      const p = entry.p;
+      if (selected === p.id) {
+        selectedEntry = entry;
+        continue;
       }
-
-      allPts.forEach((pt, idx) => {
-        const sc = project(pt.x, pt.y + depthOffset, pt.z, width, height);
-        if (idx === 0) ctx.moveTo(sc.x, sc.y);
-        else ctx.lineTo(sc.x, sc.y);
-      });
+      const isValving = valving.has(p.id);
+      const color = isValving ? '#D97706' : p.status === 'CLOSED' ? '#64748B' : '#5BC0DE';
+      const lw = isValving ? 5 : p.diameter_mm >= 400 ? 4.5 : 2.5;
+      const key = `${color}|${lw}`;
+      let g = groups.get(key);
+      if (!g) groups.set(key, (g = { color, lw, list: [] }));
+      g.list.push(entry);
+    }
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    const strokeGroup = (list, color, lw) => {
+      ctx.beginPath();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = lw;
+      for (const { pts } of list) {
+        for (let i = 0; i < pts.length; i++) {
+          proj.to(pts[i].x, pts[i].y + depthOffset, pts[i].z);
+          if (i === 0) ctx.moveTo(proj.x, proj.y);
+          else ctx.lineTo(proj.x, proj.y);
+        }
+      }
       ctx.stroke();
+    };
+    groups.forEach((g) => strokeGroup(g.list, g.color, g.lw));
+    if (selectedEntry) {
+      ctx.shadowColor = 'rgba(244, 214, 176, 0.6)';
+      ctx.shadowBlur = 10;
+      strokeGroup([selectedEntry], '#F4D6B0', 6.5);
       ctx.shadowBlur = 0;
-
-      // Draw intermediate route handles if in Edit mode and selected
-      if (isSelected && interactionMode === 'edit') {
+      // Intermediate route handles if in Edit mode and selected
+      if (interactionMode === 'edit') {
+        const allPts = selectedEntry.pts;
         allPts.forEach((pt, idx) => {
-          const sc = project(pt.x, pt.y + depthOffset, pt.z, width, height);
+          proj.to(pt.x, pt.y + depthOffset, pt.z);
           ctx.beginPath();
-          ctx.arc(sc.x, sc.y, idx === 0 || idx === allPts.length - 1 ? 5.5 : 7, 0, Math.PI * 2);
+          ctx.arc(proj.x, proj.y, idx === 0 || idx === allPts.length - 1 ? 5.5 : 7, 0, Math.PI * 2);
           ctx.fillStyle = idx === 0 || idx === allPts.length - 1 ? '#5BC0DE' : '#D97706';
           ctx.fill();
           ctx.strokeStyle = '#FFFFFF';
@@ -564,24 +613,27 @@ export default function Terrain3DViewer({
           ctx.stroke();
         });
       }
-    });
+    }
 
-    // 5. Draw Canonical Network Nodes (Junctions & Sensors)
-    activeNodes.forEach((n) => {
+    // 5. Nodes (Junctions & Sensors)
+    const topId = top[0]?.node_id;
+    ctx.font = 'bold 9px monospace';
+    for (const s of scene.nodes) {
+      const n = s.n;
       const isSelected = selected === n.id;
       const isSensor = sensors.has(n.id) || n.is_sensor;
       const isIsolated = isolatedNodes.has(n.id);
-      const isTopLeak = top[0]?.node_id === n.id;
+      const isTopLeak = topId === n.id;
       const isRevealedTruth = judge && revealed && result?.injected_node_id === n.id;
 
-      const pt = projectToMetricScene(n.lat, n.lng, n.elevation_m || 818);
-      const sc = project(pt.x, pt.y + depthOffset, pt.z, width, height);
+      proj.to(s.x, s.y + depthOffset, s.z);
+      const sx = proj.x;
+      const sy = proj.y;
+      if (sx < -30 || sy < -30 || sx > width + 30 || sy > height + 30) continue;
 
-      // Base circle
       ctx.beginPath();
       const radius = isTopLeak ? 9 : isSensor ? 7 : isSelected ? 8 : 4;
-      ctx.arc(sc.x, sc.y, radius, 0, Math.PI * 2);
-
+      ctx.arc(sx, sy, radius, 0, Math.PI * 2);
       ctx.fillStyle = isIsolated
         ? '#64748B'
         : isRevealedTruth
@@ -596,40 +648,36 @@ export default function Terrain3DViewer({
       ctx.lineWidth = isSelected ? 3 : 1.5;
       ctx.stroke();
 
-      // Sensor Tag
       if (isSensor) {
         ctx.fillStyle = '#10B981';
-        ctx.font = 'bold 9px monospace';
-        ctx.fillText(`S${sensors.get(n.id) || 1}`, sc.x + 9, sc.y - 4);
+        ctx.fillText(`S${sensors.get(n.id) || 1}`, sx + 9, sy - 4);
       }
-
-      // Top Leak Radar Ring
       if (isTopLeak) {
         ctx.beginPath();
-        ctx.arc(sc.x, sc.y, 18, 0, Math.PI * 2);
+        ctx.arc(sx, sy, 18, 0, Math.PI * 2);
         ctx.strokeStyle = '#EF444499';
         ctx.lineWidth = 2;
         ctx.setLineDash([4, 4]);
         ctx.stroke();
         ctx.setLineDash([]);
       }
-
-      // Ground-truth revealed ring
       if (isRevealedTruth) {
         ctx.beginPath();
-        ctx.arc(sc.x, sc.y, 22, 0, Math.PI * 2);
+        ctx.arc(sx, sy, 22, 0, Math.PI * 2);
         ctx.strokeStyle = '#FFFFFF';
         ctx.lineWidth = 2.5;
         ctx.setLineDash([5, 5]);
         ctx.stroke();
         ctx.setLineDash([]);
       }
-    });
+    }
+  };
+
+  // Any render that changes data/selection/layers/mode schedules one coalesced redraw.
+  useEffect(() => {
+    requestDraw();
   }, [
-    draftNetwork,
-    activeNodes,
-    activePipes,
-    byId,
+    scene,
     selected,
     valving,
     isolatedNodes,
@@ -641,34 +689,35 @@ export default function Terrain3DViewer({
     showIllustrativeDepth,
     visibleLayers,
     interactionMode,
-    project,
+    terrainGrid,
+    requestDraw,
   ]);
 
+
   // Mouse Input Handling: Orbit, Pan, Zoom and Handle Dragging
+  const pending = useRef(null); // coalesced draft-drag update (applied once per frame)
+  const flushDragRef = useRef(0);
+
   const handleMouseDown = (e) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
-    const width = canvas.width;
-    const height = canvas.height;
+    const { w: width, h: height } = sizeRef.current;
+    const cam = camRef.current;
+    const proj = makeProjector(cam, width, height);
     const depthOffset = showIllustrativeDepth ? -12 : 0;
 
     // In Edit mode, check if clicked on intermediate route handles or nodes
     if (interactionMode === 'edit' && selectedPipe) {
-      const a = byId[selectedPipe.source];
-      const b = byId[selectedPipe.target];
-      if (a && b) {
-        const intermediatePts = (selectedPipe.coordinates || []).map((c) =>
-          projectToMetricScene(c.lat ?? c[0], c.lng ?? c[1], 815),
-        );
-        for (let i = 0; i < intermediatePts.length; i++) {
-          const pt = intermediatePts[i];
-          const sc = project(pt.x, pt.y + depthOffset, pt.z, width, height);
-          if (Math.hypot(mouseX - sc.x, mouseY - sc.y) < 12) {
-            // Hit intermediate vertex handle!
-            const handleInfo = { type: 'vertex', pipeId: selectedPipe.id, vertexIdx: i };
+      const entry = scene.pipes.find((s) => s.p.id === selectedPipe.id);
+      if (entry) {
+        for (let i = 1; i <= entry.mids; i++) {
+          const pt = entry.pts[i];
+          proj.to(pt.x, pt.y + depthOffset, pt.z);
+          if (Math.hypot(mouseX - proj.x, mouseY - proj.y) < 12) {
+            const handleInfo = { type: 'vertex', pipeId: selectedPipe.id, vertexIdx: i - 1 };
             setActiveDragHandle(handleInfo);
             dragHandleRef.current = handleInfo;
             return;
@@ -678,65 +727,40 @@ export default function Terrain3DViewer({
     }
 
     // Check if clicked on a Node
-    let clickedNodeId = null;
-    for (const n of activeNodes) {
-      const pt = projectToMetricScene(n.lat, n.lng, n.elevation_m || 818);
-      const sc = project(pt.x, pt.y + depthOffset, pt.z, width, height);
-      if (Math.hypot(mouseX - sc.x, mouseY - sc.y) < 14) {
-        clickedNodeId = n.id;
-        break;
+    for (const s of scene.nodes) {
+      proj.to(s.x, s.y + depthOffset, s.z);
+      if (Math.hypot(mouseX - proj.x, mouseY - proj.y) < 14) {
+        setSelected?.(s.n.id);
+        if (interactionMode === 'edit') {
+          const handleInfo = { type: 'node', nodeId: s.n.id };
+          setActiveDragHandle(handleInfo);
+          dragHandleRef.current = handleInfo;
+        }
+        return;
       }
-    }
-
-    if (clickedNodeId) {
-      setSelected(clickedNodeId);
-      if (interactionMode === 'edit') {
-        const handleInfo = { type: 'node', nodeId: clickedNodeId };
-        setActiveDragHandle(handleInfo);
-        dragHandleRef.current = handleInfo;
-      }
-      return;
     }
 
     // Check if clicked on a Pipe
-    let clickedPipeId = null;
-    for (const p of activePipes) {
-      const a = byId[p.source];
-      const b = byId[p.target];
-      if (!a || !b) continue;
-      const ptA = projectToMetricScene(a.lat, a.lng, 815);
-      const ptB = projectToMetricScene(b.lat, b.lng, 815);
-      const allPts = [
-        ptA,
-        ...(p.coordinates || []).map((c) => projectToMetricScene(c.lat, c.lng, 815)),
-        ptB,
-      ];
-
-      for (let i = 0; i < allPts.length - 1; i++) {
-        const sc1 = project(allPts[i].x, allPts[i].y + depthOffset, allPts[i].z, width, height);
-        const sc2 = project(allPts[i + 1].x, allPts[i + 1].y + depthOffset, allPts[i + 1].z, width, height);
-
-        // Distance from point to line segment
-        const A = mouseX - sc1.x;
-        const B = mouseY - sc1.y;
-        const C = sc2.x - sc1.x;
-        const D = sc2.y - sc1.y;
-        const dot = A * C + B * D;
-        const lenSq = C * C + D * D;
-        const param = lenSq !== 0 ? Math.max(0, Math.min(1, dot / lenSq)) : -1;
-        const xx = sc1.x + param * C;
-        const yy = sc1.y + param * D;
-        if (Math.hypot(mouseX - xx, mouseY - yy) < 10) {
-          clickedPipeId = p.id;
-          break;
+    for (const { p, pts } of scene.pipes) {
+      let sx = 0;
+      let sy = 0;
+      for (let i = 0; i < pts.length; i++) {
+        proj.to(pts[i].x, pts[i].y + depthOffset, pts[i].z);
+        if (i > 0) {
+          const A = mouseX - sx;
+          const B = mouseY - sy;
+          const C = proj.x - sx;
+          const D = proj.y - sy;
+          const lenSq = C * C + D * D;
+          const param = lenSq !== 0 ? Math.max(0, Math.min(1, (A * C + B * D) / lenSq)) : -1;
+          if (Math.hypot(mouseX - (sx + param * C), mouseY - (sy + param * D)) < 10) {
+            setSelected?.(p.id);
+            return;
+          }
         }
+        sx = proj.x;
+        sy = proj.y;
       }
-      if (clickedPipeId) break;
-    }
-
-    if (clickedPipeId) {
-      setSelected(clickedPipeId);
-      return;
     }
 
     // Default: Camera Navigation Drag
@@ -744,86 +768,81 @@ export default function Terrain3DViewer({
     navDragStart.current = {
       x: e.clientX,
       y: e.clientY,
-      azimuth: rotation.azimuth,
-      elevation: rotation.elevation,
-      panX: pan.x,
-      panY: pan.y,
+      azimuth: cam.azimuth,
+      elevation: cam.elevation,
+      panX: cam.panX,
+      panY: cam.panY,
       button: e.button,
+      active: true,
     };
+  };
+
+  const applyHandleDrag = (handle, mouseX, mouseY) => {
+    const { w, h } = sizeRef.current;
+    const cam = camRef.current;
+    const metric = unprojectScreen(cam, mouseX, mouseY, 0, w, h);
+    const geo = unprojectFromMetricScene(metric.x, metric.z);
+    setDraftNetwork((prev) => {
+      if (!prev) return prev;
+      const next = JSON.parse(JSON.stringify(prev));
+      if (handle.type === 'vertex') {
+        const p = next.pipes.find((item) => item.id === handle.pipeId);
+        if (p && p.coordinates && p.coordinates[handle.vertexIdx]) {
+          p.coordinates[handle.vertexIdx] = geo;
+          const a = byId[p.source];
+          const b = byId[p.target];
+          if (a && b) p.length_m = calculatePolylineLength([a, ...p.coordinates, b]);
+        }
+      } else if (handle.type === 'node') {
+        const n = next.nodes.find((item) => item.id === handle.nodeId);
+        if (n) {
+          n.lat = geo.lat;
+          n.lng = geo.lng;
+          next.pipes.forEach((p) => {
+            if (p.source === n.id || p.target === n.id) {
+              const a = p.source === n.id ? n : byId[p.source];
+              const b = p.target === n.id ? n : byId[p.target];
+              if (a && b) p.length_m = calculatePolylineLength([a, ...(p.coordinates || []), b]);
+            }
+          });
+        }
+      }
+      return next;
+    });
   };
 
   const handleMouseMove = (e) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-    const width = canvas.width;
-    const height = canvas.height;
 
-    // If actively dragging a route vertex handle or node
+    // Dragging a route vertex / node: at most one draft update per animation frame.
     const handle = dragHandleRef.current;
     if (handle) {
-      const metric = unproject(mouseX, mouseY, 0, width, height);
-      const geo = unprojectFromMetricScene(metric.x, metric.z);
-
-      if (handle.type === 'vertex') {
-        setDraftNetwork((prev) => {
-          if (!prev) return prev;
-          const next = JSON.parse(JSON.stringify(prev));
-          const p = next.pipes.find((item) => item.id === handle.pipeId);
-          if (p && p.coordinates && p.coordinates[handle.vertexIdx]) {
-            p.coordinates[handle.vertexIdx] = geo;
-            const a = byId[p.source];
-            const b = byId[p.target];
-            if (a && b) {
-              p.length_m = calculatePolylineLength([a, ...p.coordinates, b]);
-            }
-          }
-          return next;
-        });
-      } else if (handle.type === 'node') {
-        setDraftNetwork((prev) => {
-          if (!prev) return prev;
-          const next = JSON.parse(JSON.stringify(prev));
-          const n = next.nodes.find((item) => item.id === handle.nodeId);
-          if (n) {
-            n.lat = geo.lat;
-            n.lng = geo.lng;
-            // Update connected pipe lengths
-            next.pipes.forEach((p) => {
-              if (p.source === n.id || p.target === n.id) {
-                const a = p.source === n.id ? n : byId[p.source];
-                const b = p.target === n.id ? n : byId[p.target];
-                if (a && b) {
-                  p.length_m = calculatePolylineLength([a, ...(p.coordinates || []), b]);
-                }
-              }
-            });
-          }
-          return next;
+      const rect = canvas.getBoundingClientRect();
+      pending.current = { handle, x: e.clientX - rect.left, y: e.clientY - rect.top };
+      if (!flushDragRef.current) {
+        flushDragRef.current = requestAnimationFrame(() => {
+          flushDragRef.current = 0;
+          const job = pending.current;
+          pending.current = null;
+          if (job && dragHandleRef.current) applyHandleDrag(job.handle, job.x, job.y);
         });
       }
       return;
     }
 
-    // Otherwise, Camera Navigation
-    if (!isNavDragging) return;
-    const dx = e.clientX - navDragStart.current.x;
-    const dy = e.clientY - navDragStart.current.y;
-
-    if (navDragStart.current.button === 0 && !e.shiftKey) {
-      // Orbit
-      setRotation({
-        azimuth: (navDragStart.current.azimuth + dx * 0.45) % 360,
-        elevation: Math.max(12, Math.min(84, navDragStart.current.elevation - dy * 0.35)),
+    // Camera navigation: mutate the ref and schedule a draw. No React render.
+    const st = navDragStart.current;
+    if (!st.active) return;
+    const dx = e.clientX - st.x;
+    const dy = e.clientY - st.y;
+    if (st.button === 0 && !e.shiftKey) {
+      updateCam({
+        azimuth: (st.azimuth + dx * 0.45) % 360,
+        elevation: Math.max(12, Math.min(84, st.elevation - dy * 0.35)),
       });
     } else {
-      // Pan
-      setPan({
-        x: navDragStart.current.panX + dx,
-        y: navDragStart.current.panY + dy,
-      });
+      updateCam({ panX: st.panX + dx, panY: st.panY + dy });
     }
   };
 
@@ -834,14 +853,34 @@ export default function Terrain3DViewer({
       setDirty(true);
       if (draftNetwork) onUpdateDraft?.(draftNetwork);
     }
-    setIsNavDragging(false);
+    if (navDragStart.current.active) {
+      navDragStart.current.active = false;
+      setIsNavDragging(false);
+    }
   };
 
-  const handleWheel = (e) => {
-    e.preventDefault();
-    const factor = e.deltaY < 0 ? 1.12 : 0.89;
-    setZoom((z) => Math.max(0.4, Math.min(4.5, z * factor)));
-  };
+  // Wheel zoom needs a non-passive listener to preventDefault (React's onWheel is passive).
+  useEffect(() => {
+    const host = canvasRef.current?.parentElement;
+    if (!host) return undefined;
+    const onWheel = (e) => {
+      e.preventDefault();
+      const f = e.deltaY < 0 ? 1.12 : 0.89;
+      updateCam({ zoom: Math.max(0.4, Math.min(4.5, camRef.current.zoom * f)) });
+    };
+    host.addEventListener('wheel', onWheel, { passive: false });
+    return () => host.removeEventListener('wheel', onWheel);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasNetwork]);
+
+  // Cancel any pending frames on unmount.
+  useEffect(
+    () => () => {
+      if (flushDragRef.current) cancelAnimationFrame(flushDragRef.current);
+    },
+    [],
+  );
+
 
   if (!draftNetwork) {
     return (
@@ -852,7 +891,7 @@ export default function Terrain3DViewer({
   }
 
   return (
-    <div className='terrain-3d-container' onWheel={handleWheel}>
+    <div className='terrain-3d-container' style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}>
       <canvas
         ref={canvasRef}
         className='terrain-3d-canvas'
@@ -860,7 +899,7 @@ export default function Terrain3DViewer({
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
-        style={{ cursor: activeDragHandle ? 'crosshair' : interactionMode === 'edit' ? 'pointer' : isNavDragging ? 'grabbing' : 'grab' }}
+        style={{ display: 'block', width: '100%', height: '100%', cursor: activeDragHandle ? 'crosshair' : interactionMode === 'edit' ? 'pointer' : isNavDragging ? 'grabbing' : 'grab' }}
       />
 
       {/* Top HUD Toolbar: Mode Selector, Camera, & Depth */}
@@ -888,16 +927,16 @@ export default function Terrain3DViewer({
         </div>
 
         {/* Camera Azimuth Compass */}
-        <div className='hud-compass' aria-label={`Azimuth ${Math.round(rotation.azimuth)} degrees, Elevation ${Math.round(rotation.elevation)} degrees`}>
-          <Compass size={14} style={{ transform: `rotate(${-rotation.azimuth}deg)` }} />
-          <span>{Math.round(rotation.azimuth)}° Az · {Math.round(rotation.elevation)}° El</span>
+        <div className='hud-compass' aria-label='Camera azimuth and elevation'>
+          <span ref={compassIconRef} style={{ display: 'inline-flex' }}><Compass size={14} /></span>
+          <span ref={compassTextRef}>{DEFAULT_CAM.azimuth}° Az · {DEFAULT_CAM.elevation}° El</span>
         </div>
 
         {/* Camera Navigation Buttons */}
         <div className='hud-button-group'>
           <button
             className='studio-icon-button'
-            onClick={() => setZoom((z) => Math.min(4.5, z * 1.2))}
+            onClick={() => zoomBy(1.2)}
             title='Zoom in camera (+)'
             type='button'
             aria-label='Zoom in'
@@ -906,7 +945,7 @@ export default function Terrain3DViewer({
           </button>
           <button
             className='studio-icon-button'
-            onClick={() => setZoom((z) => Math.max(0.4, z / 1.2))}
+            onClick={() => zoomBy(1 / 1.2)}
             title='Zoom out camera (-)'
             type='button'
             aria-label='Zoom out'
