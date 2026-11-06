@@ -208,7 +208,7 @@ export default function OperationsChatbot({
               estimated_junction: topCandidate,
               leak_loss_lpm: lossLpm,
               tankers_per_day: tankers,
-              isolated_valves: result?.recommended_valves_to_close || ['P18', 'P20', 'P21'],
+              isolated_valves: result?.recommended_valves_to_close || [],
               network_revision: network?.network_revision,
             },
             history: messages.slice(-6).map((m) => ({

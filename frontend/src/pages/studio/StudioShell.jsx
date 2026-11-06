@@ -131,7 +131,7 @@ function StudioWorkspace({ initialNetwork, networkSource, onNetworkActivated, on
 
       await client.importCommit({
         preview_token: preview.preview_token,
-        expected_network_revision: preview.expected_network_revision,
+        expected_network_revision: preview.source_network_revision,
       });
 
       setNotice('Network plan successfully activated in Operations SCADA!');
@@ -322,7 +322,7 @@ function StudioWorkspace({ initialNetwork, networkSource, onNetworkActivated, on
         }
         await client.importCommit({
           preview_token: preview.preview_token,
-          expected_network_revision: preview.expected_network_revision,
+          expected_network_revision: preview.source_network_revision,
         });
         await onNetworkActivated?.();
         setNotice(`Network "${file.name}" imported and activated successfully.`);

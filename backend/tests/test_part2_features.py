@@ -870,7 +870,7 @@ def test_ai_chat_endpoint_deterministic_and_custom_key(client):
     assert r1.status_code == 200, f"AI chat failed: {r1.text}"
     resp1 = AiChatResponse.model_validate(r1.json())
     assert resp1.provider == "deterministic_hydraulic"
-    assert "Two-Stage Physics" in resp1.reply
+    assert "Two-Stage Localization" in resp1.reply
     assert "J13" in resp1.reply
 
     # 2. Water hammer and valve isolation question
@@ -883,8 +883,8 @@ def test_ai_chat_endpoint_deterministic_and_custom_key(client):
     )
     assert r2.status_code == 200
     resp2 = AiChatResponse.model_validate(r2.json())
-    assert "Joukowsky" in resp2.reply or "hammer" in resp2.reply.lower()
-    assert "CAUTION" in resp2.reply
+    assert "P18" in resp2.reply and "P20" in resp2.reply
+    assert "simulated" in resp2.reply.lower()
 
     # 3. Tanker logistics question
     r3 = client.post(

@@ -28,6 +28,28 @@ This document records every registered HTTP endpoint on the FastAPI backend, its
 | 20 | `POST` | `/api/iot/ingest` | `TelemetryIngestRequest` | `TelemetryIngestResponse` | Appends telemetry packets | `X-Admin-Token` | `test_contract.py`, `test_iot_manager.py` | Verified |
 | 21 | `GET` | `/api/pipes/condition` | None | `PipeConditionResponse` | Read-only physical stress | None | `test_contract.py`, `test_iot_manager.py`, smoke | Verified |
 | 22 | `POST` | `/api/iot/auto-valve` | `AutoValveRequest` | `AutoValveResponse` | Propose/Confirm/Emergency Stop | `X-Admin-Token` (except emergency_stop) | `test_contract.py`, `test_iot_manager.py`, smoke | Verified |
+| 23 | `POST` | `/api/ai/chat` | `AiChatRequest` | `AiChatResponse` | Read-only advisory (LLM or deterministic reply, no state change) | None (optional `X-OpenRouter-Key` header) | `test_part2_features.py` | Schema checked |
+
+## AI Chat: `POST /api/ai/chat`
+
+**Request (`AiChatRequest`)**
+- `message` (string, required, 1-2000 characters).
+- `context` (`AiChatContext`, optional): `phase`, `target_node_id`, `estimated_junction`, `leak_loss_lpm` (float), `tankers_per_day` (float), `isolated_valves` (list of strings), `network_revision`. All fields optional.
+- `history` (list of `AiChatMessage`, optional): each item has `role` (`user`, `assistant` or `system`) and `content` (string). Only the last 6 entries are sent to OpenRouter.
+
+**Header**
+- `X-OpenRouter-Key` (optional): OpenRouter API key for this request only. Sent as a header, never in the body.
+
+**Response (`AiChatResponse`)**
+- `reply` (string, markdown).
+- `provider`: `openrouter` or `deterministic_hydraulic`.
+- `model`: the OpenRouter model used, or `hydraulic-rag-twin-v1.1` for the deterministic path.
+- `compute_time_ms` (float): server-side latency.
+- `rag_sources` (list of strings, default `[]`): titles of the knowledge chunks used for the reply.
+
+**Fallback without a key**
+- If no key is available (neither the header nor a server-configured OpenRouter key) or OpenRouter returns no reply, the deterministic RAG twin answers with `provider: "deterministic_hydraulic"`.
+- It echoes only the incident fields actually received in `context`. With no incident context it reports "No active incident". It never invents node IDs or figures.
 
 ## Invariants & Security Boundaries
 - **CORS**: Enforced in `backend/config.py`. Wildcard forbidden in production; regex allowed only when strictly anchored.

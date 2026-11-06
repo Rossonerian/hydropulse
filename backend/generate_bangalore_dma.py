@@ -106,7 +106,7 @@ def osm_graph(lat: float, lng: float, dist: float, cache_dir: str | None = None,
                         print(f"  Loaded {len(nodes_in)} intersections from offline cache: {cached_file.name}", file=sys.stderr)
                         gm = gm_candidate.subgraph(nodes_in).copy()
                         break
-            except Exception as err:
+            except Exception:
                 pass
 
     if gm is None:

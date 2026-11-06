@@ -23,6 +23,7 @@ from backend import ai_advisor, iot_manager, network_builder, scenario_engine
 from backend.config import BackendConfig, load_config
 from backend.hydraulic_engine import HydraulicEngine
 from backend.openrouter_client import get_openrouter_client
+from backend.rate_limit import enforce_ai_rate_limit
 from backend.security import (
     SecurityAndTracingMiddleware,
     make_admin_dependency,
@@ -141,7 +142,13 @@ app.add_middleware(
     allow_origin_regex=config.cors_origin_regex,
     allow_credentials=False,
     allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization", "X-Admin-Token", "X-Request-ID"],
+    allow_headers=[
+        "Content-Type",
+        "Authorization",
+        "X-Admin-Token",
+        "X-Request-ID",
+        "X-OpenRouter-Key",
+    ],
     expose_headers=["X-Request-ID"],
 )
 register_exception_handlers(app, get_config=get_config)
@@ -275,7 +282,7 @@ def what_if(req: WhatIfRequest) -> WhatIfResponse:
     return scenario_engine.evaluate_what_if(_engine(), req)
 
 
-@app.get("/api/ai/suggestions", response_model=AiSuggestionsResponse)
+@app.get("/api/ai/suggestions", response_model=AiSuggestionsResponse, dependencies=[Depends(enforce_ai_rate_limit)])
 def get_ai_suggestions(
     x_openrouter_key: str | None = Header(None, alias="X-OpenRouter-Key"),
     openrouter_key: str | None = Query(None, alias="openrouter_key"),
@@ -291,7 +298,7 @@ def apply_ai_suggestion(req: ApplySuggestionRequest) -> ApplySuggestionResponse:
     return ai_advisor.apply_suggestion(_engine(), req)
 
 
-@app.post("/api/ai/chat", response_model=AiChatResponse)
+@app.post("/api/ai/chat", response_model=AiChatResponse, dependencies=[Depends(enforce_ai_rate_limit)])
 def ai_chat(
     req: AiChatRequest,
     x_openrouter_key: str | None = Header(None, alias="X-OpenRouter-Key"),
