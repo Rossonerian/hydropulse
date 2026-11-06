@@ -40,7 +40,7 @@ export default function ExportReportModal({
 
     return `# DHARA · Municipal Water Leakage & Consumption Incident Report
 **Event Context:** Lakshya 2026 @ SJBIT, Kengeri, Bengaluru (Track 02: Smart & Sustainable Future)  
-**System:** DHARA SCADA / HydroPulse Hydraulic Engine  
+**System:** HydroPulse service · DHARA dashboard  
 **Report Generated:** ${timestamp} UTC  
 **Ward Jurisdiction:** Kengeri District Metered Area (DMA) · ${network.nodes?.length || 130} Junctions · ${network.pipes?.length || 203} Pipelines
 
