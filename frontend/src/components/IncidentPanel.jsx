@@ -1,13 +1,24 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   Activity,
   AlertTriangle,
+  Check,
+  Copy,
   Droplet,
   MapPinned,
   Truck,
 } from 'lucide-react';
 import { Button, DataTable } from '../ui/index.js';
 import { number } from '../lib/format.js';
+import {
+  leakConfidence,
+  resultFigures,
+  reportText,
+  copyText,
+  sensorRows,
+  dropText,
+} from '../lib/opsFlow.js';
+import { useReveal } from '../hooks/useReveal.js';
 import '../styles/ops/incident.css';
 
 function CountUp({ value, digits = 0 }) {
@@ -33,6 +44,7 @@ export default function IncidentPanel({
   onFocus,
   onSelectNode,
   showTruth,
+  revealed = false,
   mode,
   judge,
   errorMeters,
@@ -59,16 +71,31 @@ export default function IncidentPanel({
     ? pressures.reduce((a, b) => a + b, 0) / pressures.length
     : 0;
 
+  // Rich ops figures and confidence
+  const figures = useMemo(() => (data && network ? resultFigures(data, network) : null), [data, network]);
+  const confidence = useMemo(() => (data ? leakConfidence(data) : null), [data]);
+  const reveal = useReveal({ result: data, reduced: false });
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyReport = useCallback(async () => {
+    if (!data) return;
+    const text = reportText({ result: data, network, phase, judge, revealed });
+    const ok = await copyText(text);
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    }
+  }, [data, network, phase, judge, revealed]);
+
   // Result-derived values
-  const totalLoss = data?.actual_loss_lpm || 0;
-  const tankers = Math.round((totalLoss * 1440 / 6000) * 10) / 10;
-  const affectedHouseholds = data?.affected_households_after_isolation || 0;
-  const supplied = Math.max(
-    0,
-    100 - (affectedHouseholds / Math.max(households, 1)) * 100,
-  );
-  const topCandidate = data?.predicted_top_candidates?.[0];
+  const totalLoss = figures?.loss ?? (data?.actual_loss_lpm || 0);
+  const tankers = figures?.tankers ?? (Math.round(((totalLoss * 1440) / 6000) * 10) / 10);
+  const affectedHouseholds = figures?.cut ?? (data?.affected_households_after_isolation || 0);
+  const supplied = figures?.supplied ?? Math.max(0, 100 - (affectedHouseholds / Math.max(households, 1)) * 100);
+  const topCandidate = figures?.top ?? data?.predicted_top_candidates?.[0];
   const predictedNode = topCandidate?.node_id || data?.injected_node_id;
+
+  const sensorList = useMemo(() => (data ? sensorRows(data) : []), [data]);
 
   // Candidate table data
   const candidateRows = (data?.predicted_top_candidates || []).map((c, i) => ({
@@ -143,10 +170,18 @@ export default function IncidentPanel({
 
       {phase === 'located' && data && (
         <div className='incident-header incident-header--leak'>
-          <h2>
-            Leak near <strong>{predictedNode}</strong>
-          </h2>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
+            <h2>
+              Leak near <strong>{predictedNode}</strong>
+            </h2>
+            {confidence && (
+              <span className={`confidence-chip confidence-chip--${confidence.level}`} title={confidence.hint}>
+                {confidence.label} match
+              </span>
+            )}
+          </div>
           <p className='incident-id'>{data.injected_node_id}</p>
+          {confidence?.hint && <p className="confidence-hint">{confidence.hint}</p>}
         </div>
       )}
 
@@ -228,6 +263,19 @@ export default function IncidentPanel({
 
       {(phase === 'located' || phase === 'isolated') && data && (
         <div className='incident-content'>
+          {/* Skippable reveal banner */}
+          {reveal.active && (
+            <div className="reveal-banner">
+              <div className="reveal-banner__caption">
+                <span className="reveal-pulse" />
+                <span>{reveal.caption}</span>
+              </div>
+              <Button variant="secondary" size="sm" onClick={reveal.skip} aria-label="Skip animation">
+                Skip
+              </Button>
+            </div>
+          )}
+
           {/* Metrics */}
           <div className='incident-metrics'>
             <div className='metric-card'>
@@ -245,15 +293,27 @@ export default function IncidentPanel({
             <div className='metric-card'>
               <span className='metric-label'>Est. hole area</span>
               <span className='metric-value'>
-                {number(
-                  topCandidate?.estimated_leak_area_cm2 ||
-                    data.injected_leak_area_cm2,
-                  1,
-                )}{' '}
-                cm²
+                {number(figures?.holeCm2 ?? data.injected_leak_area_cm2, 1)} cm²
               </span>
             </div>
           </div>
+
+          {/* Sensor readings */}
+          {sensorList.length > 0 && (
+            <div className="incident-section">
+              <h3>Sentinel sensor response</h3>
+              <div className="sensor-readings-list">
+                {sensorList.map((s) => (
+                  <div key={s.sensor_id} className="sensor-chip">
+                    <span className="sensor-chip__label">{s.label} ({s.sensor_id})</span>
+                    <span className={`sensor-chip__drop ${Number(s.drop_m) > 0.1 ? 'sensor-chip__drop--fell' : ''}`}>
+                      {dropText(s.drop_m)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Candidates table */}
           {phase === 'located' && (
@@ -317,6 +377,29 @@ export default function IncidentPanel({
               )}
             </div>
           )}
+
+          {/* Action buttons */}
+          <div className="incident-actions-bar">
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={copied ? Check : Copy}
+              onClick={handleCopyReport}
+              aria-label="Copy incident report"
+            >
+              {copied ? 'Copied report' : 'Copy report'}
+            </Button>
+            {phase === 'located' && (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={onIsolate}
+                aria-label="Isolate recommended valves"
+              >
+                Isolate valves
+              </Button>
+            )}
+          </div>
 
           {/* Compute time */}
           {data.compute_time_ms && (
