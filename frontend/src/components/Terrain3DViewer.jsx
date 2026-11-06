@@ -442,8 +442,8 @@ export default function Terrain3DViewer({
     setSaveStatus('Draft reset to baseline');
     try {
       localStorage.removeItem('hydropulse_active_draft');
-    } catch {
-      // Storage unavailable
+    } catch (err) {
+      console.debug('Storage unavailable for draft removal:', err);
     }
     onUpdateDraft?.(null);
   }, [network, onUpdateDraft]);

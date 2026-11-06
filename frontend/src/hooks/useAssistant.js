@@ -155,8 +155,8 @@ export function useAssistant({
     setPreviews({});
     try {
       await onChangedRef.current?.();
-    } catch {
-      /* the app's own load() reports its errors */
+    } catch (err) {
+      console.debug('Error in afterChange callback:', err);
     }
     return load();
   }, [load]);
