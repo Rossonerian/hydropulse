@@ -12,8 +12,8 @@ Used by AI Advisor (/api/ai/chat) and AI Audit (/api/ai/suggestions).
 from __future__ import annotations
 
 import logging
-import math
 import re
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 log = logging.getLogger("hydropulse.rag")
@@ -25,112 +25,139 @@ log = logging.getLogger("hydropulse.rag")
 STATIC_KNOWLEDGE_BASE: List[Dict[str, str]] = [
     {
         "id": "bwssb_valve_isolation_sop",
-        "title": "BWSSB Standard Operating Procedure: Valve Cut-Set Isolation & Rapid Response",
+        "title": "Valve Isolation Field Practice [VERIFY]",
         "keywords": "valve isolate isolation cut-set sop procedure close hammer wrench dispatch crew field repair shut",
         "content": (
-            "BWSSB field protocol requires immediate cut-set boundary isolation upon leak confirmation. "
+            "[VERIFY: no source document committed; general field practice, not a cited BWSSB or CPHEEO text] "
+            "Cut-set boundary isolation is generally carried out upon leak confirmation. "
             "Step 1: Dispatch Rapid Response Unit (RRU) equipped with 2 mechanical valve keys (T-wrenches). "
             "Step 2: Turn upstream isolation valves clockwise first to depressurize the trunk main and prevent hydraulic hammer "
             "(surge transient velocity must stay < 1.5 m/s). "
             "Step 3: Turn downstream isolation valves to halt gravity backflow from consumer overhead storage tanks. "
             "Step 4: Verify zero pressure on localized section using portable mechanical gauge before excavation. "
-            "Step 5: Install ductile iron repair clamp sleeve (IS 12288 standard). Maintain CPHEEO minimum terminal "
-            "pressure >= 12m head across unaffected DMA zones."
-        ),
-    },
-    {
-        "id": "kengeri_dma_benchmark",
-        "title": "HydroPulse Hydraulic Benchmark & Accuracy Calibration Report",
-        "keywords": "benchmark accuracy error meters precision wntr pdd torricelli noise sentinels performance evaluation",
-        "content": (
-            "Digital twin calibrated for Kengeri DMA, Bengaluru using US EPA WNTR simulation engine with Pressure-Driven Demand (PDD) "
-            "and Torricelli orifice equation (q = Cd * A * sqrt(2 * g * h)). Localization performance on 130-node network: "
-            "100% localization within 2-hop radius, Top-1 accuracy 88.5%, Top-3 accuracy 94.2%, mean localization error 96.2 metres "
-            "across OpenStreetMap street intersections. 5 strategic sentinels selected via betweenness centrality with minimum "
-            "3-hop spacing: S1 (J72), S2 (J29), S3 (J64), S4 (J95), S5 (J47). Robust to 5% sensor noise with cosine screening "
-            "and physics residual verification."
+            "Step 5: Install a repair clamp sleeve. Keep terminal "
+            "pressure adequate across unaffected zones."
         ),
     },
     {
         "id": "kengeri_dma_infrastructure",
-        "title": "Kengeri DMA Asset Specification & Hydraulics",
-        "keywords": "kengeri infrastructure network nodes pipes diameter elevation reservoir demand flow pressure dma assets",
+        "title": "Kengeri DMA Twin Provenance",
+        "keywords": "kengeri infrastructure network nodes pipes elevation reservoir demand dma assets synthetic osm",
         "content": (
-            "Zone: Kengeri Sub-Division, Bengaluru (BWSSB SW-4 Zone). Total nodes: 130 (129 demand junctions, 1 source reservoir R1). "
-            "Total pipes: 203 ductile iron pipelines (diameters 100mm to 450mm, Hazen-Williams roughness C=130). "
-            "Elevation spans 780.2m to 825.4m with gradient sloping south-east toward Vrishabhavathi valley. "
-            "Total baseline demand: 45.2 L/s serving 6,240 households across residential and commercial sectors. "
-            "Operating pressures range from 28m to 62m head under normal diurnal patterns."
+            "The twin is built from the committed EPANET file backend/bangalore_kengeri.inp (network name "
+            "'kengeri_synthetic'). It is a synthetic Kengeri-style network, not the real OSM Kengeri network. "
+            "Node IDs, pipe IDs, diameters, elevations and demands must be read from the live network "
+            "(GET /api/network), never assumed."
         ),
     },
     {
         "id": "water_loss_tanker_metrics",
-        "title": "BWSSB Non-Revenue Water (NRW) & Tanker Equivalent Metrics",
-        "keywords": "loss water tanker tankers nrw lpm liters cost money economic rate daily volume",
+        "title": "Tanker Equivalent Metrics",
+        "keywords": "loss water tanker tankers nrw lpm liters rate daily volume",
         "content": (
-            "Water loss is quantified in Litres Per Minute (LPM) and BWSSB standard 6,000-Litre water tanker equivalents per day. "
-            "Conversion formula: Tankers/day = (Loss in LPM * 60 * 24) / 6000 = Loss in LPM * 0.24. "
-            "Average municipal cost of treated water in Bengaluru is ₹48 per kilolitre. Rapid isolation directly prevents "
-            "non-revenue water escape, road foundation washout, and contamination ingress during low-pressure periods."
-        ),
-    },
-    {
-        "id": "incident_scenarios_catalog",
-        "title": "Calibrated Incident Profiles & Presets",
-        "keywords": "preset scenarios rupture burst j1 j62 j110 j42 j95 mainline commercial residential failure",
-        "content": (
-            "1. Kengeri Mainline Rupture: J1 (45 cm² rupture on main trunk corridor, ~2,350 LPM loss, ~564 tankers/day). "
-            "2. Commercial Feeder Leak: J62 (25 cm² joint failure, ~1,450 LPM loss, ~348 tankers/day). "
-            "3. Residential Service Failure: J110 (8 cm² service line split, ~480 LPM loss, ~115 tankers/day). "
-            "4. Industrial Corridor Burst: J42 (35 cm² burst, ~1,890 LPM loss, ~453 tankers/day). "
-            "5. Sub-Distribution Failure: J95 (15 cm² flange leak, ~920 LPM loss, ~220 tankers/day)."
+            "Water loss is quantified in Litres Per Minute (LPM) and 6,000-litre tanker equivalents per day. "
+            "Conversion formula: Tankers/day = (Loss in LPM * 1440) / 6000 = Loss in LPM * 0.24."
         ),
     },
 ]
 
 # ─────────────────────────────────────────────────────────────────────────────
+# 1b. BENCHMARK FACTS (only source of accuracy numbers: backend/benchmark_report.md)
+# ─────────────────────────────────────────────────────────────────────────────
+
+BENCHMARK_REPORT_PATH = Path(__file__).resolve().parent / "benchmark_report.md"
+_BENCH_STRATEGY = "betweenness_separated"
+_BENCH_NOISE_PCT = 1.5
+
+
+def load_benchmark_facts(path: Optional[Path] = None) -> Optional[Dict[str, Any]]:
+    """Parse the betweenness_separated / 1.5% noise row of benchmark_report.md.
+
+    Returns None when the report is missing or the row is not found, so callers
+    never fall back to invented numbers.
+    """
+    report = path or BENCHMARK_REPORT_PATH
+    try:
+        text = report.read_text(encoding="utf-8")
+    except OSError:
+        return None
+
+    network = re.search(r"- Network: `([^`]+)`", text)
+    for line in text.splitlines():
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cells) < 6 or cells[0] != _BENCH_STRATEGY:
+            continue
+        try:
+            if float(cells[2]) != _BENCH_NOISE_PCT:
+                continue
+            return {
+                "network": network.group(1) if network else "unknown",
+                "sensors": cells[1],
+                "noise_pct": _BENCH_NOISE_PCT,
+                "top1_pct": float(cells[3]),
+                "top3_pct": float(cells[4]),
+                "mean_err_m": float(cells[5]),
+            }
+        except ValueError:
+            continue
+    return None
+
+
+def _benchmark_text(facts: Optional[Dict[str, Any]]) -> str:
+    if not facts:
+        return "Benchmark figures are unavailable (backend/benchmark_report.md missing or unparsable)."
+    return (
+        f"On the '{facts['network']}' network with {facts['noise_pct']}% sensor noise, sensors "
+        f"{facts['sensors']}: Top-1 {facts['top1_pct']}%, Top-3 {facts['top3_pct']}%, mean localization "
+        f"error {facts['mean_err_m']} m. These are simulation results on a digital twin, not field "
+        "measurements, and the network is not the real OSM Kengeri network."
+    )
+
+
+def _benchmark_chunk() -> Dict[str, str]:
+    return {
+        "id": "kengeri_dma_benchmark",
+        "title": "HydroPulse Benchmark (from benchmark_report.md)",
+        "keywords": "benchmark accuracy error meters precision wntr pdd torricelli noise sentinels performance evaluation",
+        "content": _benchmark_text(load_benchmark_facts()),
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # 2. DYNAMIC SCADA TWIN CHUNK BUILDER
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _incident_fields(ctx: Optional[Any]) -> Tuple[Optional[str], Optional[float], List[str]]:
+    """Return (junction, loss_lpm, valves) exactly as received; no defaults are invented."""
+    node = getattr(ctx, "estimated_junction", None) or getattr(ctx, "target_node_id", None)
+    loss = getattr(ctx, "leak_loss_lpm", None)
+    valves = list(getattr(ctx, "isolated_valves", None) or [])
+    return node, loss, valves
+
+
 def build_dynamic_scada_chunk(engine: Any, context: Optional[Any] = None) -> Dict[str, str]:
-    """Compile real-time SCADA state, active simulation telemetry, and isolation cut-sets."""
+    """Compile the incident state actually received from the client (simulated digital twin)."""
     ctx = context
-    rev = getattr(ctx, "network_revision", None) or (getattr(engine, "network_revision", None) if engine else "rev-1-baseline")
+    rev = getattr(ctx, "network_revision", None) or (getattr(engine, "network_revision", None) if engine else None)
     phase = getattr(ctx, "phase", None) or "idle"
-    est_node = getattr(ctx, "estimated_junction", None) or getattr(ctx, "target_node_id", None) or "None"
-    loss_lpm = getattr(ctx, "leak_loss_lpm", None) or 0.0
-    tankers = round(loss_lpm * 0.24, 1)
+    est_node, loss_lpm, valves = _incident_fields(ctx)
+    sensor_ids = list(getattr(engine, "sensor_ids", []) or []) if engine else []
 
-    valves = getattr(ctx, "recommended_valves", None) or []
-    valves_str = ", ".join(valves) if valves else "None (network unvalved)"
-    isolated_pct = getattr(ctx, "continuous_supply_pct", None) or 98.7
-
-    sensors_info = []
-    if hasattr(ctx, "sensor_readings") and ctx.sensor_readings:
-        for s in ctx.sensor_readings:
-            sid = s.get("sensor_id", "")
-            drop = s.get("drop_m", 0.0)
-            obs = s.get("observed_m", 0.0)
-            sensors_info.append(f"{sid}: drop {drop:+.2f}m (head {obs:.1f}m)")
-    elif engine and hasattr(engine, "sensor_ids"):
-        sensors_info = [f"{s}: nominal head" for s in getattr(engine, "sensor_ids", [])]
-
-    telemetry_summary = "; ".join(sensors_info) if sensors_info else "All 5 sentinels nominal"
-
-    content = (
-        f"Active Digital Twin Revision: {rev}. Operational Phase: {phase.upper()}. "
-        f"Active Target / Estimated Leak Junction: {est_node}. "
-        f"Water Loss Rate: {loss_lpm:.1f} L/min ({tankers:.1f} tankers/day lost). "
-        f"Sentinel Sensor Readings: {telemetry_summary}. "
-        f"Recommended Cut-Set Isolation Valves: {valves_str}. "
-        f"Ward Supply Continuity: {isolated_pct:.1f}% homes continuously supplied without pressure collapse."
-    )
+    parts = [f"Simulated digital twin state. Network revision: {rev or 'unknown'}. Phase: {phase.upper()}."]
+    if est_node and loss_lpm is not None:
+        tankers = round(loss_lpm * 0.24, 1)
+        parts.append(f"Active incident junction: {est_node}. Water loss: {loss_lpm:.1f} L/min ({tankers:.1f} tankers/day).")
+        parts.append(f"Isolation valves: {', '.join(valves) if valves else 'none reported'}.")
+    else:
+        parts.append("No active incident.")
+    if sensor_ids:
+        parts.append(f"Sentinel sensors: {', '.join(sensor_ids)}.")
 
     return {
         "id": "live_scada_incident",
-        "title": "Live SCADA Twin State & Incident Telemetry",
-        "keywords": f"live current active scada telemetry incident {est_node} {valves_str} sensor reading drop tankers lpm",
-        "content": content,
+        "title": "Simulated Twin State & Incident Context",
+        "keywords": f"live current active telemetry incident {est_node or ''} {' '.join(valves)} sensor reading drop tankers lpm valve",
+        "content": " ".join(parts),
     }
 
 
@@ -154,13 +181,13 @@ def retrieve_relevant_knowledge(
 
     # Ingest dynamic live SCADA state
     live_chunk = build_dynamic_scada_chunk(engine, context)
-    all_chunks = [live_chunk] + STATIC_KNOWLEDGE_BASE
+    all_chunks = [live_chunk, _benchmark_chunk()] + STATIC_KNOWLEDGE_BASE
 
     scores: List[Tuple[float, Dict[str, str]]] = []
 
     # Dynamic incident boost keywords
     incident_indicators = {"valve", "valves", "isolate", "isolation", "leak", "burst", "tanker", "tankers",
-                           "current", "reading", "drop", "drawdown", "loss", "j1", "j62", "j42", "j110", "j95"}
+                           "current", "reading", "drop", "drawdown", "loss"}
     has_incident_intent = bool(query_tokens & incident_indicators)
 
     for chunk in all_chunks:
@@ -209,17 +236,16 @@ def build_rag_system_prompt(chunks: List[Dict[str, str]]) -> str:
     )
 
     return (
-        "You are the DHARA Chief Hydraulic Operations Specialist for the Bangalore Water Supply and "
-        "Sewerage Board (BWSSB) Kengeri DMA distribution network.\n"
-        "Your responses must be grounded strictly in the verified hydraulic digital twin telemetry "
-        "and standard operating procedures provided below. Do NOT fabricate numbers, node IDs, or pipe connections.\n\n"
+        "You are the HydroPulse hydraulic copilot for a simulated Kengeri-style water distribution twin.\n"
+        "Ground every answer strictly in the knowledge below. Do NOT fabricate numbers, node IDs, or pipe "
+        "connections. If the knowledge does not contain a fact, say so. Treat anything tagged [VERIFY] as unconfirmed.\n\n"
         f"=== RETRIEVED DIGITAL TWIN KNOWLEDGE (RAG) ===\n{corpus_text}\n"
         "===============================================\n\n"
         "Guidelines:\n"
         "- Format responses with clean Markdown: headers (###), bold key metrics, bullet points, and warning callouts.\n"
         "- When asked about leaks or valves, quote the exact cut-set pipe IDs and water loss rates.\n"
-        "- Cite relevant BWSSB SOPs and CPHEEO minimum pressure standards (>= 12m head) where applicable.\n"
-        "- Maintain professional, crisp, municipal SCADA engineering tone."
+        "- Do not cite BWSSB or CPHEEO documents; none are available here.\n"
+        "- Maintain professional, crisp, engineering tone."
     )
 
 
@@ -227,78 +253,70 @@ def generate_deterministic_rag_response(
     query: str,
     chunks: List[Dict[str, str]],
     context: Optional[Any] = None,
+    engine: Any = None,
 ) -> str:
-    """Produce an intelligent, grounded engineering response when OpenRouter is offline."""
+    """Offline reply that echoes only the fields actually received; it never invents IDs or figures."""
     q_lower = query.lower()
-    live_chunk = next((c for c in chunks if c["id"] == "live_scada_incident"), None)
-
-    est_node = getattr(context, "estimated_junction", None) or getattr(context, "target_node_id", None) or "J1"
-    loss_lpm = getattr(context, "leak_loss_lpm", None) or 1450.0
-    tankers = round(loss_lpm * 0.24, 1)
-    valves = getattr(context, "recommended_valves", None) or ["P32", "P45", "P18"]
-    valves_str = ", ".join(valves) if valves else "Boundary isolation complete"
+    est_node, loss_lpm, valves = _incident_fields(context)
+    has_incident = bool(est_node) and loss_lpm is not None
     phase = getattr(context, "phase", None) or "idle"
-
-    # Query routing
-    if any(k in q_lower for k in ["why", "ranked", "candidate", "stage", "cosine", "locat"]):
-        return (
-            f"### Two-Stage Physics Localization Analysis · Candidate {est_node}\n\n"
-            f"1. **Stage 1 (Cosine Similarity Fingerprinting):**\n"
-            f"   - Sentinel sensors captured negative hydraulic head drawdowns matching the precomputed sensitivity matrix.\n"
-            f"   - Cosine screening identified junction **`{est_node}`** as the highest correlation candidate in the DMA grid.\n\n"
-            f"2. **Stage 2 (WNTR Verification Re-Simulation):**\n"
-            f"   - US EPA WNTR simulated Torricelli orifice discharge ($Q = C_d A \\sqrt{{2gH}}$) across candidate nodes.\n"
-            f"   - Junction **`{est_node}`** minimized the $L_2$ pressure residual ($0.08\\text{{ m}}$), confirming the pipe burst location."
-        )
-
-    if any(k in q_lower for k in ["valve", "isolate", "isolation", "close", "cut-set", "shut"]):
-        return (
-            f"### BWSSB Isolation Advisory · Incident {est_node}\n\n"
-            f"Based on real-time topological cut-set analysis on the Kengeri DMA twin:\n\n"
-            f"- **Target Junction:** `{est_node}`\n"
-            f"- **Valves to Shut:** `{valves_str}`\n"
-            f"- **Water Escape Rate:** **{loss_lpm:.1f} L/min** ({tankers:.1f} BWSSB 6,000-L tankers/day)\n"
-            f"- **Ward Supply Continuity:** **98.7%** of connected households remain fully pressurized.\n\n"
-            f"> [!IMPORTANT]\n"
-            f"> ⚠️ **CAUTION**: **Joukowsky Water Hammer Protocol**\n"
-            f"> Turn the upstream isolation valve on the main supply feeder first "
-            f"> to depressurize the trunk line and mitigate transient hydraulic shockwaves (< 1.5 m/s). "
-            f"> Ensure two mechanical valve keys (T-wrenches) are deployed with the Rapid Response Unit."
-        )
-
-    if any(k in q_lower for k in ["tanker", "loss", "nrw", "waste", "cost", "money", "liters"]):
-        daily_loss_litres = loss_lpm * 1440.0
-        daily_cost_inr = round((daily_loss_litres / 1000.0) * 48.0, 2)
-        return (
-            f"### Non-Revenue Water (NRW) Loss Quantification\n\n"
-            f"Current telemetry analysis for junction `{est_node}`:\n\n"
-            f"- **Escape Rate:** **{loss_lpm:.1f} L/min**\n"
-            f"- **Daily Volume Escaping:** **{daily_loss_litres:,.0f} Litres/day**\n"
-            f"- **Tanker Equivalents:** **{tankers:.1f} tankers/day** (BWSSB standard 6,000-L capacity)\n"
-            f"- **Estimated Financial Loss:** **₹{daily_cost_inr:,.2f} per day** (at treated tariff ₹48/kL)\n\n"
-            f"- **Action Required:** Immediate physical isolation of cut-set `{valves_str}` to preserve treated storage."
-        )
+    sensor_ids = list(getattr(engine, "sensor_ids", []) or []) if engine else []
+    no_incident = (
+        "### No active incident\n\n"
+        "No incident context was received. Run a leak simulation first, then ask again."
+    )
 
     if any(k in q_lower for k in ["benchmark", "accuracy", "error", "precision", "sentinel", "algorithm"]):
         return (
-            f"### Digital Twin Calibration & Localization Benchmark\n\n"
-            f"The HydroPulse hydraulic twin localization engine is verified against US EPA WNTR physics:\n\n"
-            f"- **Top-1 Accuracy:** **88.5%**\n"
-            f"- **Top-3 Accuracy:** **94.2%**\n"
-            f"- **Mean Localization Error:** **96.2 metres** (corresponds to single city-block OSM street intersection)\n"
-            f"- **2-Hop Neighborhood Capture:** **100.0%**\n"
-            f"- **Strategic Sentinels:** 5 nodes (`J72`, `J29`, `J64`, `J95`, `J47`) selected via betweenness centrality.\n"
-            f"- **Physics Model:** Pressure-Driven Demand (PDD) with Torricelli orifice equation ($q = C_d A \\sqrt{{2gh}}$)."
+            "### Localization Benchmark (simulated digital twin)\n\n"
+            f"{_benchmark_text(load_benchmark_facts())}\n\n"
+            "Source: `backend/benchmark_report.md`."
         )
 
-    # General digital twin SCADA briefing
-    return (
-        f"### DHARA Hydraulic SCADA Intelligence · Kengeri DMA\n\n"
-        f"Connected to live Kengeri distribution network (130 nodes, 203 ductile iron pipes):\n\n"
-        f"- **Operating Status:** `{phase.upper()}`\n"
-        f"- **Monitored Sentinels:** 5 high-frequency pressure junctions (`J72`, `J29`, `J64`, `J95`, `J47`)\n"
-        f"- **Active Node:** `{est_node}` ({loss_lpm:.1f} L/min leak rate)\n"
-        f"- **Isolation Boundary:** Valves `{valves_str}`\n\n"
-        f"- **Field Guidelines:** All operations comply with CPHEEO guidelines maintaining terminal head >= 12m. "
-        f"Dispatch crews should carry mechanical T-wrenches and ductile iron repair sleeves."
-    )
+    if any(k in q_lower for k in ["why", "ranked", "candidate", "stage", "locat"]):
+        if not has_incident:
+            return no_incident
+        return (
+            f"### Two-Stage Localization · Candidate {est_node}\n\n"
+            "1. **Stage 1 (size-aware fingerprint fit):** the five sentinel pressure drops are fitted against "
+            "precomputed fingerprints over a grid of leak areas to shortlist candidate junctions.\n"
+            "2. **Stage 2 (verification re-simulation):** WNTR re-simulates the shortlisted candidates and "
+            "ranks them by how well they reproduce the observed drops.\n\n"
+            f"Top candidate in this simulation: **`{est_node}`**."
+        )
+
+    if any(k in q_lower for k in ["valve", "isolate", "isolation", "close", "cut-set", "shut"]):
+        if not (valves or has_incident):
+            return no_incident
+        rows = ["### Isolation Advisory (simulated)\n"]
+        if est_node:
+            rows.append(f"- **Target junction:** `{est_node}`")
+        rows.append(f"- **Valves to close:** `{', '.join(valves) if valves else 'none reported'}`")
+        if loss_lpm is not None:
+            rows.append(f"- **Water loss:** **{loss_lpm:.1f} L/min** ({round(loss_lpm * 0.24, 1):.1f} tankers/day)")
+        rows.append("\n> Simulated result from the digital twin. Confirm in the field before operating any valve.")
+        return "\n".join(rows)
+
+    if any(k in q_lower for k in ["tanker", "loss", "nrw", "waste", "liters", "litres"]):
+        if loss_lpm is None:
+            return no_incident
+        return (
+            "### Water Loss Quantification (simulated)\n\n"
+            f"- **Junction:** `{est_node or 'not reported'}`\n"
+            f"- **Loss rate:** **{loss_lpm:.1f} L/min**\n"
+            f"- **Daily volume:** **{loss_lpm * 1440.0:,.0f} L/day**\n"
+            f"- **Tanker equivalents:** **{round(loss_lpm * 0.24, 1):.1f} tankers/day** (6,000 L each)"
+        )
+
+    lines = [
+        "### HydroPulse Twin Briefing (simulated)\n",
+        f"- **Operating status:** `{phase.upper()}`",
+    ]
+    if sensor_ids:
+        lines.append(f"- **Sentinel sensors:** {', '.join(f'`{s}`' for s in sensor_ids)}")
+    if has_incident:
+        lines.append(f"- **Active node:** `{est_node}` ({loss_lpm:.1f} L/min)")
+        lines.append(f"- **Isolation valves:** {', '.join(valves) if valves else 'none reported'}")
+    else:
+        lines.append("- **Incident:** none active")
+    return "\n".join(lines)

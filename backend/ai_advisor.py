@@ -28,8 +28,6 @@ from data_utils.geo_mapper import haversine_m
 from data_utils.schemas import (
     AiChatContext,
     AiChatMessage,
-    AiChatRequest,
-    AiChatResponse,
     AiSuggestion,
     AiSuggestionsResponse,
     ApplySuggestionRequest,
@@ -735,8 +733,11 @@ def generate_chat_response(
     if effective_key:
         sys_prompt = rag_engine.build_rag_system_prompt(retrieved_chunks)
         msg_payload = [{"role": "system", "content": sys_prompt}]
-        for h in (history or [])[-6:]:
-            msg_payload.append({"role": h.role, "content": h.content})
+        # Only user/assistant turns are forwarded: a client-supplied "system" message
+        # must never override the server's grounding prompt.
+        safe_history = [h for h in (history or []) if h.role in ("user", "assistant")]
+        for h in safe_history[-6:]:
+            msg_payload.append({"role": h.role, "content": h.content[:2000]})
         msg_payload.append({"role": "user", "content": message})
 
         llm_reply = client_openrouter.generate_chat_completion(
@@ -751,6 +752,7 @@ def generate_chat_response(
         query=message,
         chunks=retrieved_chunks,
         context=ctx,
+        engine=engine,
     )
     return reply, "deterministic_hydraulic", "hydraulic-rag-twin-v1.1", rag_sources
 
