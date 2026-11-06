@@ -353,6 +353,44 @@
 }
 .stu-node__copy small { font-family: var(--font-mono); font-size: 12px; color: var(--ink-muted); }
 .stu-node-ghost { width: 2px; height: 2px; opacity: 0; }
+.stu-node.is-sensor {
+  border-color: var(--sensor);
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.35);
+}
+.stu-node__body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+.stu-node__meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+.stu-node__badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 4px;
+  border-radius: 3px;
+  line-height: 1.1;
+}
+.stu-node__badge.elev-badge {
+  background: rgba(148, 163, 184, 0.15);
+  color: var(--ink-muted);
+}
+.stu-node__badge.press-badge {
+  background: rgba(56, 189, 248, 0.2);
+  color: #38bdf8;
+}
+.stu-node__badge.press-low {
+  background: rgba(239, 68, 68, 0.25);
+  color: #ef4444;
+}
 
 /* ---------- Edges ---------- */
 .stu-edge.react-flow__edge-path {
@@ -364,6 +402,24 @@
 .stu-edge.is-selected.react-flow__edge-path { stroke: var(--focus); stroke-width: 3; }
 .stu-edge.is-preview.react-flow__edge-path { stroke-dasharray: 8 6; opacity: 0.8; }
 .stu-edge.is-closed.react-flow__edge-path { stroke-dasharray: 8 6; opacity: 0.7; }
+
+/* Animated flow dash for active pipes */
+.stu-edge-flow-dash {
+  stroke: #38bdf8;
+  stroke-dasharray: 6 10;
+  animation: studioPipeFlow 1.2s linear infinite;
+  opacity: 0.85;
+  pointer-events: none;
+}
+.stu-edge-flow-dash.is-selected {
+  stroke: #a855f7;
+  stroke-dasharray: 8 10;
+  animation: studioPipeFlow 0.8s linear infinite;
+}
+@keyframes studioPipeFlow {
+  from { stroke-dashoffset: 32; }
+  to { stroke-dashoffset: 0; }
+}
 .stu-edge__label {
   position: absolute;
   padding: var(--space-1) var(--space-2);

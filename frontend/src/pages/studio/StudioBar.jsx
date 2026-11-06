@@ -5,7 +5,9 @@ import {
   GitBranch,
   Map,
   Pencil,
+  Play,
   Redo2,
+  Sparkles,
   Undo2,
 } from 'lucide-react';
 import { Button, IconButton, SegmentedControl } from '../../ui/index.js';
@@ -134,6 +136,9 @@ export default function StudioBar({
   saveDraft,
   canExport,
   readOnly = false,
+  onSimulateWhatIf,
+  isSimulating = false,
+  onOpenAiAudit,
 }) {
   const fileItems = [
     { label: 'Load Kengeri sample', onSelect: loadDemo, disabled: readOnly },
@@ -193,6 +198,30 @@ export default function StudioBar({
 
       <span className='stu-bar-sep' aria-hidden='true' />
       <SegmentedControl label='View mode' className='stu-bar-views' options={VIEW_OPTIONS} value={viewMode} onChange={setViewMode} />
+
+      {!readOnly && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+          <Button
+            size='sm'
+            variant='secondary'
+            icon={Play}
+            onClick={onSimulateWhatIf}
+            disabled={isSimulating}
+            title='Run WNTR hydraulic pressure & demand simulation'
+          >
+            {isSimulating ? 'Simulating…' : 'Simulate'}
+          </Button>
+          <Button
+            size='sm'
+            variant='secondary'
+            icon={Sparkles}
+            onClick={onOpenAiAudit}
+            title='Open AI Network Topology & Sizing Audit'
+          >
+            AI Audit
+          </Button>
+        </div>
+      )}
 
       {readOnly ? (
         <span className='stu-bar-desktop'>Open on desktop to edit</span>

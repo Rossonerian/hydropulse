@@ -11,6 +11,7 @@ import {
   Upload,
   Activity,
   PencilRuler,
+  Sparkles,
 } from 'lucide-react';
 import { DataSourceBadge } from '../ui/DataSourceBadge.jsx';
 import { useTheme } from '../ui/useTheme.js';
@@ -51,6 +52,7 @@ export default function TopBar({
   onDataSource,
   onResetCustom,
   onReplayTour,
+  onAiAdvisor,
 }) {
   const { theme, toggleTheme } = useTheme();
   const [open, setOpen] = useState(false);
@@ -176,6 +178,18 @@ export default function TopBar({
             </span>
           )}
         </div>
+
+        {onAiAdvisor && (
+          <button
+            type="button"
+            className="topbar-ai-btn"
+            onClick={onAiAdvisor}
+            title="Open DHARA AI Hydraulic Advisor"
+          >
+            <Sparkles size={14} />
+            <span>AI Advisor</span>
+          </button>
+        )}
 
         <div className="topbar-menu">
           <button

@@ -2,12 +2,14 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Background,
   BackgroundVariant,
+  MiniMap,
   ReactFlow,
   useReactFlow,
 } from '@xyflow/react';
 import {
   FileUp,
   MousePointer2,
+  Sparkles,
   Waves,
   ZoomIn,
   ZoomOut,
@@ -113,6 +115,11 @@ export default function SchematicCanvas({
   pendingConnection,
   setCursor,
   loadDemo,
+  addNode,
+  addPipe,
+  autoLayout,
+  setPendingConnection,
+  updateField,
   inspectedFeature,
   setInspectedFeature,
   visibleLayers,
@@ -136,6 +143,20 @@ export default function SchematicCanvas({
               <span className='stu-canvas__pct'>{Math.round((draft.editor_layout.viewport.zoom || 1) * 100)}%</span>
               <IconButton icon={ZoomIn} label='Zoom in' size='sm' onClick={() => flow.zoomIn({ duration: 160 })} />
               <Button size='sm' onClick={() => flow.fitView({ padding: 0.18, duration: 300 })}>Fit</Button>
+              {autoLayout && (
+                <Button
+                  size='sm'
+                  variant='secondary'
+                  icon={Sparkles}
+                  onClick={() => {
+                    autoLayout();
+                    setTimeout(() => flow.fitView({ padding: 0.18, duration: 400 }), 60);
+                  }}
+                  title='Auto-organize schematic into clean hierarchical topology'
+                >
+                  Clean Layout
+                </Button>
+              )}
             </div>
           </div>
           <div className='stu-canvas__flow'>
@@ -194,6 +215,12 @@ export default function SchematicCanvas({
               proOptions={{ hideAttribution: true }}
             >
               <Background variant={BackgroundVariant.Dots} gap={20} size={1.15} color='var(--line)' />
+              <MiniMap
+                nodeStrokeWidth={2}
+                zoomable
+                pannable
+                ariaLabel="Schematic overview minimap"
+              />
               <FlowViewport draft={draft} viewVersion={viewVersion} />
             </ReactFlow>
             <div className='stu-canvas__hint'><MousePointer2 size={13} />{placeHint}</div>
@@ -201,6 +228,14 @@ export default function SchematicCanvas({
         </>
       ) : viewMode === 'geographic' ? (
         <GeographicMapCanvas
+          draft={draft}
+          tool={tool}
+          addNode={addNode}
+          addPipe={addPipe}
+          setSelection={setSelection}
+          updateField={updateField}
+          pendingConnection={pendingConnection}
+          setPendingConnection={setPendingConnection}
           selectedFeature={inspectedFeature}
           onSelectFeature={(feat) => setInspectedFeature(feat)}
           visibleLayers={visibleLayers}

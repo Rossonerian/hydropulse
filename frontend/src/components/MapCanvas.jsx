@@ -139,6 +139,9 @@ function MapCanvas({
   const [basemap, setBasemap] = useState(true);
   const [tilesFailed, setTilesFailed] = useState(false);
   const [recenterRevision, setRecenterRevision] = useState(0);
+  const [showFlowArrows, setShowFlowArrows] = useState(true);
+  const [showHeatmap, setShowHeatmap] = useState(true);
+  const [layerTogglesOpen, setLayerTogglesOpen] = useState(false);
 
   // Index nodes once because every pipe and overlay resolves endpoints by id.
   const byId = useMemo(
@@ -203,12 +206,25 @@ function MapCanvas({
     });
   }, [colors.water]);
 
-  // Valve marker icon (amber square)
-  const valveIcon = useMemo(() => L.divIcon({
-    className: 'valve-marker',
-    html: '<span aria-hidden="true"></span>',
-    iconSize: [18, 18],
-    iconAnchor: [9, 9],
+  // Animated pulsing valve barrier marker icon
+  const valveBarrierIcon = useMemo(() => L.divIcon({
+    className: 'valve-barrier-marker',
+    html: `<div class="valve-barrier-glow"></div>
+           <div class="valve-barrier-badge" title="Isolation Valve Closed">
+             <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" fill="none" stroke-width="2.5" stroke-linecap="round">
+               <path d="M4 6h16M12 6v12M4 18h16M7 10l5 4 5-4" />
+             </svg>
+           </div>`,
+    iconSize: [26, 26],
+    iconAnchor: [13, 13],
+  }), []);
+
+  // Sentinel radar pulse icon
+  const sentinelRadarIcon = useMemo(() => L.divIcon({
+    className: 'sentinel-marker-wrap',
+    html: '<div class="sentinel-radar-ring"></div><div class="sentinel-core-dot"></div>',
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
   }), []);
 
   // Leak ring icon (static, no radar animation)
@@ -218,6 +234,31 @@ function MapCanvas({
     iconSize: [40, 40],
     iconAnchor: [20, 20],
   }), []);
+
+  // Compute directional hydraulic flow arrows along pipes
+  const flowArrows = useMemo(() => {
+    if (!showFlowArrows) return [];
+    const arrows = [];
+    for (const p of network?.pipes || []) {
+      const a = byId[p.source];
+      const b = byId[p.target];
+      if (!a || !b) continue;
+      const isIsolated = isolated.has(p.source) || isolated.has(p.target);
+      if (isIsolated) continue;
+      const midLat = (a.lat + b.lat) / 2;
+      const midLng = (a.lng + b.lng) / 2;
+      const dLng = b.lng - a.lng;
+      const dLat = b.lat - a.lat;
+      const angle = (Math.atan2(dLng, dLat) * 180) / Math.PI;
+      arrows.push({
+        id: `arrow-${p.id}`,
+        position: [midLat, midLng],
+        angle,
+        pipeId: p.id,
+      });
+    }
+    return arrows;
+  }, [network?.pipes, byId, isolated, showFlowArrows]);
 
   // Calculate pipe midpoints for valve markers
   const valveMarkers = useMemo(() => {
@@ -320,8 +361,25 @@ function MapCanvas({
           );
         })}
 
+        {/* Directional Hydraulic Flow Arrows */}
+        {flowArrows.map((arrow) => (
+          <Marker
+            key={arrow.id}
+            position={arrow.position}
+            icon={L.divIcon({
+              className: 'pipe-flow-arrow',
+              html: `<svg viewBox="0 0 12 12" style="transform: rotate(${arrow.angle}deg); width: 10px; height: 10px;">
+                <path d="M2 10 L6 3 L10 10 Z" fill="${colors.water}" opacity="0.75" />
+              </svg>`,
+              iconSize: [10, 10],
+              iconAnchor: [5, 5],
+            })}
+            interactive={false}
+          />
+        ))}
+
         {/* Heat circles */}
-        {Object.entries(heat).map(([id, value]) => {
+        {showHeatmap && Object.entries(heat).map(([id, value]) => {
           const n = byId[id];
           if (!n || value < 0.05) return null;
           const heatColor =
@@ -364,7 +422,7 @@ function MapCanvas({
               ? colors.leak
               : colors.inkFaint;
 
-          const radius = isTopCandidate ? 9 : picked ? 6 : 4;
+          const radius = isTopCandidate ? 10 : picked ? 8 : 5.5;
           const weight = truth || picked || isTopCandidate ? 2.5 : 1;
           const opacity = isIsolated ? 0.4 : 1;
 
@@ -383,12 +441,13 @@ function MapCanvas({
               }}
               eventHandlers={{
                 click: () => {
-                  setSelected(n.id);
-                  onPick?.(n);
+                  const cleanId = String(n.id);
+                  setSelected(cleanId);
+                  onPick?.(cleanId);
                 },
               }}
             >
-              {(picked || truth || (result && topRank >= 0 && topRank < 5)) && (
+              {(picked || truth || (result && topRank >= 0 && topRank < 5)) ? (
                 <Tooltip
                   permanent={result && topRank >= 0 && topRank < 5}
                   direction='top'
@@ -406,6 +465,17 @@ function MapCanvas({
                     : topRank > 0 && topRank < 5
                       ? String(topRank + 1)
                       : n.id}
+                </Tooltip>
+              ) : (
+                <Tooltip direction='top' offset={[0, -6]}>
+                  <div className='map-node-tooltip'>
+                    <strong>{n.id}</strong> {n.elevation_m ? `· ${n.elevation_m}m` : ''}
+                    {n.base_pressure_m ? <div>Base: {n.base_pressure_m.toFixed(1)}m</div> : null}
+                    {n.households ? <div>{n.households} homes</div> : null}
+                    <div style={{ fontSize: '10px', color: colors.water, marginTop: '2px' }}>
+                      Click to select
+                    </div>
+                  </div>
                 </Tooltip>
               )}
             </CircleMarker>
@@ -434,8 +504,9 @@ function MapCanvas({
                 }}
                 eventHandlers={{
                   click: () => {
-                    setSelected(n.id);
-                    onPick?.(n);
+                    const cleanId = String(n.id);
+                    setSelected(cleanId);
+                    onPick?.(cleanId);
                   },
                 }}
               >
@@ -472,15 +543,46 @@ function MapCanvas({
             </Marker>
           ))}
 
-        {/* Valve markers at pipe midpoints */}
+        {/* Selected custom spot glowing ring */}
+        {selected && byId[selected] && !judge && (
+          <CircleMarker
+            center={[byId[selected].lat, byId[selected].lng]}
+            radius={14}
+            pathOptions={{
+              color: colors.water,
+              fillColor: 'transparent',
+              weight: 2,
+              dashArray: '4 4',
+              opacity: 0.95,
+            }}
+            interactive={false}
+          />
+        )}
+
+        {/* Sentinel radar pulses */}
+        {(network?.nodes || [])
+          .filter((n) => sensors.has(n.id) || n.is_sensor)
+          .map((n) => (
+            <Marker
+              key={`sentinel-pulse-${n.id}`}
+              position={[n.lat, n.lng]}
+              icon={sentinelRadarIcon}
+              interactive={false}
+            />
+          ))}
+
+        {/* Valve markers at pipe midpoints (pulsing barrier badges) */}
         {valveMarkers.map((vm) => (
           <Marker
             key={vm.id}
             position={vm.position}
-            icon={valveIcon}
+            icon={valveBarrierIcon}
           >
-            <Tooltip>
-              Valve · {vm.pipeId}
+            <Tooltip permanent direction='top' offset={[0, -12]}>
+              <div className='map-node-tooltip'>
+                <strong style={{ color: colors.valve }}>SHUT VALVE</strong> · {vm.pipeId}
+                <div style={{ fontSize: '11px', color: colors.ink }}>Isolation Cut-Set</div>
+              </div>
             </Tooltip>
           </Marker>
         ))}
@@ -520,6 +622,13 @@ function MapCanvas({
               setBasemap(tilesFailed ? true : !basemap);
               setTilesFailed(false);
             }}
+          />
+          <IconButton
+            label={showFlowArrows ? 'Hide flow arrows' : 'Show flow arrows'}
+            icon={Maximize2}
+            size='sm'
+            pressed={showFlowArrows}
+            onClick={() => setShowFlowArrows((v) => !v)}
           />
           <IconButton
             label='Center map'

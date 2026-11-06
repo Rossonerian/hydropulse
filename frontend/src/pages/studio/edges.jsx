@@ -20,6 +20,14 @@ function StudioPipe({ id, sourceX, sourceY, targetX, targetY, data, selected }) 
         path={path}
         className={`stu-edge ${selected ? 'is-selected' : ''} ${preview ? 'is-preview' : ''} ${closed ? 'is-closed' : ''}`}
       />
+      {!preview && !closed && (
+        <path
+          d={path}
+          fill="none"
+          className={`stu-edge-flow-dash ${selected ? 'is-selected' : ''}`}
+          strokeWidth={selected ? 2.5 : 1.8}
+        />
+      )}
       {!preview && (selected || data?.showLabel) && (
         <EdgeLabelRenderer>
           <div

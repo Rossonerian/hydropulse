@@ -7,6 +7,7 @@ import {
   TileLayer,
   Tooltip,
   useMap,
+  useMapEvents,
 } from 'react-leaflet';
 import { AlertTriangle } from 'lucide-react';
 import { Switch } from '../ui/index.js';
@@ -22,6 +23,25 @@ const STP_STROKE = '#C084FC'; // data colour
 const STP_FILL = '#7E22CE'; // data colour
 const PUMP_COLOUR = '#3B82F6'; // data colour
 const RAIN_COLOUR = '#3B82F6'; // data colour
+
+function getElevationColor(elev) {
+  if (!Number.isFinite(elev)) return '#38bdf8';
+  const norm = Math.max(0, Math.min(1, (elev - 760) / 80));
+  if (norm < 0.33) return '#10b981';
+  if (norm < 0.66) return '#38bdf8';
+  return '#f59e0b';
+}
+
+function MapClickHandler({ tool, onMapClick }) {
+  useMapEvents({
+    click(e) {
+      if (['junction', 'reservoir', 'tank'].includes(tool)) {
+        onMapClick?.(e.latlng);
+      }
+    },
+  });
+  return null;
+}
 
 const readTheme = () =>
   (typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme')) || 'night';
@@ -64,6 +84,14 @@ export default function GeographicMapCanvas({
   onSelectFeature,
   visibleLayers = {},
   stagedLayers = [],
+  draft,
+  tool = 'select',
+  addNode,
+  addPipe,
+  setSelection,
+  updateField,
+  pendingConnection,
+  setPendingConnection,
 }) {
   const [basemapOn, setBasemapOn] = useState(true);
   const [tileError, setTileError] = useState(false);
@@ -96,6 +124,43 @@ export default function GeographicMapCanvas({
     return () => controller.abort();
   }, [tileUrl, proxy]);
 
+  const nodeMap = useMemo(() => {
+    const map = new Map();
+    (draft?.network?.nodes || []).forEach((n) => {
+      if (Number.isFinite(n.lat) && Number.isFinite(n.lng)) {
+        map.set(n.id, n);
+      }
+    });
+    return map;
+  }, [draft?.network?.nodes]);
+
+  const selectedPipe = useMemo(() => {
+    if (!draft?.network?.pipes) return null;
+    const id = selectedFeature?.id || selectedFeature?.properties?.id;
+    return draft.network.pipes.find((p) => p.id === id);
+  }, [draft?.network?.pipes, selectedFeature]);
+
+  const { srcNode, tgtNode, slopePct, headLossM, elevDiff } = useMemo(() => {
+    if (!selectedPipe) return {};
+    const src = nodeMap.get(selectedPipe.source);
+    const tgt = nodeMap.get(selectedPipe.target);
+    const e1 = src?.elevation_m ?? 800;
+    const e2 = tgt?.elevation_m ?? 800;
+    const diff = Math.round((e2 - e1) * 10) / 10;
+    const len = selectedPipe.length_m || 100;
+    const slope = Math.round((diff / Math.max(len, 1)) * 1000) / 10;
+    const diam = selectedPipe.diameter_mm || 150;
+    const hl = Math.round((10.67 * len * Math.pow(0.015, 1.852) / (Math.pow(130, 1.852) * Math.pow(diam / 1000, 4.87))) * 10) / 10;
+    return { srcNode: src, tgtNode: tgt, slopePct: slope, headLossM: hl, elevDiff: diff };
+  }, [selectedPipe, nodeMap]);
+
+  const handleMapClick = (latlng) => {
+    if (['junction', 'reservoir', 'tank'].includes(tool)) {
+      const elev = Math.round(790 + (latlng.lat - 12.9) * 200 + (latlng.lng - 77.4) * 150);
+      addNode?.(tool, { x: 500, y: 500 }, { lat: latlng.lat, lng: latlng.lng, elevation_m: elev });
+    }
+  };
+
   return (
     <div className='stu-geo'>
       <MapContainer
@@ -107,6 +172,118 @@ export default function GeographicMapCanvas({
         attributionControl={false}
       >
         <MapBoundsManager center={KENGERI_AOI.center} zoom={KENGERI_AOI.zoom} />
+        <MapClickHandler tool={tool} onMapClick={handleMapClick} />
+
+        {/* 0. Potable Distribution Network Pipes (from Studio Draft) */}
+        {(visibleLayers.potable_water ?? true) &&
+          (draft?.network?.pipes || []).map((pipe) => {
+            const src = nodeMap.get(pipe.source);
+            const tgt = nodeMap.get(pipe.target);
+            if (!src || !tgt) return null;
+            const isSelected = selectedFeature?.id === pipe.id;
+            const isClosed = pipe.status === 'CLOSED';
+            const diam = pipe.diameter_mm || 150;
+            const weight = Math.max(3, Math.min(8, diam / 40));
+            return (
+              <Polyline
+                key={pipe.id}
+                positions={[
+                  [src.lat, src.lng],
+                  [tgt.lat, tgt.lng],
+                ]}
+                pathOptions={{
+                  color: isSelected ? '#a855f7' : isClosed ? '#64748b' : P.water,
+                  weight: isSelected ? weight + 3 : weight,
+                  dashArray: isClosed ? '6 6' : undefined,
+                  opacity: 0.9,
+                }}
+                eventHandlers={{
+                  click: (e) => {
+                    e.originalEvent?.stopPropagation();
+                    setSelection?.({ type: 'pipe', id: pipe.id });
+                    onSelectFeature?.({
+                      id: pipe.id,
+                      name: `Pipeline ${pipe.id}`,
+                      category: 'potable_water',
+                      properties: {
+                        source: pipe.source,
+                        target: pipe.target,
+                        diameter_mm: diam,
+                        length_m: pipe.length_m || '—',
+                        status: pipe.status,
+                      },
+                    });
+                  },
+                }}
+              >
+                <Tooltip sticky>
+                  <b>{pipe.id}</b> · Ø{diam} mm · {pipe.length_m ? `${pipe.length_m}m` : 'calc'} ({pipe.source} → {pipe.target})
+                </Tooltip>
+              </Polyline>
+            );
+          })}
+
+        {/* 0. Potable Distribution Nodes (Junctions, Reservoirs, Tanks) */}
+        {(visibleLayers.potable_water ?? true) &&
+          (draft?.network?.nodes || []).map((node) => {
+            if (!Number.isFinite(node.lat) || !Number.isFinite(node.lng)) return null;
+            const isSelected = selectedFeature?.id === node.id;
+            const isPending = pendingConnection === node.id;
+            const elev = node.elevation_m;
+            const color = getElevationColor(elev);
+            const isRes = node.type === 'reservoir';
+            const isTank = node.type === 'tank';
+            const isSensor = node.is_sensor;
+            const radius = isSelected ? 9.5 : isRes || isTank ? 8.5 : isSensor ? 7.5 : 6;
+
+            return (
+              <CircleMarker
+                key={node.id}
+                center={[node.lat, node.lng]}
+                radius={radius}
+                pathOptions={{
+                  color: isPending ? '#ec4899' : isSelected ? '#a855f7' : isSensor ? '#22c55e' : color,
+                  fillColor: isPending ? '#f43f5e' : isSelected ? '#c084fc' : isSensor ? '#4ade80' : color,
+                  fillOpacity: 0.92,
+                  weight: isSelected || isPending ? 3.5 : 1.5,
+                }}
+                eventHandlers={{
+                  click: (e) => {
+                    e.originalEvent?.stopPropagation();
+                    if (tool === 'pipe') {
+                      if (!pendingConnection) {
+                        setPendingConnection?.(node.id);
+                      } else if (pendingConnection !== node.id) {
+                        addPipe?.(pendingConnection, node.id);
+                      } else {
+                        setPendingConnection?.(null);
+                      }
+                    } else {
+                      setSelection?.({ type: 'node', id: node.id });
+                      onSelectFeature?.({
+                        id: node.id,
+                        name: `${node.type.toUpperCase()} ${node.id}`,
+                        category: 'potable_water',
+                        properties: {
+                          elevation_m: elev,
+                          households: node.households,
+                          type: node.type,
+                          is_sensor: node.is_sensor,
+                        },
+                      });
+                    }
+                  },
+                }}
+              >
+                <Tooltip sticky>
+                  <b>{node.id}</b> ({node.type})
+                  {elev ? ` · Elev: ${Math.round(elev)}m` : ''}
+                  {node.households ? ` · ${node.households} homes` : ''}
+                  {tool === 'pipe' ? (isPending ? ' (Connecting pipe from here...)' : ' · Click to connect') : ''}
+                </Tooltip>
+              </CircleMarker>
+            );
+          })}
 
         {/* Basemap Tiles with Offline Grid Fallback */}
         {basemapOn && !tileError && (
@@ -392,6 +569,44 @@ export default function GeographicMapCanvas({
           </>
         )}
       </MapContainer>
+
+      {selectedPipe && (
+        <div className="geo-cross-section-hud">
+          <div className="geo-cross-section-title">
+            <span>Pipeline Profile: {selectedPipe.id}</span>
+            <span className="geo-pipe-diam">Ø {selectedPipe.diameter_mm || 150} mm</span>
+          </div>
+          <div className="geo-profile-graph">
+            <div className="geo-profile-point">
+              <span className="geo-point-id">{srcNode?.id || selectedPipe.source}</span>
+              <span className="geo-point-elev">{Math.round(srcNode?.elevation_m || 800)} m</span>
+            </div>
+            <div className="geo-profile-line">
+              <span className="geo-profile-slope">{slopePct > 0 ? `+${slopePct}%` : `${slopePct}%`} grade</span>
+              <div className="geo-profile-vector" />
+              <span className="geo-profile-dist">{selectedPipe.length_m || 100} m</span>
+            </div>
+            <div className="geo-profile-point">
+              <span className="geo-point-id">{tgtNode?.id || selectedPipe.target}</span>
+              <span className="geo-point-elev">{Math.round(tgtNode?.elevation_m || 800)} m</span>
+            </div>
+          </div>
+          <div className="geo-profile-meta">
+            <span>Head loss: ~{headLossM} m</span>
+            <span>Flow: {elevDiff < 0 ? 'Gravity Assisted ↓' : 'Pressure Head Req ↑'}</span>
+          </div>
+        </div>
+      )}
+
+      <div className="geo-terrain-legend">
+        <span className="geo-legend-title">Terrain Elevation</span>
+        <div className="geo-legend-bar" />
+        <div className="geo-legend-labels">
+          <span>760m (Low)</span>
+          <span>800m</span>
+          <span>840m (High)</span>
+        </div>
+      </div>
 
       {tileError && (
         <p className='stu-geo__unavailable' role='status'>Basemap unavailable</p>
