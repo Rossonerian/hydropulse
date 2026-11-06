@@ -1,14 +1,15 @@
 import { useId, useMemo, useState } from 'react';
-import { RotateCcw, Search, SlidersHorizontal, Zap } from 'lucide-react';
+import { Play, RotateCcw, Search, SlidersHorizontal, Zap } from 'lucide-react';
 import { Button, Field, Select, Slider, Switch } from '../ui/index.js';
 import { LEAK_SIZES, getPresetList, sizeForArea } from '../lib/opsFlow.js';
 import '../styles/ops/control.css';
 
 /**
  * Left panel of the Operations screen.
- *   1. "Pick a problem to try": 3 preset cards. A click SELECTS a problem; it does not run it.
- *   2. "Or choose your own spot" (collapsed): search, list and leak size.
- *   3. Footer: progress chips + the one contextual primary button (passed in as `footer`), Reset and Advanced.
+ *   1. "START DHARA DEMO": 1-click deterministic live demo runner.
+ *   2. "Pick a problem to try": 3 preset cards. A click SELECTS a problem; it does not run it.
+ *   3. "Or choose your own spot" (collapsed): search, list and leak size.
+ *   4. Footer: progress chips + the one contextual primary button (passed in as `footer`), Reset and Advanced.
  */
 export default function ControlPanel({
   network,
@@ -22,6 +23,7 @@ export default function ControlPanel({
   revealed = false,
   phase = 'idle',
   footer,
+  onStartDemo,
   onSelectPreset,
   onPickSpot,
   onSizeChange,
@@ -61,6 +63,23 @@ export default function ControlPanel({
   return (
     <aside className="control-panel" aria-label="Pick a problem">
       <div className="control-scroll">
+        <div className="demo-launcher-section">
+          <Button
+            variant="primary"
+            size="lg"
+            className="btn--start-demo"
+            disabled={!network || busy}
+            onClick={onStartDemo}
+            icon={Play}
+            aria-label="Start DHARA live demo"
+          >
+            START DHARA DEMO
+          </Button>
+          <span className="demo-launcher-sub">
+            Deterministic 5-sentinel leak test on Kengeri DMA (J1 · 45 cm²)
+          </span>
+        </div>
+
         <section aria-labelledby={`${uid}-pick`} data-tour="presets">
           <h2 className="control-title" id={`${uid}-pick`}>
             Pick a problem to try

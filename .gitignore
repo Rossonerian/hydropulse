@@ -19,3 +19,4 @@ backend/.state/
 frontend/public/mock/backups/
 .vercel
 .env*
+.claude/

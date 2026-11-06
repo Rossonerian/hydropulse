@@ -19,25 +19,23 @@ export function DataSourceBadge({ mode, networkSource, health, network, compact 
   let detail = '';
 
   if (mode === 'live') {
-    label = 'Connected';
+    label = 'LIVE API';
     detail = `Live API, ${health?.network_revision || 'rev-1'}`;
   } else if (mode === 'mock' && networkSource === 'recorded') {
-    label = 'Demo data';
-    detail = 'Recorded fixture';
+    label = 'RECORDED DEMO DATA';
+    detail = 'Recorded API fixture (offline insurance)';
   } else if (mode === 'offline') {
-    label = 'Offline';
+    label = 'RECORDED DEMO DATA';
     detail =
       networkSource === 'live'
-        ? 'Offline, last live snapshot'
-        : networkSource === 'synthetic'
-          ? 'Offline, generated demo data'
-          : 'Offline, showing fixture';
+        ? 'Backend offline: showing last live snapshot'
+        : 'Backend offline: showing recorded fixture';
   } else if (mode === 'mock' && networkSource === 'synthetic') {
-    label = 'Demo data';
+    label = 'RECORDED DEMO DATA';
     detail = 'Generated demo data';
   } else if (mode === 'loading') {
     label = 'Connecting';
-    detail = 'Connecting to the server';
+    detail = 'Connecting to backend';
   }
 
   const tooltip = `${detail}${synthetic ? ', synthetic network' : ''}`.trim();

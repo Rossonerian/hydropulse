@@ -48,6 +48,20 @@ header.topbar .topbar-nav-btn {
   align-items: center;
   gap: var(--space-2);
 }
+.topbar-counts {
+  font-size: 12px;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  padding: 2px var(--space-2);
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+@media (max-width: 900px) {
+  .topbar-counts {
+    display: none;
+  }
+}
 header.topbar .topbar-custom {
   padding: 2px var(--space-2);
   font-size: 13px;

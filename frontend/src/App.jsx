@@ -241,13 +241,29 @@ export default function App() {
           target_node_id: targetId,
           leak_area_cm2: Number(leakArea) || 25,
           noise_pct: Number(noisePct) || 1.5,
-          seed: null,
+          seed: params?.seed !== undefined ? params.seed : null,
         },
         presetId,
       );
     },
     [judge, selected, area, noise, simulate],
   );
+
+  const handleStartDemo = useCallback(() => {
+    const preset = presets?.find((p) => p.id === 'kengeri_mainline_rupture') || presets?.[0];
+    const targetNode = preset?.target_node_id || 'J1';
+    const leakArea = preset?.leak_area_cm2 || 45.0;
+    const leakNoise = preset?.noise_pct ?? 1.5;
+    const presetId = preset?.id || 'kengeri_mainline_rupture';
+
+    setActivePresetId(presetId);
+    setSelected(targetNode);
+    setArea(leakArea);
+    setNoise(leakNoise);
+    setRevealed(false);
+
+    run({ target_node_id: targetNode, area_cm2: leakArea, noise_pct: leakNoise, seed: 7 }, presetId);
+  }, [presets, run]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -543,6 +559,7 @@ export default function App() {
           revealed={revealed}
           phase={phase}
           footer={nextActionFooter}
+          onStartDemo={handleStartDemo}
           onSelectPreset={handleSelectPreset}
           onPickSpot={handlePickSpot}
           onSizeChange={handleSizeChange}

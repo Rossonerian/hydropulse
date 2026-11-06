@@ -131,8 +131,8 @@ export default function TopBar({
           <Droplets size={16} />
         </div>
         <div className="brand-text">
-          <span className="brand-title">HydroPulse</span>
-          <span className="brand-subtitle">Kengeri DMA</span>
+          <span className="brand-title">DHARA</span>
+          <span className="brand-subtitle">Smart Water Leakage & Consumption Tracker · Kengeri DMA</span>
         </div>
       </div>
 
@@ -157,12 +157,15 @@ export default function TopBar({
 
       <div className="topbar-right">
         <div className="topbar-status">
+          <span className="topbar-counts" title="5 sentinel monitoring junctions on Kengeri DMA">
+            5 sentinels · {network?.nodes?.length || 130} nodes
+          </span>
           <DataSourceBadge
             mode={mode}
             networkSource={networkSource}
             health={health}
             network={network}
-            compact
+            compact={false}
           />
           {customData && (
             <span className="topbar-custom">

@@ -31,6 +31,37 @@
   color: var(--ink);
 }
 
+/* ---- START DHARA DEMO Launcher ---- */
+.demo-launcher-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--line);
+}
+
+.btn--start-demo {
+  width: 100%;
+  min-height: 48px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  background: var(--water, #0284c7);
+  box-shadow: 0 0 16px rgba(34, 211, 238, 0.25);
+  transition: all var(--dur-fast, 120ms) var(--ease, ease);
+}
+
+.btn--start-demo:hover:not(:disabled) {
+  background: #0369a1;
+  box-shadow: 0 0 20px rgba(34, 211, 238, 0.4);
+}
+
+.demo-launcher-sub {
+  font-size: 12px;
+  color: var(--ink-muted);
+  text-align: center;
+}
+
 /* ---- Preset cards ---- */
 .preset-list {
   display: flex;
