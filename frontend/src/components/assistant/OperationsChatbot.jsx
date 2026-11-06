@@ -126,7 +126,7 @@ export default function OperationsChatbot({
     {
       id: 'init-1',
       sender: 'assistant',
-      text: '### DHARA Municipal Hydraulic Copilot\n\nI monitor real-time pressure drawdowns across Kengeri DMA and compute physics-grounded leak localization and valve isolation plans.\n\nSelect any quick prompt below or query pipe conditions, water hammer risks, or tanker logistics.',
+      text: '### DHARA Municipal Hydraulic Copilot\n\nI am the AI built into DHARA, your HydroPulse dashboard. I monitor real-time pressure drawdowns across Kengeri DMA and compute physics-grounded leak localization and valve isolation plans.\n\nSelect any quick prompt below or query pipe conditions, water hammer risks, or tanker logistics.',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       provider: 'deterministic_hydraulic',
     },
@@ -164,7 +164,7 @@ export default function OperationsChatbot({
       ];
     }
     return [
-      'How does DHARA localize leaks without acoustic sensors?',
+      'How does HydroPulse localize leaks without acoustic sensors?',
       'Explain the 5 sentinel placement algorithm',
       'What is Torricelli orifice equation in PDD?',
     ];
@@ -414,7 +414,7 @@ export default function OperationsChatbot({
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
           <p style={{ margin: 0, fontSize: '13.5px', color: 'var(--ink-muted)', lineHeight: 1.5 }}>
-            You can optionally route the AI Hydraulic Advisor through your own <strong>OpenRouter API Key</strong>. If omitted, DHARA automatically uses its built-in deterministic EPA WNTR hydraulic physics solver.
+            You can optionally route the AI Hydraulic Advisor through your own <strong>OpenRouter API Key</strong>. If omitted, DHARA automatically uses the built-in deterministic HydroPulse hydraulic engine (EPA WNTR physics).
           </p>
           <Field
             label="OpenRouter API Key"

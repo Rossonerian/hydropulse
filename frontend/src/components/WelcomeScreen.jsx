@@ -29,7 +29,7 @@ export default function WelcomeScreen({ onChoose }) {
           Find a burst pipe from just 5 pressure sensors
         </h1>
         <p className="welcome__lead">
-          HydroPulse finds where a pipe has burst, estimates how much water is lost, and tells you which valves to shut.
+          HydroPulse finds where a pipe has burst, estimates how much water is lost, and tells you which valves to shut. You see it all in DHARA, the HydroPulse dashboard and its built-in AI.
         </p>
 
         <div className="welcome__cta">

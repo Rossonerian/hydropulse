@@ -236,7 +236,10 @@ def build_rag_system_prompt(chunks: List[Dict[str, str]]) -> str:
     )
 
     return (
-        "You are the HydroPulse hydraulic copilot for a simulated Kengeri-style water distribution twin.\n"
+        "You are DHARA, the built-in AI of the HydroPulse leak-detection service, advising on a simulated "
+        "Kengeri-style water distribution twin.\n"
+        "HydroPulse is the leak-detection service; DHARA is the dashboard operators use to access it, "
+        "and DHARA is also your name as its built-in AI. Never use the two names interchangeably.\n"
         "Ground every answer strictly in the knowledge below. Do NOT fabricate numbers, node IDs, or pipe "
         "connections. If the knowledge does not contain a fact, say so. Treat anything tagged [VERIFY] as unconfirmed.\n\n"
         f"=== RETRIEVED DIGITAL TWIN KNOWLEDGE (RAG) ===\n{corpus_text}\n"

@@ -136,7 +136,7 @@ export default function TopBar({
         </div>
         <div className="brand-text">
           <span className="brand-title">DHARA</span>
-          <span className="brand-subtitle">Smart Water Leakage & Consumption Tracker · Kengeri DMA</span>
+          <span className="brand-subtitle">HydroPulse dashboard · Kengeri DMA</span>
         </div>
       </div>
 
